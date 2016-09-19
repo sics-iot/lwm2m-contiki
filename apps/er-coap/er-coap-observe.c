@@ -271,7 +271,7 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
   if(coap_req->code == COAP_GET && coap_res->code < 128) { /* GET request and response without error code */
     if(IS_OPTION(coap_req, COAP_OPTION_OBSERVE)) {
       if(coap_req->observe == 0) {
-        obs = add_observer(&UIP_IP_BUF->srcipaddr, UIP_UDP_BUF->srcport,
+        obs = add_observer(coap_srcipaddr(), coap_srcport(),
                            coap_req->token, coap_req->token_len,
                            coap_req->uri_path, coap_req->uri_path_len);
        if(obs) {
@@ -296,9 +296,8 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
       } else if(coap_req->observe == 1) {
 
         /* remove client if it is currently observe */
-        coap_remove_observer_by_token(&UIP_IP_BUF->srcipaddr,
-                                      UIP_UDP_BUF->srcport, coap_req->token,
-                                      coap_req->token_len);
+        coap_remove_observer_by_token(coap_srcipaddr(), coap_srcport(),
+                                      coap_req->token, coap_req->token_len);
       }
     }
   }
