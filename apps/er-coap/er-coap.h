@@ -65,14 +65,6 @@
                                           (REST_MAX_CHUNK_SIZE < 2048 ? 1024 : 2048)))))))
 #endif /* COAP_MAX_BLOCK_SIZE */
 
-/* direct access into the buffer */
-#define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
-#if NETSTACK_CONF_WITH_IPV6
-#define UIP_UDP_BUF  ((struct uip_udp_hdr *)&uip_buf[uip_l2_l3_hdr_len])
-#else
-#define UIP_UDP_BUF  ((struct uip_udp_hdr *)&uip_buf[UIP_LLH_LEN + UIP_IPH_LEN])
-#endif
-
 /* bitmap for set options */
 enum { OPTION_MAP_SIZE = sizeof(uint8_t) * 8 };
 
@@ -176,7 +168,12 @@ typedef struct {
 extern coap_status_t erbium_status_code;
 extern char *coap_error_message;
 
-void coap_init_connection(uint16_t port);
+uip_ipaddr_t *coap_srcipaddr(void);
+uint16_t coap_srcport(void);
+uint8_t *coap_databuf(void);
+uint16_t coap_datalen();
+
+void coap_init_connection(void);
 uint16_t coap_get_mid(void);
 
 void coap_init_message(void *packet, coap_message_type_t type, uint8_t code,

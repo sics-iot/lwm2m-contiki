@@ -45,13 +45,15 @@
 #include "er-coap-observe.h"
 #include "er-coap-separate.h"
 #include "er-coap-observe-client.h"
-
-#define SERVER_LISTEN_PORT      UIP_HTONS(COAP_SERVER_PORT)
+#include "er-coap-transport.h"
 
 typedef coap_packet_t rest_request_t;
 typedef coap_packet_t rest_response_t;
 
 void coap_init_engine(void);
+
+int coap_receive(uip_ipaddr_t *src, uint16_t src_port,
+                 uint8_t *payload, uint16_t payload_length);
 
 /*---------------------------------------------------------------------------*/
 /*- Client Part -------------------------------------------------------------*/
