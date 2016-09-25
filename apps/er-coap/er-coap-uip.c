@@ -39,11 +39,17 @@
 #include "sys/cc.h"
 #include "er-coap.h"
 #include "er-coap-engine.h"
+#include "er-coap-endpoint.h"
 #include "er-coap-transport.h"
 #include "er-coap-transactions.h"
 
 #define DEBUG DEBUG_NONE
 #include "net/ip/uip-debug.h"
+
+/* sanity check for configured values */
+#if COAP_MAX_PACKET_SIZE > (UIP_BUFSIZE - UIP_IPH_LEN - UIP_UDPH_LEN)
+#error "UIP_CONF_BUFFER_SIZE too small for REST_MAX_CHUNK_SIZE"
+#endif
 
 #define SERVER_LISTEN_PORT      UIP_HTONS(COAP_SERVER_PORT)
 
@@ -59,6 +65,40 @@ PROCESS(coap_engine, "CoAP Engine");
 
 static struct uip_udp_conn *udp_conn = NULL;
 /*---------------------------------------------------------------------------*/
+void
+coap_endpoint_print(const coap_endpoint_t *ep)
+{
+  printf("[");
+  uip_debug_ipaddr_print(&ep->ipaddr);
+  printf("]:%u", uip_ntohs(ep->port));
+}
+/*---------------------------------------------------------------------------*/
+void
+coap_endpoint_copy(coap_endpoint_t *destination,
+                   const coap_endpoint_t *from)
+{
+  uip_ipaddr_copy(&destination->ipaddr, &from->ipaddr);
+  destination->port = from->port;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
+{
+  if(!uip_ipaddr_cmp(&e1->ipaddr, &e2->ipaddr)) {
+    return 0;
+  }
+  return e1->port == e2->port;
+}
+/*---------------------------------------------------------------------------*/
+const coap_endpoint_t *
+coap_src_endpoint(void)
+{
+  static coap_endpoint_t src;
+  uip_ipaddr_copy(&src.ipaddr, &UIP_IP_BUF->srcipaddr);
+  src.port = UIP_UDP_BUF->srcport;
+  return &src;
+}
+/*---------------------------------------------------------------------------*/
 uip_ipaddr_t *
 coap_srcipaddr(void)
 {
@@ -70,7 +110,7 @@ coap_srcport(void)
 {
   return UIP_UDP_BUF->srcport;
 }
-
+/*---------------------------------------------------------------------------*/
 uint8_t *
 coap_databuf(void)
 {
@@ -97,17 +137,16 @@ process_data(void)
   PRINTF(":%u\n  Length: %u\n", uip_ntohs(UIP_UDP_BUF->srcport),
          uip_datalen());
 
-  coap_receive(&UIP_IP_BUF->srcipaddr, UIP_UDP_BUF->srcport,
-               uip_appdata, uip_datalen());
+  coap_receive(coap_src_endpoint(), uip_appdata, uip_datalen());
 }
 /*---------------------------------------------------------------------------*/
 void
-coap_send_message(uip_ipaddr_t *addr, uint16_t port, uint8_t *data,
+coap_send_message(const coap_endpoint_t *ep, const uint8_t *data,
                   uint16_t length)
 {
   /* configure connection to reply to client */
-  uip_ipaddr_copy(&udp_conn->ripaddr, addr);
-  udp_conn->rport = port;
+  uip_ipaddr_copy(&udp_conn->ripaddr, &ep->ipaddr);
+  udp_conn->rport = ep->port;
 
   uip_udp_packet_send(udp_conn, data, length);
 

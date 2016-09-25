@@ -73,7 +73,7 @@ extern resource_t res_dtls;
 /*- Internal API ------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 int
-coap_receive(uip_ipaddr_t *srcipaddr, uint16_t srcport,
+coap_receive(const coap_endpoint_t *src,
              uint8_t *payload, uint16_t payload_length)
 {
   erbium_status_code = NO_ERROR;
@@ -99,8 +99,7 @@ coap_receive(uip_ipaddr_t *srcipaddr, uint16_t srcport,
     if(message->code >= COAP_GET && message->code <= COAP_DELETE) {
 
       /* use transaction buffer for response to confirmable request */
-      if((transaction =
-          coap_new_transaction(message->mid, srcipaddr, srcport))) {
+      if((transaction = coap_new_transaction(message->mid, src))) {
         uint32_t block_num = 0;
         uint16_t block_size = COAP_MAX_BLOCK_SIZE;
         uint32_t block_offset = 0;
@@ -234,7 +233,7 @@ coap_receive(uip_ipaddr_t *srcipaddr, uint16_t srcport,
       } else if(message->type == COAP_TYPE_RST) {
         PRINTF("Received RST\n");
         /* cancel possible subscriptions */
-        coap_remove_observer_by_mid(srcipaddr, srcport, message->mid);
+        coap_remove_observer_by_mid(src, message->mid);
       }
 
       if((transaction = coap_get_transaction_by_mid(message->mid))) {
@@ -257,7 +256,7 @@ coap_receive(uip_ipaddr_t *srcipaddr, uint16_t srcport,
       if((message->type == COAP_TYPE_CON || message->type == COAP_TYPE_NON)
          && IS_OPTION(message, COAP_OPTION_OBSERVE)) {
         PRINTF("Observe [%u]\n", message->observe);
-        coap_handle_notification(srcipaddr, srcport, message);
+        coap_handle_notification(src, message);
       }
 #endif /* COAP_OBSERVE_CLIENT */
     } /* request or response */
@@ -289,8 +288,7 @@ coap_receive(uip_ipaddr_t *srcipaddr, uint16_t srcport,
                       message->mid);
     coap_set_payload(message, coap_error_message,
                      strlen(coap_error_message));
-    coap_send_message(srcipaddr, srcport,
-                      payload, coap_serialize_message(message, payload));
+    coap_send_message(src, payload, coap_serialize_message(message, payload));
   }
 
   /* if(new data) */
@@ -335,7 +333,7 @@ coap_blocking_request_callback(void *callback_data, void *response)
 /*---------------------------------------------------------------------------*/
 PT_THREAD(coap_blocking_request
             (struct request_state_t *state, process_event_t ev,
-            uip_ipaddr_t *remote_ipaddr, uint16_t remote_port,
+            coap_endpoint_t *remote_ep,
             coap_packet_t *request,
             blocking_response_handler request_callback))
 {
@@ -355,8 +353,7 @@ PT_THREAD(coap_blocking_request
 
   do {
     request->mid = coap_get_mid();
-    if((state->transaction = coap_new_transaction(request->mid, remote_ipaddr,
-                                                  remote_port))) {
+    if((state->transaction = coap_new_transaction(request->mid, remote_ep))) {
       state->transaction->callback = coap_blocking_request_callback;
       state->transaction->callback_data = state;
 

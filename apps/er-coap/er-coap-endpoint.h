@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Institute for Pervasive Computing, ETH Zurich
+ * Copyright (c) 2016, SICS, Swedish ICT AB.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,44 +25,35 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * This file is part of the Contiki operating system.
  */
 
 /**
  * \file
- *      CoAP module for separate responses.
+ *         API to address CoAP endpoints
  * \author
- *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
+ *         Niclas Finne <nfi@sics.se>
+ *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef COAP_SEPARATE_H_
-#define COAP_SEPARATE_H_
+#ifndef ER_COAP_ENDPOINT_H_
+#define ER_COAP_ENDPOINT_H_
 
-#include "er-coap.h"
+#include "contiki-conf.h"
 
-typedef struct coap_separate {
+#ifndef COAP_ENDPOINT_CUSTOM
+#include "net/ip/uip.h"
 
-  coap_endpoint_t endpoint;
+typedef struct {
+  uip_ipaddr_t ipaddr;
+  uint16_t port;
+} coap_endpoint_t;
+#endif /* COAP_ENDPOINT_CUSTOM */
 
-  coap_message_type_t type;
-  uint16_t mid;
+void coap_endpoint_copy(coap_endpoint_t *destination,
+                        const coap_endpoint_t *from);
 
-  uint8_t token_len;
-  uint8_t token[COAP_TOKEN_LEN];
+int coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2);
 
-  uint32_t block1_num;
-  uint16_t block1_size;
+void coap_print_endpoint(const coap_endpoint_t *ep);
 
-  uint32_t block2_num;
-  uint16_t block2_size;
-} coap_separate_t;
-
-int coap_separate_handler(resource_t *resource, void *request,
-                          void *response);
-void coap_separate_reject(void);
-void coap_separate_accept(void *request, coap_separate_t *separate_store);
-void coap_separate_resume(void *response, coap_separate_t *separate_store,
-                          uint8_t code);
-
-#endif /* COAP_SEPARATE_H_ */
+#endif /* ER_COAP_ENDPOINT_H_ */

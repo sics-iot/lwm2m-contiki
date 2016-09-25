@@ -48,12 +48,10 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
+#define PRINTEP(endpoint) coap_endpoint_print(endpoint)
 #else
 #define PRINTF(...)
-#define PRINT6ADDR(addr)
-#define PRINTLLADDR(addr)
+#define PRINTEP(endpoint)
 #endif
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
@@ -68,7 +66,7 @@
 PROCESS(er_example_client, "Erbium Example Client");
 AUTOSTART_PROCESSES(&er_example_client);
 
-uip_ipaddr_t server_ipaddr;
+static coap_endpoint_t server_endpoint;
 static struct etimer et;
 
 /* Example URIs that can be queried. */
@@ -96,7 +94,8 @@ PROCESS_THREAD(er_example_client, ev, data)
 
   static coap_packet_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
-  SERVER_NODE(&server_ipaddr);
+  SERVER_NODE(&server_endpoint.ipaddr);
+  server_endpoint.port = REMOTE_PORT;
 
   /* receives all CoAP messages */
   coap_init_engine();
@@ -122,11 +121,10 @@ PROCESS_THREAD(er_example_client, ev, data)
 
       coap_set_payload(request, (uint8_t *)msg, sizeof(msg) - 1);
 
-      PRINT6ADDR(&server_ipaddr);
-      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      PRINTEP(&server_endpoint);
+      PRINTF("\n");
 
-      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request,
-                            client_chunk_handler);
+      COAP_BLOCKING_REQUEST(&server_endpoint, request, client_chunk_handler);
 
       printf("\n--Done--\n");
 
@@ -142,10 +140,10 @@ PROCESS_THREAD(er_example_client, ev, data)
 
       printf("--Requesting %s--\n", service_urls[uri_switch]);
 
-      PRINT6ADDR(&server_ipaddr);
-      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      PRINTEP(&server_endpoint);
+      PRINTF("\n");
 
-      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request,
+      COAP_BLOCKING_REQUEST(&server_endpoint, request,
                             client_chunk_handler);
 
       printf("\n--Done--\n");

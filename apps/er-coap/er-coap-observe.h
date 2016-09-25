@@ -57,8 +57,7 @@ typedef struct coap_observer {
   struct coap_observer *next;   /* for LIST */
 
   char url[COAP_OBSERVER_URL_LEN];
-  uip_ipaddr_t addr;
-  uint16_t port;
+  coap_endpoint_t endpoint;
   uint8_t token_len;
   uint8_t token[COAP_TOKEN_LEN];
   uint16_t last_mid;
@@ -71,12 +70,12 @@ typedef struct coap_observer {
 
 list_t coap_get_observers(void);
 void coap_remove_observer(coap_observer_t *o);
-int coap_remove_observer_by_client(uip_ipaddr_t *addr, uint16_t port);
-int coap_remove_observer_by_token(uip_ipaddr_t *addr, uint16_t port,
+int coap_remove_observer_by_client(const coap_endpoint_t *ep);
+int coap_remove_observer_by_token(const coap_endpoint_t *ep,
                                   uint8_t *token, size_t token_len);
-int coap_remove_observer_by_uri(uip_ipaddr_t *addr, uint16_t port,
+int coap_remove_observer_by_uri(const coap_endpoint_t *ep,
                                 const char *uri);
-int coap_remove_observer_by_mid(uip_ipaddr_t *addr, uint16_t port,
+int coap_remove_observer_by_mid(const coap_endpoint_t *ep,
                                 uint16_t mid);
 
 void coap_notify_observers(resource_t *resource);
