@@ -45,12 +45,10 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
+#define PRINTEP(ep) coap_endpoint_print(ep)
 #else
 #define PRINTF(...)
-#define PRINT6ADDR(addr)
-#define PRINTLLADDR(addr)
+#define PRINTEP(ep)
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -68,7 +66,7 @@ coap_register_as_transaction_handler()
   transaction_handler_process = PROCESS_CURRENT();
 }
 coap_transaction_t *
-coap_new_transaction(uint16_t mid, uip_ipaddr_t *addr, uint16_t port)
+coap_new_transaction(uint16_t mid, const coap_endpoint_t *endpoint)
 {
   coap_transaction_t *t = memb_alloc(&transactions_memb);
 
@@ -77,8 +75,7 @@ coap_new_transaction(uint16_t mid, uip_ipaddr_t *addr, uint16_t port)
     t->retrans_counter = 0;
 
     /* save client address */
-    uip_ipaddr_copy(&t->addr, addr);
-    t->port = port;
+    coap_endpoint_copy(&t->endpoint, endpoint);
 
     list_add(transactions_list, t); /* list itself makes sure same element is not added twice */
   }
@@ -91,7 +88,7 @@ coap_send_transaction(coap_transaction_t *t)
 {
   PRINTF("Sending transaction %u\n", t->mid);
 
-  coap_send_message(&t->addr, t->port, t->packet, t->packet_len);
+  coap_send_message(&t->endpoint, t->packet, t->packet_len);
 
   if(COAP_TYPE_CON ==
      ((COAP_HEADER_TYPE_MASK & t->packet[0]) >> COAP_HEADER_TYPE_POSITION)) {
@@ -125,7 +122,7 @@ coap_send_transaction(coap_transaction_t *t)
       void *callback_data = t->callback_data;
 
       /* handle observers */
-      coap_remove_observer_by_client(&t->addr, t->port);
+      coap_remove_observer_by_client(&t->endpoint);
 
       coap_clear_transaction(t);
 

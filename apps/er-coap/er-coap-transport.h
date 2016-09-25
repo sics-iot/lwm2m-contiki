@@ -38,6 +38,19 @@
 #ifndef ER_COAP_TRANSPORT_H_
 #define ER_COAP_TRANSPORT_H_
 
+#include "er-coap-endpoint.h"
+
 void coap_transport_init(void);
+
+void coap_send_message(const coap_endpoint_t *ep, const uint8_t *data,
+                       uint16_t length);
+
+uint8_t *coap_databuf(void);
+uint16_t coap_datalen(void);
+
+const coap_endpoint_t *coap_src_endpoint(void);
+
+uip_ipaddr_t *coap_srcipaddr(void);
+uint16_t coap_srcport(void);
 
 #endif /* ER_COAP_TRANSPORT_H_ */

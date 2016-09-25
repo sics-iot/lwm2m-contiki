@@ -43,16 +43,13 @@
 #include "contiki-net.h"
 #include "er-coap-constants.h"
 #include "er-coap-conf.h"
-
-/* sanity check for configured values */
-#define COAP_MAX_PACKET_SIZE  (COAP_MAX_HEADER_SIZE + REST_MAX_CHUNK_SIZE)
-#if COAP_MAX_PACKET_SIZE > (UIP_BUFSIZE - UIP_IPH_LEN - UIP_UDPH_LEN)
-#error "UIP_CONF_BUFFER_SIZE too small for REST_MAX_CHUNK_SIZE"
-#endif
+#include "er-coap-transport.h"
 
 /* use Erbium CoAP for the REST Engine. Must come before include of rest-engine.h. */
 #define REST coap_rest_implementation
 #include "rest-engine.h"
+
+#define COAP_MAX_PACKET_SIZE  (COAP_MAX_HEADER_SIZE + REST_MAX_CHUNK_SIZE)
 
 /* REST_MAX_CHUNK_SIZE can be different from 2^x so we need to get next lower 2^x for COAP_MAX_BLOCK_SIZE */
 #ifndef COAP_MAX_BLOCK_SIZE
@@ -168,19 +165,12 @@ typedef struct {
 extern coap_status_t erbium_status_code;
 extern char *coap_error_message;
 
-uip_ipaddr_t *coap_srcipaddr(void);
-uint16_t coap_srcport(void);
-uint8_t *coap_databuf(void);
-uint16_t coap_datalen();
-
 void coap_init_connection(void);
 uint16_t coap_get_mid(void);
 
 void coap_init_message(void *packet, coap_message_type_t type, uint8_t code,
                        uint16_t mid);
 size_t coap_serialize_message(void *packet, uint8_t *buffer);
-void coap_send_message(uip_ipaddr_t *addr, uint16_t port, uint8_t *data,
-                       uint16_t length);
 coap_status_t coap_parse_message(void *request, uint8_t *data,
                                  uint16_t data_len);
 

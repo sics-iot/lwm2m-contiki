@@ -47,12 +47,8 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
 #else
 #define PRINTF(...)
-#define PRINT6ADDR(addr)
-#define PRINTLLADDR(addr)
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -101,14 +97,13 @@ coap_separate_accept(void *request, coap_separate_t *separate_store)
       /* ACK with empty code (0) */
       coap_init_message(ack, COAP_TYPE_ACK, 0, coap_req->mid);
       /* serializing into IPBUF: Only overwrites header parts that are already parsed into the request struct */
-      coap_send_message(coap_srcipaddr(), coap_srcport(),
+      coap_send_message(coap_src_endpoint(),
                         coap_databuf(), coap_serialize_message(ack,
                                                                coap_databuf()));
     }
 
-    /* store remote address */
-    uip_ipaddr_copy(&separate_store->addr, &t->addr);
-    separate_store->port = t->port;
+    /* store remote endpoint address */
+    coap_endpoint_copy(&separate_store->endpoint, &t->endpoint);
 
     /* store correct response type */
     separate_store->type =

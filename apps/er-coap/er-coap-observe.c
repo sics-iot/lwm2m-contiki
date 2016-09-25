@@ -44,12 +44,10 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
+#define PRINTEP(ep) coap_endpoint_print(ep)
 #else
 #define PRINTF(...)
-#define PRINT6ADDR(addr)
-#define PRINTLLADDR(addr)
+#define PRINTEP(ep)
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -59,11 +57,11 @@ LIST(observers_list);
 /*- Internal API ------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 static coap_observer_t *
-add_observer(uip_ipaddr_t *addr, uint16_t port, const uint8_t *token,
+add_observer(const coap_endpoint_t *endpoint, const uint8_t *token,
              size_t token_len, const char *uri, int uri_len)
 {
   /* Remove existing observe relationship, if any. */
-  coap_remove_observer_by_uri(addr, port, uri);
+  coap_remove_observer_by_uri(endpoint, uri);
 
   coap_observer_t *o = memb_alloc(&observers_memb);
 
@@ -74,8 +72,7 @@ add_observer(uip_ipaddr_t *addr, uint16_t port, const uint8_t *token,
     }
     memcpy(o->url, uri, max);
     o->url[max] = 0;
-    uip_ipaddr_copy(&o->addr, addr);
-    o->port = port;
+    coap_endpoint_copy(&o->endpoint, endpoint);
     o->token_len = token_len;
     memcpy(o->token, token, token_len);
     o->last_mid = 0;
@@ -102,17 +99,17 @@ coap_remove_observer(coap_observer_t *o)
 }
 /*---------------------------------------------------------------------------*/
 int
-coap_remove_observer_by_client(uip_ipaddr_t *addr, uint16_t port)
+coap_remove_observer_by_client(const coap_endpoint_t *endpoint)
 {
   int removed = 0;
   coap_observer_t *obs = NULL;
 
+  PRINTF("Remove check client ");
+  PRINTEP(endpoint);
+  PRINTF("\n");
   for(obs = (coap_observer_t *)list_head(observers_list); obs;
       obs = obs->next) {
-    PRINTF("Remove check client ");
-    PRINT6ADDR(addr);
-    PRINTF(":%u\n", port);
-    if(uip_ipaddr_cmp(&obs->addr, addr) && obs->port == port) {
+    if(coap_endpoint_cmp(&obs->endpoint, endpoint)) {
       coap_remove_observer(obs);
       removed++;
     }
@@ -121,7 +118,7 @@ coap_remove_observer_by_client(uip_ipaddr_t *addr, uint16_t port)
 }
 /*---------------------------------------------------------------------------*/
 int
-coap_remove_observer_by_token(uip_ipaddr_t *addr, uint16_t port,
+coap_remove_observer_by_token(const coap_endpoint_t *endpoint,
                               uint8_t *token, size_t token_len)
 {
   int removed = 0;
@@ -130,7 +127,7 @@ coap_remove_observer_by_token(uip_ipaddr_t *addr, uint16_t port,
   for(obs = (coap_observer_t *)list_head(observers_list); obs;
       obs = obs->next) {
     PRINTF("Remove check Token 0x%02X%02X\n", token[0], token[1]);
-    if(uip_ipaddr_cmp(&obs->addr, addr) && obs->port == port
+    if(coap_endpoint_cmp(&obs->endpoint, endpoint)
        && obs->token_len == token_len
        && memcmp(obs->token, token, token_len) == 0) {
       coap_remove_observer(obs);
@@ -141,7 +138,7 @@ coap_remove_observer_by_token(uip_ipaddr_t *addr, uint16_t port,
 }
 /*---------------------------------------------------------------------------*/
 int
-coap_remove_observer_by_uri(uip_ipaddr_t *addr, uint16_t port,
+coap_remove_observer_by_uri(const coap_endpoint_t *endpoint,
                             const char *uri)
 {
   int removed = 0;
@@ -150,8 +147,8 @@ coap_remove_observer_by_uri(uip_ipaddr_t *addr, uint16_t port,
   for(obs = (coap_observer_t *)list_head(observers_list); obs;
       obs = obs->next) {
     PRINTF("Remove check URL %p\n", uri);
-    if((addr == NULL
-        || (uip_ipaddr_cmp(&obs->addr, addr) && obs->port == port))
+    if((endpoint == NULL
+        || (coap_endpoint_cmp(&obs->endpoint, endpoint)))
        && (obs->url == uri || memcmp(obs->url, uri, strlen(obs->url)) == 0)) {
       coap_remove_observer(obs);
       removed++;
@@ -161,7 +158,7 @@ coap_remove_observer_by_uri(uip_ipaddr_t *addr, uint16_t port,
 }
 /*---------------------------------------------------------------------------*/
 int
-coap_remove_observer_by_mid(uip_ipaddr_t *addr, uint16_t port, uint16_t mid)
+coap_remove_observer_by_mid(const coap_endpoint_t *endpoint, uint16_t mid)
 {
   int removed = 0;
   coap_observer_t *obs = NULL;
@@ -169,7 +166,7 @@ coap_remove_observer_by_mid(uip_ipaddr_t *addr, uint16_t port, uint16_t mid)
   for(obs = (coap_observer_t *)list_head(observers_list); obs;
       obs = obs->next) {
     PRINTF("Remove check MID %u\n", mid);
-    if(uip_ipaddr_cmp(&obs->addr, addr) && obs->port == port
+    if(coap_endpoint_cmp(&obs->endpoint, endpoint)
        && obs->last_mid == mid) {
       coap_remove_observer(obs);
       removed++;
@@ -227,15 +224,15 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
 
       /*TODO implement special transaction for CON, sharing the same buffer to allow for more observers */
 
-      if((transaction = coap_new_transaction(coap_get_mid(), &obs->addr, obs->port))) {
+      if((transaction = coap_new_transaction(coap_get_mid(), &obs->endpoint))) {
         if(obs->obs_counter % COAP_OBSERVE_REFRESH_INTERVAL == 0) {
           PRINTF("           Force Confirmable for\n");
           notification->type = COAP_TYPE_CON;
         }
 
         PRINTF("           Observer ");
-        PRINT6ADDR(&obs->addr);
-        PRINTF(":%u\n", obs->port);
+        PRINTEP(&obs->endpoint);
+        PRINTF("\n");
 
         /* update last MID for RST matching */
         obs->last_mid = transaction->mid;
@@ -271,7 +268,7 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
   if(coap_req->code == COAP_GET && coap_res->code < 128) { /* GET request and response without error code */
     if(IS_OPTION(coap_req, COAP_OPTION_OBSERVE)) {
       if(coap_req->observe == 0) {
-        obs = add_observer(coap_srcipaddr(), coap_srcport(),
+        obs = add_observer(coap_src_endpoint(),
                            coap_req->token, coap_req->token_len,
                            coap_req->uri_path, coap_req->uri_path_len);
        if(obs) {
@@ -296,7 +293,7 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
       } else if(coap_req->observe == 1) {
 
         /* remove client if it is currently observe */
-        coap_remove_observer_by_token(coap_srcipaddr(), coap_srcport(),
+        coap_remove_observer_by_token(coap_src_endpoint(),
                                       coap_req->token, coap_req->token_len);
       }
     }
