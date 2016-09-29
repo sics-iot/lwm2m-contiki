@@ -42,7 +42,9 @@
 #ifndef OAM_TLV_H_
 #define OAM_TLV_H_
 
-#include "contiki.h"
+#include "contiki-conf.h"
+#include <stdint.h>
+#include <stddef.h>
 
 enum {
   OMA_TLV_TYPE_OBJECT_INSTANCE   = 0,
