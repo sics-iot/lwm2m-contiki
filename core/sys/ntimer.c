@@ -51,11 +51,17 @@
 #endif
 
 LIST(timer_list);
+static uint8_t is_initialized;
 /*---------------------------------------------------------------------------*/
 static void
 add_timer(ntimer_t *timer)
 {
   ntimer_t *n, *l, *p;
+
+  if(!is_initialized) {
+    /* The ntimer system has not yet been initialized */
+    ntimer_init();
+  }
 
   PRINTF("ntimer: adding timer %p at %lu\n", timer,
          (unsigned long)timer->expiration_time);
@@ -167,6 +173,10 @@ ntimer_run(void)
 void
 ntimer_init(void)
 {
+  if(is_initialized) {
+    return;
+  }
+  is_initialized = 1;
   list_init(timer_list);
   if(NTIMER_DRIVER.init) {
     NTIMER_DRIVER.init();
