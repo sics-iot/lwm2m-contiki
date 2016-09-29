@@ -173,9 +173,6 @@ PROCESS_THREAD(coap_engine, ev, data)
       if(uip_newdata()) {
         process_data();
       }
-    } else if(ev == PROCESS_EVENT_TIMER) {
-      /* retransmissions are handled here */
-      coap_check_transactions();
     }
   } /* while (1) */
 

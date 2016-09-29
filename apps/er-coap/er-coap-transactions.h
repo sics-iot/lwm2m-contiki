@@ -40,6 +40,7 @@
 #define COAP_TRANSACTIONS_H_
 
 #include "er-coap.h"
+#include "sys/ntimer.h"
 
 /*
  * Modulo mask (thus +1) for a random number to get the tick number for the random
@@ -53,7 +54,8 @@ typedef struct coap_transaction {
   struct coap_transaction *next;        /* for LIST */
 
   uint16_t mid;
-  struct etimer retrans_timer;
+  struct ntimer retrans_timer;
+  uint32_t retrans_interval;
   uint8_t retrans_counter;
 
   coap_endpoint_t endpoint;
@@ -66,13 +68,9 @@ typedef struct coap_transaction {
                                                  * Use snprintf(buf, len+1, "", ...) to completely fill payload */
 } coap_transaction_t;
 
-void coap_register_as_transaction_handler(void);
-
 coap_transaction_t *coap_new_transaction(uint16_t mid, const coap_endpoint_t *ep);
 void coap_send_transaction(coap_transaction_t *t);
 void coap_clear_transaction(coap_transaction_t *t);
 coap_transaction_t *coap_get_transaction_by_mid(uint16_t mid);
-
-void coap_check_transactions(void);
 
 #endif /* COAP_TRANSACTIONS_H_ */
