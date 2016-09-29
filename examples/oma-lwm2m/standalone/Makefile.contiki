@@ -1,0 +1,45 @@
+CONTIKI = ../../..
+CP=cp
+MKDIR=mkdir
+
+CORE_FILES = sys/cc.h sys/cc-gcc.h sys/ntimer.c lib/list.c lib/memb.c
+COAP_FILES = ${addprefix er-coap/,${filter-out er-coap-blocking-api.% er-coap-uip.%,${notdir ${wildcard $(CONTIKI)/apps/er-coap/er-coap*}}}}
+LWM2M_FILES = ${addprefix oma-lwm2m/,${filter-out lwm2m-rd-client.%,${notdir ${wildcard $(CONTIKI)/apps/oma-lwm2m/lwm2m-* $(CONTIKI)/apps/oma-lwm2m/oma-*}}}}
+#IPSO_FILES = ${addprefix ipso-objects/,${notdir ${wildcard $(CONTIKI)/apps/ipso-objects/ipso-*}}}
+REST_FILES = ${addprefix rest-engine/,${notdir ${wildcard $(CONTIKI)/apps/rest-engine/rest-*}}}
+
+TARGET_FILES += ${addprefix $(TARGETCDIR)/,$(CORE_FILES) $(CORE_FILES:.c=.h) \
+	$(COAP_FILES) $(LWM2M_FILES) $(IPSO_FILES) $(REST_FILES)}
+SOURCE_FILES += ${filter %.c,$(TARGET_FILES)}
+OBJECT_FILES = $(SOURCE_FILES:.c=.o)
+
+$(TARGETCDIR):
+	@$(MKDIR) $@
+
+$(TARGETCDIRS): $(TARGETCDIR)
+	@$(MKDIR) $@
+
+$(TARGETCDIR)/sys/%: $(CONTIKI)/core/sys/% | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(TARGETCDIR)/lib/%: $(CONTIKI)/core/lib/% | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(TARGETCDIR)/er-coap/%: $(CONTIKI)/apps/er-coap/% | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(TARGETCDIR)/oma-lwm2m/%: $(CONTIKI)/apps/oma-lwm2m/% | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(TARGETCDIR)/ipso-objects/%: $(CONTIKI)/apps/ipso-objects/% | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(TARGETCDIR)/rest-engine/%: $(CONTIKI)/apps/rest-engine/% | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(OBJECT_FILES): $(TARGET_FILES)
+
+copy:	$(TARGET_FILES)
+
+clean::
+	@-rm -rf $(TARGETCDIR)
