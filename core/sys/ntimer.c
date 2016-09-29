@@ -153,7 +153,7 @@ ntimer_run(void)
     list_remove(timer_list, next);
 
     if(next->callback) {
-      next->callback(next->user_data);
+      next->callback(next);
     }
 
     /* The next timer has changed */
