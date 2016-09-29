@@ -45,6 +45,7 @@
 #include "lwm2m-object.h"
 #include "oma-tlv-reader.h"
 #include "oma-tlv.h"
+#include <string.h>
 
 /*---------------------------------------------------------------------------*/
 static size_t

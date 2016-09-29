@@ -51,17 +51,21 @@
 #include "oma-tlv.h"
 #include "oma-tlv-reader.h"
 #include "oma-tlv-writer.h"
-#include "net/ipv6/uip-ds6.h"
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 
 #if UIP_CONF_IPV6_RPL
 #include "net/rpl/rpl.h"
+#include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#define DEBUG 0
+#if DEBUG
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...)
+#endif
 
 #ifndef LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX
 #ifdef LWM2M_DEVICE_MODEL_NUMBER
@@ -95,7 +99,7 @@ lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
     if(objects[i] != NULL) {
       for(j = 0; j < objects[i]->count; j++) {
         if(objects[i]->instances[j].flag & LWM2M_INSTANCE_FLAG_USED) {
-          len = snprintf(&rd_data[pos], size - pos,
+          len = snprintf((char *)&rd_data[pos], size - pos,
                          "%s<%d/%d>", pos > 0 ? "," : "",
                          objects[i]->id, objects[i]->instances[j].id);
           if(len > 0 && len < sizeof(rd_data) - pos) {

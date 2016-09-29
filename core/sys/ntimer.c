@@ -137,7 +137,11 @@ ntimer_time_to_next_expiration(void)
 int
 ntimer_run(void)
 {
+  uint64_t now;
   ntimer_t *next;
+
+  /* Always get the current time because it might trigger clock updates */
+  now = ntimer_uptime();
 
   next = list_head(timer_list);
   if(next == NULL) {
@@ -145,9 +149,9 @@ ntimer_run(void)
     return 0;
   }
 
-  if(next->expiration_time <= ntimer_uptime()) {
+  if(next->expiration_time <= now) {
     PRINTF("ntimer: timer %p expired at %lu\n", next,
-           (unsigned long)ntimer_uptime());
+           (unsigned long)now);
 
     /* This timer should expire now */
     list_remove(timer_list, next);
