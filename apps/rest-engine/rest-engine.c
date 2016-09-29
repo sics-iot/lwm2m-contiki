@@ -55,7 +55,6 @@
 #define PRINTLLADDR(addr)
 #endif
 
-PROCESS(rest_engine_process, "REST Engine");
 /*---------------------------------------------------------------------------*/
 LIST(restful_services);
 LIST(restful_periodic_services);
