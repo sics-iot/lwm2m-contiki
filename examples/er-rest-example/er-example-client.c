@@ -42,6 +42,7 @@
 #include "contiki.h"
 #include "contiki-net.h"
 #include "er-coap-engine.h"
+#include "er-coap-blocking-api.h"
 #include "dev/button-sensor.h"
 
 #define DEBUG 0

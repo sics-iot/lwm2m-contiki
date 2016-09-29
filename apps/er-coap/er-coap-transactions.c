@@ -56,7 +56,15 @@
 MEMB(transactions_memb, coap_transaction_t, COAP_MAX_OPEN_TRANSACTIONS);
 LIST(transactions_list);
 
-static void coap_retransmit_transaction(ntimer *nt, (void *) t);
+/*---------------------------------------------------------------------------*/
+static void
+coap_retransmit_transaction(ntimer_t *nt, void *t)
+{
+  ++(t->retrans_counter);
+  PRINTF("Retransmitting %u (%u)\n", t->mid, t->retrans_counter);
+  coap_send_transaction(t);
+}
+/*---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*/
 /*- Internal API ------------------------------------------------------------*/
@@ -93,7 +101,7 @@ coap_send_transaction(coap_transaction_t *t)
       PRINTF("Keeping transaction %u\n", t->mid);
 
       if(t->retrans_counter == 0) {
-        ntimer_set_callback(&t->retrans_timer, coap_retransmit_transction, t);
+        ntimer_set_callback(&t->retrans_timer, coap_retransmit_transaction, t);
         t->retrans_interval =
           COAP_RESPONSE_TIMEOUT_TICKS + (random_rand()
                                          %
@@ -155,12 +163,3 @@ coap_get_transaction_by_mid(uint16_t mid)
   }
   return NULL;
 }
-/*---------------------------------------------------------------------------*/
-static void
-coap_retransmit_transaction(ntimer *nt, (void *) t)
-{
-  ++(t->retrans_counter);
-  PRINTF("Retransmitting %u (%u)\n", t->mid, t->retrans_counter);
-  coap_send_transaction(t);
-}
-/*---------------------------------------------------------------------------*/

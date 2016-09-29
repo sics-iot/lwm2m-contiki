@@ -302,7 +302,6 @@ coap_init_engine(void)
 
   rest_activate_resource(&res_well_known_core, ".well-known/core");
 
-  coap_register_as_transaction_handler();
   coap_transport_init();
   coap_init_connection();
 }
@@ -318,83 +317,6 @@ coap_get_rest_method(void *packet)
 {
   return (rest_resource_flags_t)(1 <<
                                  (((coap_packet_t *)packet)->code - 1));
-}
-/*---------------------------------------------------------------------------*/
-/*- Client Part -------------------------------------------------------------*/
-/*---------------------------------------------------------------------------*/
-void
-coap_blocking_request_callback(void *callback_data, void *response)
-{
-  struct request_state_t *state = (struct request_state_t *)callback_data;
-
-  state->response = (coap_packet_t *)response;
-  process_poll(state->process);
-}
-/*---------------------------------------------------------------------------*/
-PT_THREAD(coap_blocking_request
-            (struct request_state_t *state, process_event_t ev,
-            coap_endpoint_t *remote_ep,
-            coap_packet_t *request,
-            blocking_response_handler request_callback))
-{
-  PT_BEGIN(&state->pt);
-
-  static uint8_t more;
-  static uint32_t res_block;
-  static uint8_t block_error;
-
-  state->block_num = 0;
-  state->response = NULL;
-  state->process = PROCESS_CURRENT();
-
-  more = 0;
-  res_block = 0;
-  block_error = 0;
-
-  do {
-    request->mid = coap_get_mid();
-    if((state->transaction = coap_new_transaction(request->mid, remote_ep))) {
-      state->transaction->callback = coap_blocking_request_callback;
-      state->transaction->callback_data = state;
-
-      if(state->block_num > 0) {
-        coap_set_header_block2(request, state->block_num, 0,
-                               REST_MAX_CHUNK_SIZE);
-      }
-      state->transaction->packet_len = coap_serialize_message(request,
-                                                              state->
-                                                              transaction->
-                                                              packet);
-
-      coap_send_transaction(state->transaction);
-      PRINTF("Requested #%lu (MID %u)\n", state->block_num, request->mid);
-
-      PT_YIELD_UNTIL(&state->pt, ev == PROCESS_EVENT_POLL);
-
-      if(!state->response) {
-        PRINTF("Server not responding\n");
-        PT_EXIT(&state->pt);
-      }
-
-      coap_get_header_block2(state->response, &res_block, &more, NULL, NULL);
-
-      PRINTF("Received #%lu%s (%u bytes)\n", res_block, more ? "+" : "",
-             state->response->payload_len);
-
-      if(res_block == state->block_num) {
-        request_callback(state->response);
-        ++(state->block_num);
-      } else {
-        PRINTF("WRONG BLOCK %lu/%lu\n", res_block, state->block_num);
-        ++block_error;
-      }
-    } else {
-      PRINTF("Could not allocate transaction buffer");
-      PT_EXIT(&state->pt);
-    }
-  } while(more && block_error < COAP_MAX_ATTEMPTS);
-
-  PT_END(&state->pt);
 }
 /*---------------------------------------------------------------------------*/
 /*- REST Engine Interface ---------------------------------------------------*/
