@@ -39,8 +39,8 @@
 
 #include <string.h>
 #include <stdio.h>
-#include "contiki.h"
 #include "sys/ntimer.h"
+#include "lib/list.h"
 #include "rest-engine.h"
 
 #define DEBUG 0
@@ -73,6 +73,7 @@ static void init_periodic(void)
       PRINTF("Periodic: Set timer for /%s to %lu\n",
              periodic_resource->resource->url, periodic_resource->period);
       ntimer_set_callback(&periodic_resource->periodic_timer, process_callback);
+      ntimer_set_user_data(&periodic_resource->periodic_timer, periodic_resource);
       ntimer_set(&periodic_resource->periodic_timer,
                  periodic_resource->period);
     }
@@ -218,8 +219,8 @@ rest_invoke_restful_service(void *request, void *response, uint8_t *buffer,
 static void process_callback(ntimer_t *t)
 {
   periodic_resource_t *periodic_resource;
-  periodic_resource = (periodic_resource_t *) t->user_data;
-  if(periodic_resource->period) {
+  periodic_resource = ntimer_get_user_data(t);
+  if(periodic_resource != NULL && periodic_resource->period) {
     PRINTF("Periodic: timer expired for /%s (period: %lu)\n",
            periodic_resource->resource->url, periodic_resource->period);
 
