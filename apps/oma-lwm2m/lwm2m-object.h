@@ -51,7 +51,7 @@
 #ifndef LWM2M_OBJECT_H_
 #define LWM2M_OBJECT_H_
 
-#include "rest-engine.h"
+#include "er-coap.h"
 #include "er-coap-observe.h"
 
 #define LWM2M_OBJECT_SECURITY_ID                0

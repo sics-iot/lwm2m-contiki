@@ -41,13 +41,11 @@
  *         Niclas Finne <nfi@sics.se>
  */
 
-#include "contiki.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-object.h"
 #include "lwm2m-device.h"
 #include "lwm2m-plain-text.h"
 #include "lwm2m-json.h"
-#include "rest-engine.h"
 #include "er-coap-constants.h"
 #include "er-coap-engine.h"
 #include "oma-tlv.h"

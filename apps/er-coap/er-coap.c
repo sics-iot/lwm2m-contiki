@@ -37,6 +37,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include "sys/cc.h"
 
@@ -276,7 +277,7 @@ void
 coap_init_connection(void)
 {
   /* initialize transaction ID */
-  current_mid = random_rand();
+  current_mid = rand();
 }
 /*---------------------------------------------------------------------------*/
 uint16_t
