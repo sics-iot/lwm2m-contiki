@@ -41,9 +41,8 @@
 #define REST_ENGINE_H_
 
 #include <stdio.h>
-#include "contiki.h"
-#include "contiki-lib.h"
 #include "sys/ntimer.h"
+#include "lib/list.h"
 #include "rest-constants.h"
 
 /* list of valid REST Enigne implementations */

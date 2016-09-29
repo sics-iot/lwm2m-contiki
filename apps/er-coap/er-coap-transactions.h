@@ -46,15 +46,15 @@
  * Modulo mask (thus +1) for a random number to get the tick number for the random
  * retransmission time between COAP_RESPONSE_TIMEOUT and COAP_RESPONSE_TIMEOUT*COAP_RESPONSE_RANDOM_FACTOR.
  */
-#define COAP_RESPONSE_TIMEOUT_TICKS         (CLOCK_SECOND * COAP_RESPONSE_TIMEOUT)
-#define COAP_RESPONSE_TIMEOUT_BACKOFF_MASK  (long)((CLOCK_SECOND * COAP_RESPONSE_TIMEOUT * ((float)COAP_RESPONSE_RANDOM_FACTOR - 1.0)) + 0.5) + 1
+#define COAP_RESPONSE_TIMEOUT_TICKS         (1000 * COAP_RESPONSE_TIMEOUT)
+#define COAP_RESPONSE_TIMEOUT_BACKOFF_MASK  (uint32_t)(((1000 * COAP_RESPONSE_TIMEOUT * ((float)COAP_RESPONSE_RANDOM_FACTOR - 1.0)) + 0.5) + 1)
 
 /* container for transactions with message buffer and retransmission info */
 typedef struct coap_transaction {
   struct coap_transaction *next;        /* for LIST */
 
   uint16_t mid;
-  struct ntimer retrans_timer;
+  ntimer_t retrans_timer;
   uint32_t retrans_interval;
   uint8_t retrans_counter;
 

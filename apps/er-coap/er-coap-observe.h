@@ -41,13 +41,12 @@
 
 #include "er-coap.h"
 #include "er-coap-transactions.h"
-#include "stimer.h"
 
 #define COAP_OBSERVER_URL_LEN 20
 
 typedef struct coap_observable {
   uint32_t observe_clock;
-  struct stimer orphan_timer;
+  ntimer_t orphan_timer;
   list_t observers;
   coap_packet_t notification;
   uint8_t buffer[COAP_MAX_PACKET_SIZE + 1];
@@ -64,7 +63,7 @@ typedef struct coap_observer {
 
   int32_t obs_counter;
 
-  struct ntimer retrans_timer;
+  ntimer_t retrans_timer;
   uint8_t retrans_counter;
 } coap_observer_t;
 

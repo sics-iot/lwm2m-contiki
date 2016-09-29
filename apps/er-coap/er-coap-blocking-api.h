@@ -29,6 +29,12 @@
  * This file is part of the Contiki operating system.
  */
 
+#ifndef COAP_BLOCKING_API_H_
+#define COAP_BLOCKING_API_H_
+
+#include "sys/pt.h"
+#include "er-coap-transactions.h"
+
 /*---------------------------------------------------------------------------*/
 /*- Client Part -------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
@@ -57,3 +63,5 @@ PT_THREAD(coap_blocking_request
                                    request, chunk_handler)              \
              );                                                         \
   }
+
+#endif /* COAP_BLOCKING_API_H_ */

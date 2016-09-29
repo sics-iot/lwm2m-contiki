@@ -36,11 +36,12 @@
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#include "contiki.h"
-#include "contiki-net.h"
 #include "er-coap-transactions.h"
 #include "er-coap-observe.h"
 #include "sys/ntimer.h"
+#include "lib/memb.h"
+#include "lib/list.h"
+#include <stdlib.h>
 
 #define DEBUG 0
 #if DEBUG
@@ -58,9 +59,13 @@ LIST(transactions_list);
 
 /*---------------------------------------------------------------------------*/
 static void
-coap_retransmit_transaction(ntimer_t *nt, void *vt)
+coap_retransmit_transaction(ntimer_t *nt)
 {
-  coap_transaction_t *t = (coap_transaction_t *) vt;
+  coap_transaction_t *t = ntimer_get_user_data(nt);
+  if(t == NULL) {
+    PRINTF("No retransmission data in ntimer!\n");
+    return;
+  }
   ++(t->retrans_counter);
   PRINTF("Retransmitting %u (%u)\n", t->mid, t->retrans_counter);
   coap_send_transaction(t);
@@ -105,16 +110,14 @@ coap_send_transaction(coap_transaction_t *t)
         ntimer_set_callback(&t->retrans_timer, coap_retransmit_transaction);
         ntimer_set_user_data(&t->retrans_timer, t);
         t->retrans_interval =
-          COAP_RESPONSE_TIMEOUT_TICKS + (random_rand()
-                                         %
-                                         (clock_time_t)
+          COAP_RESPONSE_TIMEOUT_TICKS + (rand() %
                                          COAP_RESPONSE_TIMEOUT_BACKOFF_MASK);
-        PRINTF("Initial interval %f\n",
-               (float)t->retrans_interval / CLOCK_SECOND);
+        PRINTF("Initial interval %lu msec\n",
+               (unsigned long)t->retrans_interval);
       } else {
         t->retrans_interval <<= 1;  /* double */
         PRINTF("Doubled (%u) interval %d s\n", t->retrans_counter,
-               t->retrans_interval / CLOCK_SECOND);
+               t->retrans_interval / 1000);
       }
 
       /* interval updated above */

@@ -39,7 +39,6 @@
 #ifndef ER_COAP_ENGINE_H_
 #define ER_COAP_ENGINE_H_
 
-#include "pt.h"
 #include "er-coap.h"
 #include "er-coap-transactions.h"
 #include "er-coap-observe.h"

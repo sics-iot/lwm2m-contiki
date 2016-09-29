@@ -40,7 +40,6 @@
 #define ER_COAP_H_
 
 #include <stddef.h> /* for size_t */
-#include "contiki-net.h"
 #include "er-coap-constants.h"
 #include "er-coap-conf.h"
 #include "er-coap-transport.h"
