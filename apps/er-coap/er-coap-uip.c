@@ -144,17 +144,9 @@ void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data,
                   uint16_t length)
 {
-  /* configure connection to reply to client */
-  uip_ipaddr_copy(&udp_conn->ripaddr, &ep->ipaddr);
-  udp_conn->rport = ep->port;
-
-  uip_udp_packet_send(udp_conn, data, length);
+  uip_udp_packet_sendto(udp_conn, data, length, &ep->ipaddr, ep->port);
 
   PRINTF("-sent UDP datagram (%u)-\n", length);
-
-  /* restore server socket to allow data from any node */
-  memset(&udp_conn->ripaddr, 0, sizeof(udp_conn->ripaddr));
-  udp_conn->rport = 0;
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(coap_engine, ev, data)
