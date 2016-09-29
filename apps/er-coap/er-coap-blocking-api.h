@@ -29,31 +29,31 @@
  * This file is part of the Contiki operating system.
  */
 
-/**
- * \file
- *      CoAP implementation for the REST Engine.
- * \author
- *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
- */
-
-#ifndef ER_COAP_ENGINE_H_
-#define ER_COAP_ENGINE_H_
-
-#include "pt.h"
-#include "er-coap.h"
-#include "er-coap-transactions.h"
-#include "er-coap-observe.h"
-#include "er-coap-separate.h"
-#include "er-coap-observe-client.h"
-#include "er-coap-transport.h"
-
-typedef coap_packet_t rest_request_t;
-typedef coap_packet_t rest_response_t;
-
-void coap_init_engine(void);
-
-int coap_receive(const coap_endpoint_t *src,
-                 uint8_t *payload, uint16_t payload_length);
 /*---------------------------------------------------------------------------*/
+/*- Client Part -------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+struct request_state_t {
+  struct pt pt;
+  struct process *process;
+  coap_transaction_t *transaction;
+  coap_packet_t *response;
+  uint32_t block_num;
+};
 
-#endif /* ER_COAP_ENGINE_H_ */
+typedef void (*blocking_response_handler)(void *response);
+
+PT_THREAD(coap_blocking_request
+            (struct request_state_t *state, process_event_t ev,
+            coap_endpoint_t *remote,
+            coap_packet_t *request,
+            blocking_response_handler request_callback));
+
+#define COAP_BLOCKING_REQUEST(server_endpoint, request, chunk_handler)  \
+  {                                                                     \
+    static struct request_state_t request_state;                        \
+    PT_SPAWN(process_pt, &request_state.pt,                             \
+             coap_blocking_request(&request_state, ev,                  \
+                                   server_endpoint,                     \
+                                   request, chunk_handler)              \
+             );                                                         \
+  }
