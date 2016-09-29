@@ -40,6 +40,7 @@
 #include "contiki-net.h"
 #include "er-coap-transactions.h"
 #include "er-coap-observe.h"
+#include "sys/ntimer.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -55,16 +56,11 @@
 MEMB(transactions_memb, coap_transaction_t, COAP_MAX_OPEN_TRANSACTIONS);
 LIST(transactions_list);
 
-static struct process *transaction_handler_process = NULL;
+static void coap_retransmit_transaction(ntimer *nt, (void *) t);
 
 /*---------------------------------------------------------------------------*/
 /*- Internal API ------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
-void
-coap_register_as_transaction_handler()
-{
-  transaction_handler_process = PROCESS_CURRENT();
-}
 coap_transaction_t *
 coap_new_transaction(uint16_t mid, const coap_endpoint_t *endpoint)
 {
@@ -97,22 +93,22 @@ coap_send_transaction(coap_transaction_t *t)
       PRINTF("Keeping transaction %u\n", t->mid);
 
       if(t->retrans_counter == 0) {
-        t->retrans_timer.timer.interval =
+        ntimer_set_callback(&t->retrans_timer, coap_retransmit_transction, t);
+        t->retrans_interval =
           COAP_RESPONSE_TIMEOUT_TICKS + (random_rand()
                                          %
                                          (clock_time_t)
                                          COAP_RESPONSE_TIMEOUT_BACKOFF_MASK);
         PRINTF("Initial interval %f\n",
-               (float)t->retrans_timer.timer.interval / CLOCK_SECOND);
+               (float)t->retrans_interval / CLOCK_SECOND);
       } else {
-        t->retrans_timer.timer.interval <<= 1;  /* double */
-        PRINTF("Doubled (%u) interval %f\n", t->retrans_counter,
-               (float)t->retrans_timer.timer.interval / CLOCK_SECOND);
+        t->retrans_interval <<= 1;  /* double */
+        PRINTF("Doubled (%u) interval %d s\n", t->retrans_counter,
+               t->retrans_interval / CLOCK_SECOND);
       }
 
-      PROCESS_CONTEXT_BEGIN(transaction_handler_process);
-      etimer_restart(&t->retrans_timer);        /* interval updated above */
-      PROCESS_CONTEXT_END(transaction_handler_process);
+      /* interval updated above */
+      ntimer_set(&t->retrans_timer, t->retrans_interval);
 
       t = NULL;
     } else {
@@ -141,7 +137,7 @@ coap_clear_transaction(coap_transaction_t *t)
   if(t) {
     PRINTF("Freeing transaction %u: %p\n", t->mid, t);
 
-    etimer_stop(&t->retrans_timer);
+    ntimer_stop(&t->retrans_timer);
     list_remove(transactions_list, t);
     memb_free(&transactions_memb, t);
   }
@@ -160,17 +156,11 @@ coap_get_transaction_by_mid(uint16_t mid)
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
-void
-coap_check_transactions()
+static void
+coap_retransmit_transaction(ntimer *nt, (void *) t)
 {
-  coap_transaction_t *t = NULL;
-
-  for(t = (coap_transaction_t *)list_head(transactions_list); t; t = t->next) {
-    if(etimer_expired(&t->retrans_timer)) {
-      ++(t->retrans_counter);
-      PRINTF("Retransmitting %u (%u)\n", t->mid, t->retrans_counter);
-      coap_send_transaction(t);
-    }
-  }
+  ++(t->retrans_counter);
+  PRINTF("Retransmitting %u (%u)\n", t->mid, t->retrans_counter);
+  coap_send_transaction(t);
 }
 /*---------------------------------------------------------------------------*/

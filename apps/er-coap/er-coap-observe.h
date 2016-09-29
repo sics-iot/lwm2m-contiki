@@ -64,7 +64,7 @@ typedef struct coap_observer {
 
   int32_t obs_counter;
 
-  struct etimer retrans_timer;
+  struct ntimer retrans_timer;
   uint8_t retrans_counter;
 } coap_observer_t;
 
