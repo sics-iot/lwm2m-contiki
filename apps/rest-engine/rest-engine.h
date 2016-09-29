@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include "contiki.h"
 #include "contiki-lib.h"
+#include "sys/ntimer.h"
 #include "rest-constants.h"
 
 /* list of valid REST Enigne implementations */
@@ -102,7 +103,7 @@ struct periodic_resource_s {
   struct periodic_resource_s *next; /* for LIST, points to next resource defined */
   const resource_t *resource;
   uint32_t period;
-  struct etimer periodic_timer;
+  ntimer_t periodic_timer;
   const restful_periodic_handler periodic_handler;
 };
 typedef struct periodic_resource_s periodic_resource_t;
