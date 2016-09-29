@@ -58,8 +58,9 @@ LIST(transactions_list);
 
 /*---------------------------------------------------------------------------*/
 static void
-coap_retransmit_transaction(ntimer_t *nt, void *t)
+coap_retransmit_transaction(ntimer_t *nt, void *vt)
 {
+  coap_transaction_t *t = (coap_transaction_t *) vt;
   ++(t->retrans_counter);
   PRINTF("Retransmitting %u (%u)\n", t->mid, t->retrans_counter);
   coap_send_transaction(t);
@@ -101,7 +102,8 @@ coap_send_transaction(coap_transaction_t *t)
       PRINTF("Keeping transaction %u\n", t->mid);
 
       if(t->retrans_counter == 0) {
-        ntimer_set_callback(&t->retrans_timer, coap_retransmit_transaction, t);
+        ntimer_set_callback(&t->retrans_timer, coap_retransmit_transaction);
+        ntimer_set_user_data(&t->retrans_timer, t);
         t->retrans_interval =
           COAP_RESPONSE_TIMEOUT_TICKS + (random_rand()
                                          %

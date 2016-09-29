@@ -99,7 +99,6 @@ coap_obs_add_observee(const coap_endpoint_t *endpoint,
     /* o->last_mid = 0; */
     o->notification_callback = notification_callback;
     o->data = data;
-    /* stimer_set(&o->refresh_timer, COAP_OBSERVING_REFRESH_INTERVAL); */
     PRINTF("Adding obs_subject for /%s [0x%02X%02X]\n", o->url, o->token[0],
            o->token[1]);
     list_add(obs_subjects_list, o);
