@@ -59,10 +59,6 @@ typedef enum {
 
 void lwm2m_engine_init(void);
 void lwm2m_engine_register_default_objects(void);
-void lwm2m_engine_use_bootstrap_server(int use);
-void lwm2m_engine_use_registration_server(int use);
-void lwm2m_engine_register_with_server(const uip_ipaddr_t *server, uint16_t port);
-void lwm2m_engine_register_with_bootstrap_server(const uip_ipaddr_t *server, uint16_t port);
 
 const lwm2m_object_t *lwm2m_engine_get_object(uint16_t id);
 
@@ -77,6 +73,14 @@ void lwm2m_engine_delete_handler(const lwm2m_object_t *object,
                                  void *request, void *response,
                                  uint8_t *buffer, uint16_t preferred_size,
                                  int32_t *offset);
+
+
+const lwm2m_instance_t *lwm2m_engine_get_first_instance_of_object(uint16_t id, lwm2m_context_t *context);
+const lwm2m_instance_t *lwm2m_engine_get_instance(const lwm2m_object_t *object, lwm2m_context_t *context, int depth);
+const lwm2m_resource_t *lwm2m_get_resource(const lwm2m_instance_t *instance, lwm2m_context_t *context);
+
+int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
+
 
 #endif /* LWM2M_ENGINE_H */
 /** @} */
