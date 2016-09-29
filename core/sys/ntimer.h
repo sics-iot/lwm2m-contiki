@@ -41,13 +41,13 @@
 #include "contiki-conf.h"
 #include <stdint.h>
 
+typedef struct ntimer ntimer_t;
 struct ntimer {
-  struct ntimer *next;
-  void (* callback)(void *);
+  ntimer_t *next;
+  void (* callback)(ntimer_t *);
   void *user_data;
   uint64_t expiration_time;
 };
-typedef struct ntimer ntimer_t;
 
 typedef struct {
   void     (* init)(void);
@@ -84,10 +84,20 @@ ntimer_seconds(void)
 }
 
 static inline void
-ntimer_set_callback(ntimer_t *timer, void (* callback)(void *),
-                      void *data)
+ntimer_set_callback(ntimer_t *timer, void (* callback)(ntimer_t *))
 {
   timer->callback = callback;
+}
+
+static inline void *
+ntimer_get_user_data(ntimer_t *timer)
+{
+  return timer->user_data;
+}
+
+static inline void
+ntimer_set_user_data(ntimer_t *timer, void *data)
+{
   timer->user_data = data;
 }
 
