@@ -40,6 +40,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "contiki.h"
+#include "sys/ntimer.h"
 #include "rest-engine.h"
 
 #define DEBUG 0
@@ -58,6 +59,27 @@ PROCESS(rest_engine_process, "REST Engine");
 /*---------------------------------------------------------------------------*/
 LIST(restful_services);
 LIST(restful_periodic_services);
+/*---------------------------------------------------------------------------*/
+static void process_callback(ntimer_t *t);
+
+/* initialize periodic resources */
+static void init_periodic(void)
+{
+  periodic_resource_t *periodic_resource = NULL;
+
+  for(periodic_resource =
+        (periodic_resource_t *)list_head(restful_periodic_services);
+      periodic_resource; periodic_resource = periodic_resource->next) {
+    if(periodic_resource->periodic_handler && periodic_resource->period) {
+      PRINTF("Periodic: Set timer for /%s to %lu\n",
+             periodic_resource->resource->url, periodic_resource->period);
+      ntimer_set_callback(&periodic_resource->periodic_timer, process_callback);
+      ntimer_set(&periodic_resource->periodic_timer,
+                 periodic_resource->period);
+    }
+  }
+}
+
 /*---------------------------------------------------------------------------*/
 /*- REST Engine API ---------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
@@ -86,8 +108,9 @@ rest_init_engine(void)
   /* Start the RESTful server implementation. */
   REST.init();
 
+  init_periodic();
   /*Start REST engine process */
-  process_start(&rest_engine_process, NULL);
+  /* process_start(&rest_engine_process, NULL); */
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -184,48 +207,18 @@ rest_invoke_restful_service(void *request, void *response, uint8_t *buffer,
   return found & allowed;
 }
 /*-----------------------------------------------------------------------------------*/
-PROCESS_THREAD(rest_engine_process, ev, data)
+/* This callback occurs when t is expired */
+static void process_callback(ntimer_t *t)
 {
-  PROCESS_BEGIN();
+  periodic_resource_t *periodic_resource;
+  periodic_resource = (periodic_resource_t *) t->user_data;
+  if(periodic_resource->period) {
+    PRINTF("Periodic: timer expired for /%s (period: %lu)\n",
+           periodic_resource->resource->url, periodic_resource->period);
 
-  /* pause to let REST server finish adding resources. */
-  PROCESS_PAUSE();
-
-  /* initialize the PERIODIC_RESOURCE timers, which will be handled by this process. */
-  periodic_resource_t *periodic_resource = NULL;
-
-  for(periodic_resource =
-        (periodic_resource_t *)list_head(restful_periodic_services);
-      periodic_resource; periodic_resource = periodic_resource->next) {
-    if(periodic_resource->periodic_handler && periodic_resource->period) {
-      PRINTF("Periodic: Set timer for /%s to %lu\n",
-             periodic_resource->resource->url, periodic_resource->period);
-      etimer_set(&periodic_resource->periodic_timer,
-                 periodic_resource->period);
-    }
+    /* Call the periodic_handler function, which was checked during adding to list. */
+    (periodic_resource->periodic_handler)();
+    ntimer_reset(t, periodic_resource->period);
   }
-  while(1) {
-    PROCESS_WAIT_EVENT();
-
-    if(ev == PROCESS_EVENT_TIMER) {
-      for(periodic_resource =
-            (periodic_resource_t *)list_head(restful_periodic_services);
-          periodic_resource; periodic_resource = periodic_resource->next) {
-        if(periodic_resource->period
-           && etimer_expired(&periodic_resource->periodic_timer)) {
-
-          PRINTF("Periodic: etimer expired for /%s (period: %lu)\n",
-                 periodic_resource->resource->url, periodic_resource->period);
-
-          /* Call the periodic_handler function, which was checked during adding to list. */
-          (periodic_resource->periodic_handler)();
-
-          etimer_reset(&periodic_resource->periodic_timer);
-        }
-      }
-    }
-  }
-
-  PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
