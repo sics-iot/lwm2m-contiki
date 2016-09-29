@@ -99,24 +99,12 @@ coap_src_endpoint(void)
   return &src;
 }
 /*---------------------------------------------------------------------------*/
-uip_ipaddr_t *
-coap_srcipaddr(void)
-{
-  return &UIP_IP_BUF->srcipaddr;
-}
-
-uint16_t
-coap_srcport(void)
-{
-  return UIP_UDP_BUF->srcport;
-}
-/*---------------------------------------------------------------------------*/
 uint8_t *
 coap_databuf(void)
 {
   return uip_appdata;
 }
-
+/*---------------------------------------------------------------------------*/
 uint16_t
 coap_datalen()
 {

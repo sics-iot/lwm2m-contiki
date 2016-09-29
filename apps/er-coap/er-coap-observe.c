@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "er-coap-observe.h"
+#include "lib/memb.h"
 
 #define DEBUG 0
 #if DEBUG

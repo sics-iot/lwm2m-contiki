@@ -50,7 +50,4 @@ uint16_t coap_datalen(void);
 
 const coap_endpoint_t *coap_src_endpoint(void);
 
-uip_ipaddr_t *coap_srcipaddr(void);
-uint16_t coap_srcport(void);
-
 #endif /* ER_COAP_TRANSPORT_H_ */
