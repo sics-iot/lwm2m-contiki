@@ -38,6 +38,7 @@
 
 #include "contiki.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-rd-client.h"
 #include "ipso-objects.h"
 
 #define DEBUG DEBUG_NONE
@@ -64,13 +65,13 @@ setup_lwm2m_servers(void)
 #ifdef LWM2M_SERVER_ADDRESS
   uip_ipaddr_t addr;
   if(uiplib_ipaddrconv(LWM2M_SERVER_ADDRESS, &addr)) {
-    lwm2m_engine_register_with_bootstrap_server(&addr, 0);
-    lwm2m_engine_register_with_server(&addr, 0);
+    lwm2m_rd_client_register_with_bootstrap_server(&addr, 0);
+    lwm2m_rd_client_register_with_server(&addr, 0);
   }
 #endif /* LWM2M_SERVER_ADDRESS */
 
-  lwm2m_engine_use_bootstrap_server(REGISTER_WITH_LWM2M_BOOTSTRAP_SERVER);
-  lwm2m_engine_use_registration_server(REGISTER_WITH_LWM2M_SERVER);
+  lwm2m_rd_client_use_bootstrap_server(REGISTER_WITH_LWM2M_BOOTSTRAP_SERVER);
+  lwm2m_rd_client_use_registration_server(REGISTER_WITH_LWM2M_SERVER);
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(example_ipso_objects, ev, data)
