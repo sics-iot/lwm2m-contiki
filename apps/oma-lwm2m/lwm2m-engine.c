@@ -391,6 +391,7 @@ write_rd_json_data(const lwm2m_context_t *context,
   PRINTF("{\"e\":[");
   rdlen = snprintf(buffer, size, "{\"e\":[");
   if(rdlen < 0 || rdlen >= size) {
+    PRINTF("#<truncated>\n");
     return -1;
   }
 
@@ -422,11 +423,12 @@ write_rd_json_data(const lwm2m_context_t *context,
       int32_t value;
       if(lwm2m_object_get_resource_floatfix(resource, context, &value)) {
         PRINTF("%s{\"n\":\"%u\",\"v\":%" PRId32 "}", s, resource->id,
-               value / LWM2M_FLOAT32_FRAC);
+               value / (int32_t)LWM2M_FLOAT32_FRAC);
         len = snprintf(&buffer[rdlen], size - rdlen,
                        "%s{\"n\":\"%u\",\"v\":", s, resource->id);
         rdlen += len;
         if(len < 0 || rdlen >= size) {
+          PRINTF("#<truncated>\n");
           return -1;
         }
 
@@ -434,6 +436,7 @@ write_rd_json_data(const lwm2m_context_t *context,
                                                 size - rdlen,
                                                 value, LWM2M_FLOAT32_BITS);
         if(len == 0) {
+          PRINTF("#<truncated>\n");
           return -1;
         }
         rdlen += len;
@@ -455,6 +458,7 @@ write_rd_json_data(const lwm2m_context_t *context,
     }
     rdlen += len;
     if(len < 0 || rdlen >= size) {
+      PRINTF("#<truncated>\n");
       return -1;
     }
     if(len > 0) {
@@ -465,6 +469,7 @@ write_rd_json_data(const lwm2m_context_t *context,
   len = snprintf(&buffer[rdlen], size - rdlen, "]}");
   rdlen += len;
   if(len < 0 || rdlen >= size) {
+    PRINTF("#<truncated>\n");
     return -1;
   }
 
@@ -522,7 +527,8 @@ lwm2m_engine_select_reader(lwm2m_context_t *context, unsigned int content_format
       context->reader = &lwm2m_plain_text_reader;
       break;
     default:
-      PRINTF("Unknown content type %u, using LWM2M plain text\n", accept);
+      PRINTF("Unknown content type %u, using LWM2M plain text\n",
+             content_format);
       context->reader = &lwm2m_plain_text_reader;
       break;
   }
@@ -543,9 +549,9 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
   lwm2m_context_t context;
   rest_resource_flags_t method;
   const lwm2m_instance_t *instance;
-#if (DEBUG) & DEBUG_PRINT
+#if DEBUG
   const char *method_str;
-#endif /* (DEBUG) & DEBUG_PRINT */
+#endif /* DEBUG */
 
   method = REST.get_method_type(request);
 
@@ -570,7 +576,7 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
   lwm2m_engine_select_reader(&context, format);
   content_type = lwm2m_engine_select_writer(&context, accept);
 
-#if (DEBUG) & DEBUG_PRINT
+#if DEBUG
   /* for debugging */
   if(method == METHOD_GET) {
     method_str = "GET";
@@ -593,7 +599,7 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
       PRINTF("Data: '%.*s'\n", plen, (char *)data);
     }
   }
-#endif /* (DEBUG) & DEBUG_PRINT */
+#endif /* DEBUG */
 
   instance = lwm2m_engine_get_instance(object, &context, depth);
 

@@ -42,11 +42,12 @@
 
 #include "er-coap.h"
 #include "er-coap-observe-client.h"
+#include "sys/cc.h"
 
 /* Compile this code only if client-side support for CoAP Observe is required */
 #if COAP_OBSERVE_CLIENT
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTEP(ep) coap_endpoint_print(ep)

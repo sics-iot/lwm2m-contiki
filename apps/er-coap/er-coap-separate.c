@@ -37,7 +37,6 @@
  */
 
 #include "sys/cc.h"
-#include <stdio.h>
 #include <string.h>
 #include "er-coap.h"
 #include "er-coap-separate.h"
@@ -87,7 +86,7 @@ coap_separate_accept(void *request, coap_separate_t *separate_store)
   coap_packet_t *const coap_req = (coap_packet_t *)request;
   coap_transaction_t *const t = coap_get_transaction_by_mid(coap_req->mid);
 
-  PRINTF("Separate ACCEPT: /%.*s MID %u\n", coap_req->uri_path_len,
+  PRINTF("Separate ACCEPT: /%.*s MID %u\n", (int)coap_req->uri_path_len,
          coap_req->uri_path, coap_req->mid);
   if(t) {
     /* send separate ACK for CON */
