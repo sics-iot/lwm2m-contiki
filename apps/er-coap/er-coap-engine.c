@@ -39,6 +39,7 @@
 #include "sys/cc.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <string.h>
 #include "er-coap-engine.h"
 
@@ -46,12 +47,8 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
 #else
 #define PRINTF(...)
-#define PRINT6ADDR(addr)
-#define PRINTLLADDR(addr)
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -92,7 +89,7 @@ coap_receive(const coap_endpoint_t *src,
 
     PRINTF("  Parsed: v %u, t %u, tkl %u, c %u, mid %u\n", message->version,
            message->type, message->token_len, message->code, message->mid);
-    PRINTF("  URL: %.*s\n", message->uri_path_len, message->uri_path);
+    PRINTF("  URL: %.*s\n", (int)message->uri_path_len, message->uri_path);
     PRINTF("  Payload: %.*s\n", message->payload_len, message->payload);
 
     /* handle requests */
@@ -121,7 +118,7 @@ coap_receive(const coap_endpoint_t *src,
         }
         if(coap_get_header_block2
            (message, &block_num, NULL, &block_size, &block_offset)) {
-          PRINTF("Blockwise: block request %lu (%u/%u) @ %lu bytes\n",
+          PRINTF("Blockwise: block request %"PRIu32" (%u/%u) @ %"PRIu32" bytes\n",
                  block_num, block_size, COAP_MAX_BLOCK_SIZE, block_offset);
           block_size = MIN(block_size, COAP_MAX_BLOCK_SIZE);
           new_offset = block_offset;
@@ -175,7 +172,7 @@ coap_receive(const coap_endpoint_t *src,
 
                   /* resource provides chunk-wise data */
                 } else {
-                  PRINTF("Blockwise: blockwise resource, new offset %ld\n",
+                  PRINTF("Blockwise: blockwise resource, new offset %"PRId32"\n",
                          new_offset);
                   coap_set_header_block2(response, block_num,
                                          new_offset != -1

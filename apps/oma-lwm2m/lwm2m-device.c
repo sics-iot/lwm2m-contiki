@@ -45,6 +45,7 @@
 #include "lwm2m-device.h"
 #include "lwm2m-engine.h"
 #include "sys/ntimer.h"
+#include <inttypes.h>
 
 #define DEBUG 0
 #if DEBUG
