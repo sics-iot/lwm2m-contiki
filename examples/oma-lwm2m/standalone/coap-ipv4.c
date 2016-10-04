@@ -148,6 +148,18 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
   PRINTEP(&last_source);
   PRINTF(" %u bytes\n", len);
   coap_buf_len = len;
+
+  if(DEBUG) {
+    int i;
+    uint8_t *data;
+    data = coap_databuf();
+    PRINTF("Received:");
+    for(i = 0; i < len; i++) {
+      PRINTF("%02x", data[i]);
+    }
+    PRINTF("\n");
+  }
+
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 }
 /*---------------------------------------------------------------------------*/
