@@ -1,7 +1,7 @@
 OMA LWM2M Standalone Example
 ====================================
 
-This is an example of how to make sure of the OMA LWM2M and CoAP
+This is an example of how to make use of the OMA LWM2M and CoAP
 implementation from Contiki in a native application.
 
 The Makefile will copy necessary files from Contiki to the subfolder
