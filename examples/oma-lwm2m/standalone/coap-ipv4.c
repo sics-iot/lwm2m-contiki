@@ -202,20 +202,24 @@ void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
 {
   if(coap_ipv4_fd >= 0) {
-    sendto(coap_ipv4_fd, data, len, 0,
-           (struct sockaddr *)&ep->addr, ep->addr_len);
+    if(sendto(coap_ipv4_fd, data, len, 0,
+              (struct sockaddr *)&ep->addr, ep->addr_len) < 1) {
+      PRINTF("failed to send to ");
+      PRINTEP(ep);
+      PRINTF(" %u bytes: %s\n", len, strerror(errno));
+    } else {
+      PRINTF("SENT to ");
+      PRINTEP(ep);
+      PRINTF(" %u bytes\n", len);
 
-    PRINTF("SENT to ");
-    PRINTEP(ep);
-    PRINTF(" %u bytes\n", len);
-
-    if(DEBUG) {
-      int i;
-      PRINTF("Sent:");
-      for(i = 0; i < len; i++) {
-        PRINTF("%02x", data[i]);
+      if(DEBUG) {
+        int i;
+        PRINTF("Sent:");
+        for(i = 0; i < len; i++) {
+          PRINTF("%02x", data[i]);
+        }
+        PRINTF("\n");
       }
-      PRINTF("\n");
     }
   }
 }
