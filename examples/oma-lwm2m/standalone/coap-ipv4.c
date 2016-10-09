@@ -101,6 +101,15 @@ coap_endpoint_print(const coap_endpoint_t *ep)
   }
 }
 /*---------------------------------------------------------------------------*/
+int
+coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
+{
+  /* text = format coap://host:port/... we assume */
+  /* will not work for know - on the TODO */
+
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
 uint8_t *
 coap_databuf(void)
 {
@@ -199,6 +208,15 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     PRINTF("SENT to ");
     PRINTEP(ep);
     PRINTF(" %u bytes\n", len);
+
+    if(DEBUG) {
+      int i;
+      PRINTF("Sent:");
+      for(i = 0; i < len; i++) {
+        PRINTF("%02x", data[i]);
+      }
+      PRINTF("\n");
+    }
   }
 }
 /*---------------------------------------------------------------------------*/

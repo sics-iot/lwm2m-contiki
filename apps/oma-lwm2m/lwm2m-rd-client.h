@@ -28,9 +28,9 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-void lwm2m_engine_use_bootstrap_server(int use);
-void lwm2m_engine_use_registration_server(int use);
-void lwm2m_engine_register_with_server(const uip_ipaddr_t *server, uint16_t port);
-void lwm2m_engine_register_with_bootstrap_server(const uip_ipaddr_t *server, uint16_t port);
+void lwm2m_rd_client_use_bootstrap_server(int use);
+void lwm2m_rd_client_use_registration_server(int use);
+void lwm2m_rd_client_register_with_server(const coap_endpoint_t *server);
+void lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server);
 
-void lwm2m_rd_client_init(void);
+void lwm2m_rd_client_init(const char *ep);
