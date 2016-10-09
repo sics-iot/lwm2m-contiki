@@ -4,7 +4,7 @@ MKDIR=mkdir
 
 CORE_FILES = sys/cc.h sys/cc-gcc.h sys/ntimer.c lib/list.c lib/memb.c
 COAP_FILES = ${addprefix er-coap/,${filter-out er-coap-blocking-api.% er-coap-uip.%,${notdir ${wildcard $(CONTIKI)/apps/er-coap/er-coap*}}}}
-LWM2M_FILES = ${addprefix oma-lwm2m/,${filter-out lwm2m-rd-client.%,${notdir ${wildcard $(CONTIKI)/apps/oma-lwm2m/lwm2m-* $(CONTIKI)/apps/oma-lwm2m/oma-*}}}}
+LWM2M_FILES = ${addprefix oma-lwm2m/,${filter-out lwm2m-rx-client.%,${notdir ${wildcard $(CONTIKI)/apps/oma-lwm2m/lwm2m-* $(CONTIKI)/apps/oma-lwm2m/oma-*}}}}
 #IPSO_FILES = ${addprefix ipso-objects/,${notdir ${wildcard $(CONTIKI)/apps/ipso-objects/ipso-*}}}
 REST_FILES = ${addprefix rest-engine/,${notdir ${wildcard $(CONTIKI)/apps/rest-engine/rest-*}}}
 

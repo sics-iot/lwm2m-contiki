@@ -38,6 +38,7 @@
 
 #include "sys/ntimer.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-rd-client.h"
 #include "coap-ipv4.h"
 #include <unistd.h>
 #include <sys/select.h>
@@ -45,6 +46,8 @@
 #include <err.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 /*---------------------------------------------------------------------------*/
 static void
 callback(ntimer_t *timer)
@@ -63,6 +66,7 @@ main(int argc, char * argv[])
   int maxfd;
   int retval;
   struct timeval tv;
+  coap_endpoint_t server_ep;
 
   /* Example using network timer */
   ntimer_set_callback(&nt, callback);
@@ -73,6 +77,16 @@ main(int argc, char * argv[])
 
   /* Register default LWM2M objects */
   lwm2m_engine_register_default_objects();
+
+  /* set server and port */
+  server_ep.addr.sin_family = AF_INET;
+  server_ep.addr.sin_port = htons(5683);
+  inet_aton("172.16.31.179", &server_ep.addr.sin_addr);
+
+  /* start RD client */
+  lwm2m_rd_client_register_with_server(&server_ep);
+  lwm2m_rd_client_use_registration_server(1);
+  lwm2m_rd_client_init("TestEndpont");
 
   while(1) {
     tv.tv_sec = 0;
