@@ -188,7 +188,7 @@ coap_transport_init(void)
 
   server.sin_family = AF_INET;
   server.sin_port = htons(COAP_SERVER_PORT);
-  server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  server.sin_addr.s_addr = htonl(INADDR_ANY);
 
   if(bind(coap_ipv4_fd, (struct sockaddr *)&server, sizeof(server)) == -1) {
     PRINTF("Could not bind CoAP UDP port to %u\n", COAP_SERVER_PORT);
