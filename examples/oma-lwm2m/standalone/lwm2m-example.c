@@ -82,6 +82,7 @@ main(int argc, char * argv[])
   server_ep.addr.sin_family = AF_INET;
   server_ep.addr.sin_port = htons(5683);
   inet_aton("172.16.31.179", &server_ep.addr.sin_addr);
+  server_ep.addr_len = sizeof(server_ep.addr);
 
   /* start RD client */
   lwm2m_rd_client_register_with_server(&server_ep);
