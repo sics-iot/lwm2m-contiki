@@ -50,17 +50,25 @@ callback(ntimer_t *timer)
   ntimer_reset(timer, 10000);
 }
 /*---------------------------------------------------------------------------*/
+#ifndef LWM2M_DEFAULT_RD_SERVER
+#define LWM2M_DEFAULT_RD_SERVER "172.16.31.179"
+#endif /* LWM2M_DEFAULT_RD_SERVER */
+/*---------------------------------------------------------------------------*/
 void
 start_application(int argc, char *argv[])
 {
   static ntimer_t nt;
+  const char *default_server = LWM2M_DEFAULT_RD_SERVER;
   coap_endpoint_t server_ep;
   int has_server_ep = 0;
 
-  /* "172.16.31.179" */
   if(argc > 1) {
-    if(coap_endpoint_parse(argv[1], strlen(argv[1]), &server_ep) == 0) {
-      fprintf(stderr, "failed to parse the server address '%s'\n", argv[1]);
+    default_server = argv[1];
+  }
+
+  if(default_server != NULL) {
+    if(coap_endpoint_parse(default_server, strlen(default_server), &server_ep) == 0) {
+      fprintf(stderr, "failed to parse the server address '%s'\n", default_server);
       exit(1);
     }
     has_server_ep = 1;
