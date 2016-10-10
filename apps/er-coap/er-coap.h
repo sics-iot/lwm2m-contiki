@@ -62,7 +62,7 @@
 #endif /* COAP_MAX_BLOCK_SIZE */
 
 /* bitmap for set options */
-enum { OPTION_MAP_SIZE = sizeof(uint8_t) * 8 };
+#define OPTION_MAP_SIZE  (sizeof(uint8_t) * 8)
 
 #define SET_OPTION(packet, opt) ((packet)->options[opt / OPTION_MAP_SIZE] |= 1 << (opt % OPTION_MAP_SIZE))
 #define IS_OPTION(packet, opt) ((packet)->options[opt / OPTION_MAP_SIZE] & (1 << (opt % OPTION_MAP_SIZE)))
