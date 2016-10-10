@@ -29,64 +29,17 @@
 
 /**
  * \file
- *         An OMA LWM2M standalone example to demonstrate how to use
- *         the Contiki OMA LWM2M library from a native application.
+ *         A HEX text transport for CoAP
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include "sys/ntimer.h"
-#include "lwm2m-engine.h"
-#include "lwm2m-rd-client.h"
-#include <inttypes.h>
-#include <string.h>
-#include <stdlib.h>
-/*---------------------------------------------------------------------------*/
-static void
-callback(ntimer_t *timer)
-{
-  printf("uptime: %"PRIu64"\n", ntimer_uptime());
-  ntimer_reset(timer, 10000);
-}
-/*---------------------------------------------------------------------------*/
-void
-start_application(int argc, char *argv[])
-{
-  static ntimer_t nt;
-  coap_endpoint_t server_ep;
-  int has_server_ep = 0;
+#ifndef COAP_HEX_H_
+#define COAP_HEX_H_
 
-  /* "172.16.31.179" */
-  if(argc > 1) {
-    if(coap_endpoint_parse(argv[1], strlen(argv[1]), &server_ep) == 0) {
-      fprintf(stderr, "failed to parse the server address '%s'\n", argv[1]);
-      exit(1);
-    }
-    has_server_ep = 1;
-  }
+#define COAP_ENDPOINT_CUSTOM 1
 
-  /* Example using network timer */
-  ntimer_set_callback(&nt, callback);
-  ntimer_set(&nt, 10000);
+typedef uint8_t coap_endpoint_t;
 
-  /* Initialize the OMA LWM2M engine */
-  lwm2m_engine_init();
-
-  /* Register default LWM2M objects */
-  lwm2m_engine_register_default_objects();
-
-  if(has_server_ep) {
-    /* start RD client */
-    printf("Starting RD client to register at ");
-    coap_endpoint_print(&server_ep);
-    printf("\n");
-
-    lwm2m_rd_client_register_with_server(&server_ep);
-    lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("?ep=abcde");
-  } else {
-    fprintf(stderr, "No registration server specified.\n");
-  }
-}
-/*---------------------------------------------------------------------------*/
+#endif /* COAP_HEX_H_ */
