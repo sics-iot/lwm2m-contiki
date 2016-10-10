@@ -276,7 +276,8 @@ periodic_process(ntimer_t *timer)
   case WAIT_NETWORK:
     if(now > wait_until_network_check) {
       /* check each 10 seconds before next check */
-      PRINTF("Checking for network...%d\n", wait_until_network_check);
+      PRINTF("Checking for network... %lu\n",
+             (unsigned long)wait_until_network_check);
       wait_until_network_check = now + 10000;
       if(has_network_access()) {
         /* Either do bootstrap then registration */
