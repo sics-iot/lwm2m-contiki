@@ -43,6 +43,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.io.PrintStream;
 
 public class Hex2UDP implements Runnable {
 
@@ -93,11 +95,30 @@ public class Hex2UDP implements Runnable {
 
     /* Loop on std in to get lines of hex to send */
     public static void main(String[] args) throws IOException {
+        InputStream in = System.in;
+        final PrintStream out;
         System.err.println("Connecting to " + args[0]);
-        Hex2UDP udpc = new Hex2UDP(args[0], 5683);
+        if(args.length > 1) {
+            Runtime rt = Runtime.getRuntime();
+            Process pr = rt.exec(args[1]);
+            System.err.println("Started " + args[1]);
+            in = pr.getInputStream();
+            out = new PrintStream(pr.getOutputStream());
+        } else {
+            out = System.out;
+        }
+
+        /* Create a Hex2UDP that print on this out stream */
+        Hex2UDP udpc = new Hex2UDP(args[0], 5683) {
+                public void receive(byte[] data) {
+                    String s = DatatypeConverter.printHexBinary(data);
+                    out.println("COAPHEX:" + s);
+                    System.err.println("IN: " + s);
+                }
+            };
 
         BufferedReader buffer =
-            new BufferedReader(new InputStreamReader(System.in));
+            new BufferedReader(new InputStreamReader(in));
 
         /* The read loop */
         while(true) {
@@ -110,6 +131,7 @@ public class Hex2UDP implements Runnable {
                 byte[] data = DatatypeConverter.parseHexBinary(line.substring(8));
                 udpc.send(data);
             }
+            System.err.println("OUT:" + line);
         }
     }
 }
