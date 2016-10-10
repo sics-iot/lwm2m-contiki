@@ -132,6 +132,7 @@ stdin_callback(const char *line)
     return;
   }
 
+  line += 8;
   llen = strlen(line);
   if((llen & 1) != 0) {
     /* Odd number of characters - not hex */
