@@ -66,7 +66,7 @@ start_application(int argc, char *argv[])
     default_server = argv[1];
   }
 
-  if(default_server != NULL) {
+  if(default_server != NULL && *default_server != '\0') {
     if(coap_endpoint_parse(default_server, strlen(default_server), &server_ep) == 0) {
       fprintf(stderr, "failed to parse the server address '%s'\n", default_server);
       exit(1);
