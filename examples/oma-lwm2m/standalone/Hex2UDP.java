@@ -114,6 +114,7 @@ public class Hex2UDP implements Runnable {
                 public void receive(byte[] data) {
                     String s = DatatypeConverter.printHexBinary(data);
                     out.println("COAPHEX:" + s);
+                    out.flush();
                     System.err.println("IN: " + s);
                 }
             };
