@@ -87,7 +87,7 @@ main(int argc, char * argv[])
   /* start RD client */
   lwm2m_rd_client_register_with_server(&server_ep);
   lwm2m_rd_client_use_registration_server(1);
-  lwm2m_rd_client_init("TestEndpont");
+  lwm2m_rd_client_init("?ep=abcde");
 
   while(1) {
     tv.tv_sec = 0;
