@@ -60,6 +60,7 @@ public class Hex2UDP implements Runnable {
             new Thread(this).start();
         } catch(Exception e) {
             /* Do good stuff here... */
+            e.printStackTrace();
         }
     }
 
