@@ -23,8 +23,13 @@ endif
 $(PROJECT): $(PROJECT).c $(OBJECT_FILES)
 	$(CC) $(CFLAGS) -o $@ $(PROJECT).c $(OBJECT_FILES)
 
+lib:	liblwm2m.a
+
 clean::
-	@-rm -f $(OBJECT_FILES) *.o $(PROJECT)
+	@-rm -f $(OBJECT_FILES) *.o liblwm2m.a $(PROJECT)
+
+liblwm2m.a: $(OBJECT_FILES)
+	$(AR) rvs $@ $(OBJECT_FILES)
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $< -o $@
