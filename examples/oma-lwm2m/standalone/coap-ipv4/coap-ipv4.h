@@ -47,6 +47,4 @@ typedef struct {
   unsigned int addr_len;
 } coap_endpoint_t;
 
-void coap_ipv4_init(void);
-
 #endif /* COAP_IPV4_H_ */

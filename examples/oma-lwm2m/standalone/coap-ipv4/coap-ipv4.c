@@ -200,6 +200,7 @@ coap_transport_init(void)
   }
 
   printf("CoAP server listening on port %u\n", COAP_SERVER_PORT);
+  select_set_callback(coap_ipv4_fd, &udp_callback);
 }
 /*---------------------------------------------------------------------------*/
 void
