@@ -29,34 +29,27 @@
 
 /**
  * \file
- *         Configuration for Contiki library
+ *         Simple posix main loop with support functions.
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef CONTIKI_CONF_H_
-#define CONTIKI_CONF_H_
+#ifndef POSIX_MAIN_H_
+#define POSIX_MAIN_H_
 
-#include <stdint.h>
+#include <inttypes.h>
+#include <sys/select.h>
 
-#include "posix-main.h"
+typedef struct select_callback {
+  int  (* set_fd)(fd_set *fdr, fd_set *fdw);
+  void (* handle_fd)(fd_set *fdr, fd_set *fdw);
+} select_callback_t;
 
-#define NTIMER_CONF_DRIVER ntimer_native_driver
+int select_set_callback(int fd, const select_callback_t *callback);
 
-#define LWM2M_ENGINE_CLIENT_ENDPOINT_NAME "lwm2m-ex"
-#define LWM2M_DEVICE_MANUFACTURER "SICS, Swedish ICT AB"
-#define LWM2M_DEVICE_TYPE "lwm2m-example"
-#define LWM2M_DEVICE_MODEL_NUMBER "000"
-#define LWM2M_DEVICE_SERIAL_NO "1"
-#define LWM2M_DEVICE_FIRMWARE_VERSION "0.1"
+void select_set_stdin_callback(void (* line_read)(const char *text));
 
-#define REST coap_rest_implementation
+void start_application(int argc, char *argv[]);
 
-#ifdef COAP_TRANSPORT_CONF_H
-#include COAP_TRANSPORT_CONF_H
-#endif
-
-#define REST_MAX_CHUNK_SIZE           256
-
-#endif /* CONTIKI_CONF_H_ */
+#endif /* POSIX_MAIN_H_ */

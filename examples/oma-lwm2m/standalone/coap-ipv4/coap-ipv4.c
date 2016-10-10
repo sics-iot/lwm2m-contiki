@@ -65,7 +65,7 @@ typedef union {
   uint8_t u8[BUFSIZE];
 } coap_buf_t;
 
-int coap_ipv4_fd = -1;
+static int coap_ipv4_fd = -1;
 
 static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
@@ -122,7 +122,7 @@ coap_datalen()
   return coap_buf_len;
 }
 /*---------------------------------------------------------------------------*/
-int
+static int
 coap_ipv4_set_fd(fd_set *rset, fd_set *wset)
 {
   if(coap_ipv4_fd >= 0) {
@@ -131,7 +131,7 @@ coap_ipv4_set_fd(fd_set *rset, fd_set *wset)
   return 1;
 }
 /*---------------------------------------------------------------------------*/
-void
+static void
 coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 {
   int len;
@@ -171,6 +171,10 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 }
+/*---------------------------------------------------------------------------*/
+static const struct select_callback udp_callback = {
+  coap_ipv4_set_fd, coap_ipv4_handle_fd
+};
 /*---------------------------------------------------------------------------*/
 void
 coap_transport_init(void)

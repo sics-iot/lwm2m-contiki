@@ -29,7 +29,7 @@
 
 /**
  * \file
- *         Example native implementation of ntimer driver.
+ *         Example posix implementation of ntimer driver.
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>

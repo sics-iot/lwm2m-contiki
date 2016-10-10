@@ -7,9 +7,23 @@ APPSDIRS = er-coap oma-lwm2m ipso-objects rest-engine
 TARGETCDIR = oma-lwm2m-src
 TARGETCDIRS = ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}
 SOURCEDIRS = . ${addprefix $(TARGETCDIR)/,. $(APPSDIRS)}
-SOURCE_FILES = coap-ipv4.c ntimer-native.c
+SOURCE_FILES = posix-main.c posix-ntimer.c
 
 CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
+
+TRANSPORT ?= ipv4
+ifeq ($(TRANSPORT),ipv4)
+  TRANSPORTDIR = coap-ipv4
+  CFLAGS += -DWITH_COAP_IPV4=1 -DCOAP_TRANSPORT_CONF_H=\"coap-ipv4.h\"
+else ifeq ($(TRANSPORT),text)
+  TRANSPORTDIR = coap-text
+  CFLAGS += -DWITH_COAP_TEXT=1 -DCOAP_TRANSPORT_CONF_H=\"coap-text.h\"
+else
+  ${error Unknown CoAP transport: $(TRANSPORT)}
+endif
+
+SOURCEDIRS += $(TRANSPORTDIR)
+SOURCE_FILES += ${notdir ${wildcard $(TRANSPORTDIR)/*.c}}
 
 vpath %.c $(SOURCEDIRS)
 
