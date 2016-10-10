@@ -84,7 +84,7 @@ progress_request(struct request_state *state) {
                              REST_MAX_CHUNK_SIZE);
     }
     state->transaction->packet_len =
-      coap_serialize_message(request,state->transaction->packet);
+      coap_serialize_message(request, state->transaction->packet);
 
     coap_send_transaction(state->transaction);
     PRINTF("Requested #%lu (MID %u)\n", (unsigned long) state->block_num,
