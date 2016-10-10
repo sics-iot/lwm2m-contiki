@@ -90,7 +90,7 @@ int
 coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 {
   /* Hex based CoAP has no addresses, just writes data to standard out */
-  *ep = *text;
+  *ep = last_source = 0;
   return 1;
 }
 /*---------------------------------------------------------------------------*/
