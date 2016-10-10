@@ -38,12 +38,14 @@
 #ifndef COAP_IPV4_H_
 #define COAP_IPV4_H_
 
-#include <sys/select.h>
+#include <netinet/in.h>
 
-extern int coap_ipv4_fd;
+#define COAP_ENDPOINT_CUSTOM 1
 
-int coap_ipv4_set_fd(fd_set *fdr, fd_set *fdw);
-void coap_ipv4_handle_fd(fd_set *fdr, fd_set *fdw);
+typedef struct {
+  struct sockaddr_in addr;
+  unsigned int addr_len;
+} coap_endpoint_t;
 
 void coap_ipv4_init(void);
 

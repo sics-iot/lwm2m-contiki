@@ -56,16 +56,10 @@ callback(ntimer_t *timer)
   ntimer_reset(timer, 10000);
 }
 /*---------------------------------------------------------------------------*/
-int
-main(int argc, char * argv[])
+void
+start_application(int argc, char *argv[])
 {
   static ntimer_t nt;
-  uint64_t next_time;
-  fd_set fdr;
-  fd_set fdw;
-  int maxfd;
-  int retval;
-  struct timeval tv;
   coap_endpoint_t server_ep;
 
   /* Example using network timer */
@@ -88,49 +82,5 @@ main(int argc, char * argv[])
   lwm2m_rd_client_register_with_server(&server_ep);
   lwm2m_rd_client_use_registration_server(1);
   lwm2m_rd_client_init("?ep=abcde");
-
-  while(1) {
-    tv.tv_sec = 0;
-    tv.tv_usec = 250;
-
-    next_time = ntimer_time_to_next_expiration();
-    if(next_time > 0) {
-      tv.tv_sec = next_time / 1000;
-      tv.tv_usec = (next_time % 1000) * 1000;
-      if(tv.tv_usec == 0 && tv.tv_sec == 0) {
-        /*
-         * ntimer time resolution is milliseconds. Avoid millisecond
-         * busy loops.
-         */
-        tv.tv_usec = 250;
-      }
-    }
-
-    FD_ZERO(&fdr);
-    FD_ZERO(&fdw);
-    maxfd = 0;
-    if(coap_ipv4_fd >= 0) {
-      if(coap_ipv4_set_fd(&fdr, &fdw)) {
-        maxfd = coap_ipv4_fd;
-      }
-    }
-
-    retval = select(maxfd + 1, &fdr, &fdw, NULL, &tv);
-    if(retval < 0) {
-      if(errno != EINTR) {
-        perror("select");
-      }
-    } else if(retval > 0) {
-      /* timeout => retval == 0 */
-      if(coap_ipv4_fd >= 0) {
-        coap_ipv4_handle_fd(&fdr, &fdw);
-      }
-    }
-
-    /* Process network timers */
-    for(retval = 0; retval < 5 && ntimer_run(); retval++);
-  }
-
-  return 0;
 }
 /*---------------------------------------------------------------------------*/
