@@ -15,9 +15,9 @@ TRANSPORT ?= ipv4
 ifeq ($(TRANSPORT),ipv4)
   TRANSPORTDIR = coap-ipv4
   CFLAGS += -DWITH_COAP_IPV4=1 -DCOAP_TRANSPORT_CONF_H=\"coap-ipv4.h\"
-else ifeq ($(TRANSPORT),text)
-  TRANSPORTDIR = coap-text
-  CFLAGS += -DWITH_COAP_TEXT=1 -DCOAP_TRANSPORT_CONF_H=\"coap-text.h\"
+else ifeq ($(TRANSPORT),hex)
+  TRANSPORTDIR = coap-hex
+  CFLAGS += -DWITH_COAP_HEX=1 -DCOAP_TRANSPORT_CONF_H=\"coap-hex.h\"
 else
   ${error Unknown CoAP transport: $(TRANSPORT)}
 endif

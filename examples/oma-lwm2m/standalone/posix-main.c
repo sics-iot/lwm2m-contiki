@@ -38,7 +38,6 @@
 #include "sys/ntimer.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
-#include "coap-ipv4.h"
 #include <unistd.h>
 #include <sys/select.h>
 #include <errno.h>
@@ -92,6 +91,12 @@ select_set_callback(int fd, const struct select_callback *callback)
   }
   fprintf(stderr, "*** failed to set callback for fd %d\n", fd);
   return 0;
+}
+/*---------------------------------------------------------------------------*/
+void
+select_set_stdin_callback(void (* line_read)(const char *line))
+{
+  stdin_callback = line_read;
 }
 /*---------------------------------------------------------------------------*/
 static int

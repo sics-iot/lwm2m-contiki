@@ -88,12 +88,12 @@ public class Hex2UDP implements Runnable {
     /* Override this to make something more sensible with the data */
     public void receive(byte[] data) {
         String s = DatatypeConverter.printHexBinary(data);
-        System.out.println(s);
+        System.out.println("COAPHEX:" + s);
     }
 
     /* Loop on std in to get lines of hex to send */
     public static void main(String[] args) throws IOException {
-        System.out.println("Connecting to " + args[0]);
+        System.err.println("Connecting to " + args[0]);
         Hex2UDP udpc = new Hex2UDP(args[0], 5683);
 
         BufferedReader buffer =
@@ -102,12 +102,14 @@ public class Hex2UDP implements Runnable {
         /* The read loop */
         while(true) {
             String line = buffer.readLine();
-            byte[] data = DatatypeConverter.parseHexBinary(line);
-            udpc.send(data);
+            if(line == null) {
+                /* Connection closed */
+                System.err.println("*** stdin closed");
+                System.exit(0);
+            } else if (line.startsWith("COAPHEX:")) {
+                byte[] data = DatatypeConverter.parseHexBinary(line.substring(8));
+                udpc.send(data);
+            }
         }
     }
 }
-
-
-
-

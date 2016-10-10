@@ -29,7 +29,7 @@
 
 /**
  * \file
- *         A native IPv4 transport for CoAP
+ *         A HEX text transport for CoAP
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
@@ -38,13 +38,6 @@
 #include "er-coap.h"
 #include "er-coap-endpoint.h"
 #include "er-coap-engine.h"
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <errno.h>
-#include <err.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,8 +58,6 @@ typedef union {
   uint8_t u8[BUFSIZE];
 } coap_buf_t;
 
-static int coap_ipv4_fd = -1;
-
 static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
@@ -80,41 +71,26 @@ coap_src_endpoint(void)
 void
 coap_endpoint_copy(coap_endpoint_t *destination, const coap_endpoint_t *from)
 {
-  memcpy(destination, from, sizeof(coap_endpoint_t));
+  *destination = *from;
 }
 /*---------------------------------------------------------------------------*/
 int
 coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
 {
-  return memcmp(e1, e2, sizeof(coap_endpoint_t)) == 0;
+  return *e1 == *e2;
 }
 /*---------------------------------------------------------------------------*/
 void
 coap_endpoint_print(const coap_endpoint_t *ep)
 {
-  const char *address;
-  address = inet_ntoa(ep->addr.sin_addr);
-  if(address != NULL) {
-    printf("%s:%u", address, ntohs(ep->addr.sin_port));
-  } else {
-    printf("<#N/A>");
-  }
+  printf("%u", *ep);
 }
 /*---------------------------------------------------------------------------*/
 int
 coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 {
-  /* text = format coap://host:port/... we assume */
-  /* will not work for know - on the TODO */
-  /* set server and port */
-
-  ep->addr.sin_family = AF_INET;
-  ep->addr.sin_port = htons(COAP_DEFAULT_PORT);
-  ep->addr_len = sizeof(ep->addr);
-  if(inet_aton(text, &ep->addr.sin_addr) == 0) {
-    /* Failed to parse the address */
-    return 0;
-  }
+  /* Hex based CoAP has no addresses, just writes data to standard out */
+  *ep = *text;
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -131,36 +107,50 @@ coap_datalen()
 }
 /*---------------------------------------------------------------------------*/
 static int
-coap_ipv4_set_fd(fd_set *rset, fd_set *wset)
+hextod(char c)
 {
-  if(coap_ipv4_fd >= 0) {
-    FD_SET(coap_ipv4_fd, rset);
+  if(c >= '0' && c <= '9') {
+    return c - '0';
   }
-  return 1;
+  if(c >= 'a' && c <= 'f') {
+    return c - 'a';
+  }
+  if(c >= 'A' && c <= 'F') {
+    return c - 'A';
+  }
+  return -1;
 }
 /*---------------------------------------------------------------------------*/
 static void
-coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
+stdin_callback(const char *line)
 {
-  int len;
+  uint8_t *buf;
+  int i, len, llen, v1, v2;
 
-  if(coap_ipv4_fd < 0) {
+  if(strncmp("COAPHEX:", line, 8) != 0) {
+    /* Not a CoAP message */
     return;
   }
-  if(!FD_ISSET(coap_ipv4_fd, rset)) {
+
+  llen = strlen(line);
+  if((llen & 1) != 0) {
+    /* Odd number of characters - not hex */
+    fprintf(stderr, "ERROR: %s\n", line);
     return;
   }
 
-  last_source.addr_len = sizeof(last_source.addr);
-  len = recvfrom(coap_ipv4_fd, coap_databuf(), BUFSIZE, 0,
-                 (struct sockaddr *)&last_source.addr, &last_source.addr_len);
-  if(len == -1) {
-    if(errno == EAGAIN) {
+  buf = coap_databuf();
+  for(i = 0, len = 0; i < llen; i += 2, len++) {
+    v1 = hextod(line[i]);
+    v2 = hextod(line[i + 1]);
+    if(v1 < 0 || v2 < 0) {
+      /* Not hex */
+      fprintf(stderr, "ERROR: %s\n", line);
       return;
     }
-    err(1, "coap-ipv4: recv");
-    return;
+    buf[len] = (uint8_t)(((v1 << 4) | v2) & 0xff);
   }
+
   PRINTF("RECV from ");
   PRINTEP(&last_source);
   PRINTF(" %u bytes\n", len);
@@ -180,60 +170,22 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 }
 /*---------------------------------------------------------------------------*/
-static const struct select_callback udp_callback = {
-  coap_ipv4_set_fd, coap_ipv4_handle_fd
-};
-/*---------------------------------------------------------------------------*/
 void
 coap_transport_init(void)
 {
-  static struct sockaddr_in server;
+  select_set_stdin_callback(stdin_callback);
 
-  coap_ipv4_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if(coap_ipv4_fd == -1) {
-    fprintf(stderr, "Could not create CoAP UDP socket\n");
-    exit(1);
-    return;
-  }
-
-  memset((void *)&server, 0, sizeof(server));
-
-  server.sin_family = AF_INET;
-  server.sin_port = htons(COAP_SERVER_PORT);
-  server.sin_addr.s_addr = htonl(INADDR_ANY);
-
-  if(bind(coap_ipv4_fd, (struct sockaddr *)&server, sizeof(server)) == -1) {
-    PRINTF("Could not bind CoAP UDP port to %u\n", COAP_SERVER_PORT);
-    exit(1);
-  }
-
-  printf("CoAP server listening on port %u\n", COAP_SERVER_PORT);
-  select_set_callback(coap_ipv4_fd, &udp_callback);
+  printf("CoAP listening on standard in\n");
 }
 /*---------------------------------------------------------------------------*/
 void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
 {
-  if(coap_ipv4_fd >= 0) {
-    if(sendto(coap_ipv4_fd, data, len, 0,
-              (struct sockaddr *)&ep->addr, ep->addr_len) < 1) {
-      PRINTF("failed to send to ");
-      PRINTEP(ep);
-      PRINTF(" %u bytes: %s\n", len, strerror(errno));
-    } else {
-      PRINTF("SENT to ");
-      PRINTEP(ep);
-      PRINTF(" %u bytes\n", len);
-
-      if(DEBUG) {
-        int i;
-        PRINTF("Sent:");
-        for(i = 0; i < len; i++) {
-          PRINTF("%02x", data[i]);
-        }
-        PRINTF("\n");
-      }
-    }
+  int i;
+  printf("COAPHEX:");
+  for(i = 0; i < len; i++) {
+    printf("%02x", data[i]);
   }
+  printf("\n");
 }
 /*---------------------------------------------------------------------------*/
