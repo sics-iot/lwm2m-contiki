@@ -62,7 +62,7 @@
 #include "net/rpl/rpl.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -110,23 +110,6 @@ static ntimer_t rd_timer;
 
 /*---------------------------------------------------------------------------*/
 static int
-index_of(const uint8_t *data, int offset, int len, uint8_t c)
-{
-  if(offset < 0) {
-    return offset;
-  }
-  for(; offset < len; offset++) {
-    if(data[offset] == c) {
-      return offset;
-    }
-  }
-  return -1;
-}
-
-/*---------------------------------------------------------------------------*/
-
-/*---------------------------------------------------------------------------*/
-static int
 has_network_access(void)
 {
 #if UIP_CONF_IPV6_RPL
@@ -135,18 +118,6 @@ has_network_access(void)
   }
 #endif /* UIP_CONF_IPV6_RPL */
   return 1;
-}
-/*---------------------------------------------------------------------------*/
-static void
-client_chunk_handler(void *response)
-{
-#if (DEBUG) & DEBUG_PRINT
-  const uint8_t *chunk;
-
-  int len = coap_get_payload(response, &chunk);
-
-  PRINTF("|%.*s\n", len, (char *)chunk);
-#endif /* (DEBUG) & DEBUG_PRINT */
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -266,11 +237,11 @@ periodic_process(ntimer_t *timer)
   ntimer_reset(&rd_timer, 500);
   now = ntimer_uptime();
 
-  printf("RD Client - state: %d\n", rd_state);
+  PRINTF("RD Client - state: %d\n", rd_state);
 
   switch(rd_state) {
   case INIT:
-    printf("RD Client started with endpoint '%s'\n", endpoint);
+    PRINTF("RD Client started with endpoint '%s'\n", endpoint);
     rd_state = WAIT_NETWORK;
     break;
   case WAIT_NETWORK:
@@ -298,14 +269,12 @@ periodic_process(ntimer_t *timer)
         coap_set_header_uri_path(request, "/bs");
         coap_set_header_uri_query(request, endpoint);
 
-        printf("Registering ID with bootstrap server [");
+        PRINTF("Registering ID with bootstrap server [");
         coap_endpoint_print(&bs_server_endpoint);
-        printf("] as '%s'\n", endpoint);
+        PRINTF("] as '%s'\n", endpoint);
 
         coap_send_request(&rd_request_state, &bs_server_endpoint, request,
                           bootstrap_callback);
-        /* COAP_BLOCKING_REQUEST(&bs_server_endpoint, request, */
-        /*                       client_chunk_handler); */
 
         rd_state = BOOTSTRAP_SENT;
       }
@@ -333,8 +302,6 @@ periodic_process(ntimer_t *timer)
         first = lwm2m_object_get_resource_string(rsc, &context);
         len = lwm2m_object_get_resource_strlen(rsc, &context);
         if(first != NULL && len > 0) {
-          int start, end;
-          int32_t port;
           uint8_t secure = 0;
 
           PRINTF("**** Found security instance using: %.*s\n", len, first);
@@ -347,13 +314,13 @@ periodic_process(ntimer_t *timer)
           coap_endpoint_print(&server_endpoint);
           PRINTF("\n");
           if(secure) {
-            printf("Secure CoAP requested but not supported - can not bootstrap\n");
+            PRINTF("Secure CoAP requested but not supported - can not bootstrap\n");
           } else {
             lwm2m_rd_client_register_with_server(&server_endpoint);
             bootstrapped++;
           }
         } else {
-          printf("** failed to parse URI %.*s\n", len, first);
+          PRINTF("** failed to parse URI %.*s\n", len, first);
         }
       }
 
@@ -379,9 +346,9 @@ periodic_process(ntimer_t *timer)
 
       coap_set_payload(request, rd_data, len);
 
-      printf("Registering with [");
+      PRINTF("Registering with [");
       coap_endpoint_print(&server_endpoint);
-      printf("] lwm2m endpoint '%s': '%.*s'\n",
+      PRINTF("] lwm2m endpoint '%s': '%.*s'\n",
              endpoint, len, (char *) rd_data);
       /* COAP_BLOCKING_REQUEST(&server_endpoint, request, */
       /*                       client_chunk_handler); */
@@ -394,7 +361,7 @@ periodic_process(ntimer_t *timer)
     break;
   case REGISTRATION_DONE:
     /* All is done! */
-    printf("registration done\n");
+    PRINTF("registration done\n");
     break;
   default:
     PRINTF("Unhandled state: %d\n", rd_state);
