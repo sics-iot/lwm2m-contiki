@@ -102,7 +102,7 @@ lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
           len = snprintf((char *)&rd_data[pos], size - pos,
                          "%s<%d/%d>", pos > 0 ? "," : "",
                          objects[i]->id, objects[i]->instances[j].id);
-          if(len > 0 && len < sizeof(rd_data) - pos) {
+          if(len > 0 && len < size - pos) {
             pos += len;
           }
         }
