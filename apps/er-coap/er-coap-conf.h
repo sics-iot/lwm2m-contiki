@@ -39,6 +39,8 @@
 #ifndef ER_COAP_CONF_H_
 #define ER_COAP_CONF_H_
 
+#include "contiki-conf.h"
+
 /* Features that can be disabled to achieve smaller memory footprint */
 #define COAP_LINK_FORMAT_FILTERING     0
 #define COAP_PROXY_OPTION_PROCESSING   0
