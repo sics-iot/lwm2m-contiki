@@ -42,6 +42,9 @@
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
+
+void custom_device_object_init(void);
+
 /*---------------------------------------------------------------------------*/
 static void
 callback(ntimer_t *timer)
@@ -82,7 +85,10 @@ start_application(int argc, char *argv[])
   lwm2m_engine_init();
 
   /* Register default LWM2M objects */
-  lwm2m_engine_register_default_objects();
+  /* lwm2m_engine_register_default_objects(); */
+
+  /* Init our own custom device object */
+  custom_device_object_init();
 
   if(has_server_ep) {
     /* start RD client */

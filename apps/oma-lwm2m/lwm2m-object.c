@@ -70,7 +70,7 @@ lwm2m_object_get_resource_string(const lwm2m_resource_t *resource,
     return resource->value.string.value;
   }
   if(resource->type == LWM2M_RESOURCE_TYPE_STR_VARIABLE) {
-    return *(resource->value.stringvar.var);
+    return resource->value.stringvar.var;
   }
   if(resource->type == LWM2M_RESOURCE_TYPE_STR_VARIABLE_ARRAY) {
     if(context->object_instance_index < resource->value.stringvararr.count) {
