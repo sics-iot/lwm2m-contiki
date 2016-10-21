@@ -59,7 +59,7 @@ static void notify(int instance, int id);
 
 /*---------------------------------------------------------------------------*/
 static int
-read_value_from_instance(int instance, int32_t *value)
+read_value_from_instance(int instance_index, int instance, int32_t *value)
 {
   /* just some value... */
   int32_t v = instance * 100 + 32;
@@ -71,12 +71,12 @@ read_value_from_instance(int instance, int32_t *value)
   /* Convert milliCelsius to fix float */
   *value = (v * LWM2M_FLOAT32_FRAC);
 
-  if(*value < min_val[instance]) {
-    min_val[instance] = *value;
+  if(*value < min_val[instance_index]) {
+    min_val[instance_index] = *value;
     notify(instance, 5601);
   }
-  if(*value > max_val[instance]) {
-    max_val[instance] = *value;
+  if(*value > max_val[instance_index]) {
+    max_val[instance_index] = *value;
     notify(instance, 5602);
   }
   return 1;
@@ -87,7 +87,7 @@ read_value(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 {
   int32_t value;
   /* Here we should check which of the instance it is... */
-  if(read_value_from_instance(ctx->object_instance_id, &value)) {
+  if(read_value_from_instance(ctx->object_instance_index, ctx->object_instance_id, &value)) {
     return ctx->writer->write_float32fix(ctx, outbuf, outsize,
                                          value, LWM2M_FLOAT32_BITS);
   }
@@ -96,7 +96,7 @@ read_value(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 /*---------------------------------------------------------------------------*/
 static int
 read_from_vars(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize) {
-  int instance = ctx->object_instance_id;
+  int instance = ctx->object_instance_index;
   int32_t *the_var;
   if(instance >= NR_INSTANCES) {
     return 0;
@@ -118,7 +118,7 @@ read_from_vars(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize) {
 /*---------------------------------------------------------------------------*/
 static int
 read_unit(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize) {
-  int instance = ctx->object_instance_id;
+  int instance = ctx->object_instance_index;
   char *unit;
   if(instance >= NR_INSTANCES) {
     return 0;
