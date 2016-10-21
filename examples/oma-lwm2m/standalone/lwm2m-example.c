@@ -44,6 +44,7 @@
 #include <stdlib.h>
 
 void custom_device_object_init(void);
+void ipso_generic_sensor_init(void);
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -89,6 +90,7 @@ start_application(int argc, char *argv[])
 
   /* Init our own custom device object */
   custom_device_object_init();
+  ipso_generic_sensor_init();
 
   if(has_server_ep) {
     /* start RD client */
