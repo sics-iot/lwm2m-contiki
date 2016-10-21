@@ -151,7 +151,7 @@ typedef struct lwm2m_resource {
     struct {
       uint16_t size;
       uint16_t *len;
-      uint8_t **var;
+      uint8_t *var;
     } stringvar;
     struct {
       uint16_t count;
