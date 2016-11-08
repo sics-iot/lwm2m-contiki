@@ -3,7 +3,7 @@ PROJECT = lwm2m-example
 all:	$(PROJECT)
 
 COREDIRS = sys lib
-APPSDIRS = er-coap oma-lwm2m ipso-objects rest-engine
+APPSDIRS = er-coap oma-lwm2m ipso-objects
 TARGETCDIR = oma-lwm2m-src
 TARGETCDIRS = ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}
 SOURCEDIRS = . ${addprefix $(TARGETCDIR)/,. $(APPSDIRS)}

@@ -12,12 +12,10 @@ PROJECTDIRS += .. ../tools
 PROJECT_SOURCEFILES += rpl-tools.c
 
 CFLAGS += -DWITH_COAP
-CFLAGS += -DREST=coap_rest_implementation
 CFLAGS += -DUIP_CONF_TCP=0
 APPS += orchestra
 APPS += json
 APPS += er-coap
-APPS += rest-engine
 
 MODULES += core/net/mac/tsch
 

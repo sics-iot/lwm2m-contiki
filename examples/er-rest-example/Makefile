@@ -25,7 +25,6 @@ SMALL=1
 
 # REST Engine shall use Erbium CoAP implementation
 APPS += er-coap
-APPS += rest-engine
 
 # optional rules to get assembly
 #CUSTOM_RULE_C_TO_OBJECTDIR_O = 1

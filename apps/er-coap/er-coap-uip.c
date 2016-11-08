@@ -37,6 +37,7 @@
 
 #include "contiki.h"
 #include "sys/cc.h"
+#include "net/ip/uip-udp-packet.h"
 #include "er-coap.h"
 #include "er-coap-engine.h"
 #include "er-coap-endpoint.h"

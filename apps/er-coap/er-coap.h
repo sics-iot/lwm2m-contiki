@@ -44,8 +44,6 @@
 #include "er-coap-conf.h"
 #include "er-coap-transport.h"
 
-/* use Erbium CoAP for the REST Engine. Must come before include of rest-engine.h. */
-#define REST coap_rest_implementation
 #include "rest-engine.h"
 
 #define COAP_MAX_PACKET_SIZE  (COAP_MAX_HEADER_SIZE + REST_MAX_CHUNK_SIZE)

@@ -45,14 +45,7 @@
 #include "lib/list.h"
 #include "rest-constants.h"
 
-/* list of valid REST Enigne implementations */
-#define REGISTERED_ENGINE_ERBIUM coap_rest_implementation
-#define REGISTERED_ENGINE_HELIUM http_rest_implementation
-
-/* sanity check for configured implementation */
-#if !defined(REST) || (REST != REGISTERED_ENGINE_ERBIUM && REST != REGISTERED_ENGINE_HELIUM)
-#error "Define a valid REST Engine implementation (REST define)!"
-#endif
+#define REST coap_rest_implementation
 
 /*
  * The maximum buffer size that is provided for resource responses and must be respected due to the limited IP buffer.
