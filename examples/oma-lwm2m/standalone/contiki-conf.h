@@ -51,8 +51,6 @@
 #define LWM2M_DEVICE_SERIAL_NO "1"
 #define LWM2M_DEVICE_FIRMWARE_VERSION "0.1"
 
-#define REST coap_rest_implementation
-
 #ifdef COAP_TRANSPORT_CONF_H
 #include COAP_TRANSPORT_CONF_H
 #endif

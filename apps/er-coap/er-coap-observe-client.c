@@ -43,6 +43,7 @@
 #include "er-coap.h"
 #include "er-coap-observe-client.h"
 #include "sys/cc.h"
+#include "lib/memb.h"
 
 /* Compile this code only if client-side support for CoAP Observe is required */
 #if COAP_OBSERVE_CLIENT

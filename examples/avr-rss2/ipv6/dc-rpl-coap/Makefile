@@ -33,9 +33,7 @@ PROJECT_SOURCEFILES += $(REST_RESOURCES_FILES) $(DC_SENSOR_FILES)
 # linker optimizations
 SMALL=1
 
-# REST Engine shall use Erbium CoAP implementation
 APPS += er-coap
-APPS += rest-engine
 
 #CFLAGS += -DUIP_CONF_BUFFER_SIZE=384
 CFLAGS += -DREST_MAX_CHUNK_SIZE=128
