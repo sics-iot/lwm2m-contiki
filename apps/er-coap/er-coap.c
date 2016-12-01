@@ -282,11 +282,9 @@ coap_get_mid()
 }
 /*---------------------------------------------------------------------------*/
 void
-coap_init_message(void *packet, coap_message_type_t type, uint8_t code,
-                  uint16_t mid)
+coap_init_message(coap_packet_t *coap_pkt, coap_message_type_t type,
+                  uint8_t code, uint16_t mid)
 {
-  coap_packet_t *const coap_pkt = (coap_packet_t *)packet;
-
   /* Important thing */
   memset(coap_pkt, 0, sizeof(coap_packet_t));
 
@@ -296,9 +294,8 @@ coap_init_message(void *packet, coap_message_type_t type, uint8_t code,
 }
 /*---------------------------------------------------------------------------*/
 size_t
-coap_serialize_message(void *packet, uint8_t *buffer)
+coap_serialize_message(coap_packet_t *coap_pkt, uint8_t *buffer)
 {
-  coap_packet_t *const coap_pkt = (coap_packet_t *)packet;
   uint8_t *option;
   unsigned int current_number = 0;
 
@@ -411,10 +408,8 @@ coap_serialize_message(void *packet, uint8_t *buffer)
 }
 /*---------------------------------------------------------------------------*/
 coap_status_t
-coap_parse_message(void *packet, uint8_t *data, uint16_t data_len)
+coap_parse_message(coap_packet_t *coap_pkt, uint8_t *data, uint16_t data_len)
 {
-  coap_packet_t *const coap_pkt = (coap_packet_t *)packet;
-
   /* initialize packet */
   memset(coap_pkt, 0, sizeof(coap_packet_t));
 

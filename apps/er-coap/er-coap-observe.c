@@ -264,15 +264,19 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
 {
   coap_packet_t *const coap_req = (coap_packet_t *)request;
   coap_packet_t *const coap_res = (coap_packet_t *)response;
-  coap_observer_t * obs;
+  const coap_endpoint_t *src_ep;
+  coap_observer_t *obs;
 
   if(coap_req->code == COAP_GET && coap_res->code < 128) { /* GET request and response without error code */
     if(IS_OPTION(coap_req, COAP_OPTION_OBSERVE)) {
-      if(coap_req->observe == 0) {
-        obs = add_observer(coap_src_endpoint(),
+      src_ep = coap_get_src_endpoint(coap_req);
+      if(src_ep == NULL) {
+        /* No source endpoint, can not add */
+      } else if(coap_req->observe == 0) {
+        obs = add_observer(src_ep,
                            coap_req->token, coap_req->token_len,
                            coap_req->uri_path, coap_req->uri_path_len);
-       if(obs) {
+        if(obs) {
           coap_set_header_observe(coap_res, (obs->obs_counter)++);
           /*
            * Following payload is for demonstration purposes only.
@@ -294,7 +298,7 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
       } else if(coap_req->observe == 1) {
 
         /* remove client if it is currently observe */
-        coap_remove_observer_by_token(coap_src_endpoint(),
+        coap_remove_observer_by_token(src_ep,
                                       coap_req->token, coap_req->token_len);
       }
     }

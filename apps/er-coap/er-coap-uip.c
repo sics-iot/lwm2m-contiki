@@ -91,8 +91,8 @@ coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
   return e1->port == e2->port;
 }
 /*---------------------------------------------------------------------------*/
-const coap_endpoint_t *
-coap_src_endpoint(void)
+static const coap_endpoint_t *
+get_src_endpoint(void)
 {
   static coap_endpoint_t src;
   uip_ipaddr_copy(&src.ipaddr, &UIP_IP_BUF->srcipaddr);
@@ -126,16 +126,20 @@ process_data(void)
   PRINTF(":%u\n  Length: %u\n", uip_ntohs(UIP_UDP_BUF->srcport),
          uip_datalen());
 
-  coap_receive(coap_src_endpoint(), uip_appdata, uip_datalen());
+  coap_receive(get_src_endpoint(), uip_appdata, uip_datalen());
 }
 /*---------------------------------------------------------------------------*/
 void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data,
                   uint16_t length)
 {
-  uip_udp_packet_sendto(udp_conn, data, length, &ep->ipaddr, ep->port);
+  if(ep == NULL) {
+    PRINTF("failed to send - no endpoint\n");
+  } else {
+    uip_udp_packet_sendto(udp_conn, data, length, &ep->ipaddr, ep->port);
 
-  PRINTF("-sent UDP datagram (%u)-\n", length);
+    PRINTF("-sent UDP datagram (%u)-\n", length);
+  }
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(coap_engine, ev, data)

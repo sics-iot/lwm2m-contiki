@@ -120,6 +120,7 @@ coap_receive(const coap_endpoint_t *src,
   coap_transaction_t *transaction = NULL;
 
   erbium_status_code = coap_parse_message(message, payload, payload_length);
+  coap_set_src_endpoint(message, src);
 
   if(erbium_status_code == NO_ERROR) {
 
@@ -150,7 +151,8 @@ coap_receive(const coap_endpoint_t *src,
           coap_init_message(response, COAP_TYPE_NON, CONTENT_2_05,
                             coap_get_mid());
           /* mirror token */
-        } if(message->token_len) {
+        }
+        if(message->token_len) {
           coap_set_token(response, message->token, message->token_len);
           /* get offset for blockwise transfers */
         }
