@@ -46,8 +46,24 @@
 #include "er-coap-observe-client.h"
 #include "er-coap-transport.h"
 
-typedef coap_packet_t rest_request_t;
-typedef coap_packet_t rest_response_t;
+typedef int (*coap_handler_callback_t)(coap_packet_t *request,
+                                       coap_packet_t *response,
+                                       uint8_t *buffer,
+                                       uint16_t buffer_size,
+                                       int32_t *offset);
+
+typedef struct coap_handler coap_handler_t;
+
+struct coap_handler {
+  coap_handler_t *next;
+  coap_handler_callback_t handler;
+};
+
+#define COAP_HANDLER(name, handler) \
+  coap_handler_t name = { NULL, handler }
+
+void coap_add_handler(coap_handler_t *handler);
+void coap_remove_handler(coap_handler_t *handler);
 
 void coap_init_engine(void);
 
