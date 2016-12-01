@@ -69,7 +69,7 @@ temp(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 {
   int32_t value;
   if(read_temp(&value)) {
-    return ctx->writer->write_float32fix(ctx, outbuf, outsize,
+    return lwm2m_object_write_float32fix(ctx, outbuf, outsize,
                                          value, LWM2M_FLOAT32_BITS);
   }
   return 0;

@@ -58,7 +58,7 @@ static uint8_t is_on = 0;
 static int
 read_state(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 {
-  return ctx->writer->write_boolean(ctx, outbuf, outsize, is_on ? 1 : 0);
+  return lwm2m_object_write_boolean(ctx, outbuf, outsize, is_on ? 1 : 0);
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -68,7 +68,7 @@ write_state(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t insize,
   int value;
   size_t len;
 
-  len = ctx->reader->read_boolean(ctx, inbuf, insize, &value);
+  len = lwm2m_object_read_boolean(ctx, inbuf, insize, &value);
   if(len > 0) {
     if(value) {
       if(!is_on) {
@@ -96,7 +96,7 @@ write_state(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t insize,
 static int
 read_dim(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 {
-  return ctx->writer->write_int(ctx, outbuf, outsize, dim_level);
+  return lwm2m_object_write_int(ctx, outbuf, outsize, dim_level);
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -106,7 +106,7 @@ write_dim(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t insize,
   int32_t value;
   size_t len;
 
-  len = ctx->reader->read_int(ctx, inbuf, insize, &value);
+  len = lwm2m_object_read_int(ctx, inbuf, insize, &value);
   if(len > 0) {
     if(value < 0) {
       value = 0;
@@ -147,7 +147,7 @@ read_on_time(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
     total_on_time += now - last_on_time;
     last_on_time = now;
   }
-  return ctx->writer->write_int(ctx, outbuf, outsize, (int32_t)total_on_time);
+  return lwm2m_object_write_int(ctx, outbuf, outsize, (int32_t)total_on_time);
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -158,7 +158,7 @@ write_on_time(lwm2m_context_t *ctx,
   int32_t value;
   size_t len;
 
-  len = ctx->reader->read_int(ctx, inbuf, insize, &value);
+  len = lwm2m_object_read_int(ctx, inbuf, insize, &value);
   if(len > 0 && value == 0) {
     total_on_time = 0;
     if(is_on) {

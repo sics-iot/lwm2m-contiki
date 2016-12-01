@@ -60,7 +60,7 @@ static int32_t time_offset = 0;
 static int
 read_lwtime(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 {
-  return ctx->writer->write_int(ctx, outbuf, outsize,
+  return lwm2m_object_write_int(ctx, outbuf, outsize,
                                 time_offset + ntimer_seconds());
 }
 /*---------------------------------------------------------------------------*/
@@ -70,7 +70,7 @@ set_lwtime(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t insize,
 {
   /* assume that this only read one TLV value */
   int32_t lw_time;
-  size_t len = ctx->reader->read_int(ctx, inbuf, insize, &lw_time);
+  size_t len = lwm2m_object_read_int(ctx, inbuf, insize, &lw_time);
   if(len == 0) {
     PRINTF("FAIL: could not read time '%*.s'\n", (int)insize, inbuf);
   } else {
