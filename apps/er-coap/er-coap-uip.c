@@ -38,6 +38,7 @@
 #include "contiki.h"
 #include "sys/cc.h"
 #include "net/ip/uip-udp-packet.h"
+#include "net/ip/uiplib.h"
 #include "er-coap.h"
 #include "er-coap-engine.h"
 #include "er-coap-endpoint.h"
@@ -89,6 +90,15 @@ coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
     return 0;
   }
   return e1->port == e2->port;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
+{
+  if(uiplib_ipaddrconv(text, &ep->ipaddr)) {
+    return 1;
+  }
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 static const coap_endpoint_t *
