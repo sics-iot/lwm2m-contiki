@@ -89,6 +89,65 @@ void lwm2m_security_init(void);
 void lwm2m_server_init(void);
 
 /*---------------------------------------------------------------------------*/
+static int
+parse_next(const char **path, int *path_len, uint16_t *value)
+{
+  char c;
+  *value = 0;
+  /* printf("parse_next: %p %d\n", *path, *path_len); */
+  if(*path_len == 0) {
+    return 0;
+  }
+  while(*path_len > 0) {
+    c = **path;
+    (*path)++;
+    *path_len = *path_len - 1;
+    if(c >= '0' && c <= '9') {
+      *value = *value * 10 + (c - '0');
+    } else if(c == '/') {
+      return 1;
+    } else {
+      /* error */
+      return -4;
+    }
+  }
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+static int
+lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
+                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+{
+  const char *path = NULL;
+  int path_len, ret;
+  uint16_t object_id, instance_id, resource_id;
+
+  path_len = REST.get_url(request, &path);
+  if(path_len == 0) {
+    PRINTF("lwm2m: no path in CoAP request - ignoring\n");
+    return 0;
+  }
+
+  PRINTF("lwm2m: checking %.*s\n", path_len, path);
+
+  ret = 0;
+  ret += parse_next(&path, &path_len, &object_id);
+  ret += parse_next(&path, &path_len, &instance_id);
+  ret += parse_next(&path, &path_len, &resource_id);
+
+  if(ret < 0) {
+    /* Probably not a LWM2M object */
+    return 0;
+  }
+
+  PRINTF("lwm2m: CoAP request to %u.%u.%u (%d)\n",
+         object_id, instance_id, resource_id, ret);
+
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
+/*---------------------------------------------------------------------------*/
 int
 lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
   int pos;
@@ -163,6 +222,9 @@ lwm2m_engine_init(void)
 
   rest_init_engine();
 
+  /* Register the CoAP handler for lightweight object handling */
+  coap_add_handler(&lwm2m_handler);
+
 #if USE_RD_CLIENT
   lwm2m_rd_client_init(endpoint);
 #endif
@@ -174,31 +236,6 @@ lwm2m_engine_register_default_objects(void)
   lwm2m_security_init();
   lwm2m_server_init();
   lwm2m_device_init();
-}
-/*---------------------------------------------------------------------------*/
-static int
-parse_next(const char **path, int *path_len, uint16_t *value)
-{
-  char c;
-  *value = 0;
-  /* printf("parse_next: %p %d\n", *path, *path_len); */
-  if(*path_len == 0) {
-    return 0;
-  }
-  while(*path_len > 0) {
-    c = **path;
-    (*path)++;
-    *path_len = *path_len - 1;
-    if(c >= '0' && c <= '9') {
-      *value = *value * 10 + (c - '0');
-    } else if(c == '/') {
-      return 1;
-    } else {
-      /* error */
-      return -4;
-    }
-  }
-  return 1;
 }
 /*---------------------------------------------------------------------------*/
 int
