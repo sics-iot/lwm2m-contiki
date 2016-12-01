@@ -53,7 +53,7 @@ PERIODIC_RESOURCE(res_plugtest_obs,
                   NULL,
                   res_put_handler,
                   res_delete_handler,
-                  5 * CLOCK_SECOND,
+                  5000,
                   res_periodic_handler);
 
 static int32_t obs_counter = 0;

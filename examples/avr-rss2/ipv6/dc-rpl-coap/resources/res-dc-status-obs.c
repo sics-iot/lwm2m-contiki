@@ -50,7 +50,7 @@
 static void res_dc_status_obs_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 static void res_dc_status_obs_periodic_handler(void);
 
-PERIODIC_RESOURCE(res_dc_status_obs, "title=\"status parameters\"", res_dc_status_obs_get_handler, NULL, NULL, NULL, 10 * CLOCK_SECOND, res_dc_status_obs_periodic_handler);
+PERIODIC_RESOURCE(res_dc_status_obs, "title=\"status parameters\"", res_dc_status_obs_get_handler, NULL, NULL, NULL, 10000, res_dc_status_obs_periodic_handler);
 
 static uint32_t observe = 0;
 static count = 0;
