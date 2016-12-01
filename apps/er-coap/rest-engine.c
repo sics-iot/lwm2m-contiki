@@ -55,30 +55,12 @@
 #define PRINTLLADDR(addr)
 #endif
 
-/*---------------------------------------------------------------------------*/
-LIST(restful_services);
-LIST(restful_periodic_services);
-/*---------------------------------------------------------------------------*/
 static void process_callback(ntimer_t *t);
 
-/* initialize periodic resources */
-static void init_periodic(void)
-{
-  periodic_resource_t *periodic_resource = NULL;
-
-  for(periodic_resource =
-        (periodic_resource_t *)list_head(restful_periodic_services);
-      periodic_resource; periodic_resource = periodic_resource->next) {
-    if(periodic_resource->periodic_handler && periodic_resource->period) {
-      PRINTF("Periodic: Set timer for /%s to %lu\n",
-             periodic_resource->resource->url, periodic_resource->period);
-      ntimer_set_callback(&periodic_resource->periodic_timer, process_callback);
-      ntimer_set_user_data(&periodic_resource->periodic_timer, periodic_resource);
-      ntimer_set(&periodic_resource->periodic_timer,
-                 periodic_resource->period);
-    }
-  }
-}
+/*---------------------------------------------------------------------------*/
+LIST(restful_services);
+/*---------------------------------------------------------------------------*/
+static uint8_t is_initialized = 0;
 
 /*---------------------------------------------------------------------------*/
 /*- REST Engine API ---------------------------------------------------------*/
@@ -93,13 +75,11 @@ void
 rest_init_engine(void)
 {
   /* avoid initializing twice */
-  static uint8_t initialized = 0;
-
-  if(initialized) {
+  if(is_initialized) {
     PRINTF("REST engine process already running - double initialization?\n");
     return;
   }
-  initialized = 1;
+  is_initialized = 1;
 
   list_init(restful_services);
 
@@ -107,10 +87,6 @@ rest_init_engine(void)
 
   /* Start the RESTful server implementation. */
   REST.init();
-
-  init_periodic();
-  /*Start REST engine process */
-  /* process_start(&rest_engine_process, NULL); */
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -123,19 +99,23 @@ rest_init_engine(void)
  * *.c file in the ./resources/ sub-directory (see example Makefile).
  */
 void
-rest_activate_resource(resource_t *resource, char *path)
+rest_activate_resource(resource_t *resource, const char *path)
 {
+  periodic_resource_t *periodic;
   resource->url = path;
   list_add(restful_services, resource);
 
   PRINTF("Activating: %s\n", resource->url);
 
   /* Only add periodic resources with a periodic_handler and a period > 0. */
-  if(resource->flags & IS_PERIODIC && resource->periodic->periodic_handler
+  if(resource->flags & IS_PERIODIC && resource->periodic
+     && resource->periodic->periodic_handler
      && resource->periodic->period) {
-    PRINTF("Periodic resource: %p (%s)\n", resource->periodic,
-           resource->periodic->resource->url);
-    list_add(restful_periodic_services, resource->periodic);
+    periodic = resource->periodic;
+    PRINTF("Periodic resource: %p (%s)\n", periodic, resource->url);
+    ntimer_set_callback(&periodic->periodic_timer, process_callback);
+    ntimer_set_user_data(&periodic->periodic_timer, resource);
+    ntimer_set(&periodic->periodic_timer, periodic->period);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -206,19 +186,26 @@ rest_invoke_restful_service(void *request, void *response, uint8_t *buffer,
   }
   return found & allowed;
 }
-/*-----------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
 /* This callback occurs when t is expired */
-static void process_callback(ntimer_t *t)
+static void
+process_callback(ntimer_t *t)
 {
-  periodic_resource_t *periodic_resource;
-  periodic_resource = ntimer_get_user_data(t);
-  if(periodic_resource != NULL && periodic_resource->period) {
+  resource_t *resource;
+  resource = ntimer_get_user_data(t);
+  if(resource != NULL && (resource->flags & IS_PERIODIC)
+     && resource->periodic != NULL && resource->periodic->period) {
     PRINTF("Periodic: timer expired for /%s (period: %lu)\n",
-           periodic_resource->resource->url, periodic_resource->period);
+           resource->url, resource->periodic->period);
 
-    /* Call the periodic_handler function, which was checked during adding to list. */
-    (periodic_resource->periodic_handler)();
-    ntimer_reset(t, periodic_resource->period);
+    if(!is_initialized) {
+      /* REST has not yet been initialized. */
+    } else if(resource->periodic->periodic_handler) {
+      /* Call the periodic_handler function. */
+      resource->periodic->periodic_handler();
+    }
+
+    ntimer_set(t, resource->periodic->period);
   }
 }
 /*---------------------------------------------------------------------------*/
