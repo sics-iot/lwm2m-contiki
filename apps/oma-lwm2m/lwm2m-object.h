@@ -350,6 +350,54 @@ lwm2m_object_notify_observers(const lwm2m_object_t *object, char *path)
   coap_notify_observers_sub(lwm2m_object_get_coap_resource(object), path);
 }
 
+static inline size_t
+lwm2m_object_read_int(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value)
+{
+  return ctx->reader->read_int(ctx, inbuf, len, value);
+}
+
+static inline size_t
+lwm2m_object_read_string(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen)
+{
+  return ctx->reader->read_string(ctx, inbuf, len, value, strlen);
+}
+
+static inline size_t
+lwm2m_object_read_float32fix(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits)
+{
+  return ctx->reader->read_float32fix(ctx, inbuf, len, value, bits);
+}
+
+static inline size_t
+lwm2m_object_read_boolean(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value)
+{
+  return ctx->reader->read_boolean(ctx, inbuf, len, value);
+}
+
+static inline size_t
+lwm2m_object_write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value)
+{
+  return ctx->writer->write_int(ctx, outbuf, outlen, value);
+}
+
+static inline size_t
+lwm2m_object_write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, const char *value, size_t strlen)
+{
+  return ctx->writer->write_string(ctx, outbuf, outlen, value, strlen);
+}
+
+static inline size_t
+lwm2m_object_write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits)
+{
+  return ctx->writer->write_float32fix(ctx, outbuf, outlen, value, bits);
+}
+
+static inline size_t
+lwm2m_object_write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int value)
+{
+  return ctx->writer->write_boolean(ctx, outbuf, outlen, value);
+}
+
 #include "lwm2m-engine.h"
 
 #endif /* LWM2M_OBJECT_H_ */

@@ -79,7 +79,7 @@ read_state(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
   if(idx >= LEDS_CONTROL_NUMBER) {
     return 0;
   }
-  return ctx->writer->write_boolean(ctx, outbuf, outsize,
+  return lwm2m_object_write_boolean(ctx, outbuf, outsize,
                                     states[idx].is_on ? 1 : 0);
 }
 /*---------------------------------------------------------------------------*/
@@ -95,7 +95,7 @@ write_state(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t insize,
     return 0;
   }
 
-  len = ctx->reader->read_boolean(ctx, inbuf, insize, &value);
+  len = lwm2m_object_read_boolean(ctx, inbuf, insize, &value);
   if(len > 0) {
     if(value) {
       if(!states[idx].is_on) {
@@ -140,7 +140,7 @@ read_color(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
     return 0;
   }
   value = get_color(states[idx].led_value);
-  return ctx->writer->write_string(ctx, outbuf, outsize,
+  return lwm2m_object_write_string(ctx, outbuf, outsize,
                                    value, strlen(value));
 }
 /*---------------------------------------------------------------------------*/
@@ -159,7 +159,7 @@ read_on_time(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
     states[idx].total_on_time += now - states[idx].last_on_time;
     states[idx].last_on_time = now;
   }
-  return ctx->writer->write_int(ctx, outbuf, outsize,
+  return lwm2m_object_write_int(ctx, outbuf, outsize,
                                 (int32_t)states[idx].total_on_time);
 }
 /*---------------------------------------------------------------------------*/
@@ -175,7 +175,7 @@ write_on_time(lwm2m_context_t *ctx,
     return 0;
   }
 
-  len = ctx->reader->read_int(ctx, inbuf, insize, &value);
+  len = lwm2m_object_read_int(ctx, inbuf, insize, &value);
   if(len > 0 && value == 0) {
     PRINTF("IPSO leds control - reset On Time\n");
     states[idx].total_on_time = 0;
