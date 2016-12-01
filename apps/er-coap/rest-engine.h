@@ -55,14 +55,14 @@
 #define REST_MAX_CHUNK_SIZE     64
 #endif
 
-struct resource_s;
-struct periodic_resource_s;
+typedef struct resource_s resource_t;
+typedef struct periodic_resource_s periodic_resource_t;
 
 /* signatures of handler functions */
 typedef void (*restful_handler)(void *request, void *response,
                                 uint8_t *buffer, uint16_t preferred_size,
                                 int32_t *offset);
-typedef void (*restful_final_handler)(struct resource_s *resource,
+typedef void (*restful_final_handler)(resource_t *resource,
                                       void *request, void *response);
 typedef void (*restful_periodic_handler)(void);
 typedef void (*restful_response_handler)(void *data, void *response);
@@ -75,7 +75,7 @@ typedef int (*service_callback_t)(void *request, void *response,
 
 /* data structure representing a resource in REST */
 struct resource_s {
-  struct resource_s *next;        /* for LIST, points to next resource defined */
+  resource_t *next;               /* for LIST, points to next resource defined */
   const char *url;                /*handled URL */
   rest_resource_flags_t flags;    /* handled RESTful methods */
   const char *attributes;         /* link-format attributes */
@@ -84,21 +84,17 @@ struct resource_s {
   restful_handler put_handler;    /* handler function */
   restful_handler delete_handler; /* handler function */
   union {
-    struct periodic_resource_s *periodic; /* special data depending on flags */
+    periodic_resource_t *periodic; /* special data depending on flags */
     restful_trigger_handler trigger;
     restful_trigger_handler resume;
   };
 };
-typedef struct resource_s resource_t;
 
 struct periodic_resource_s {
-  struct periodic_resource_s *next; /* for LIST, points to next resource defined */
-  const resource_t *resource;
   uint32_t period;
   ntimer_t periodic_timer;
   const restful_periodic_handler periodic_handler;
 };
-typedef struct periodic_resource_s periodic_resource_t;
 
 /*
  * Macro to define a RESTful resource.
@@ -123,9 +119,8 @@ typedef struct periodic_resource_s periodic_resource_t;
  * The subscriber list will be maintained by the final_handler rest_subscription_handler() (see rest-mapping header file).
  */
 #define PERIODIC_RESOURCE(name, attributes, get_handler, post_handler, put_handler, delete_handler, period, periodic_handler) \
-  periodic_resource_t periodic_##name; \
-  resource_t name = { NULL, NULL, IS_OBSERVABLE | IS_PERIODIC, attributes, get_handler, post_handler, put_handler, delete_handler, { .periodic = &periodic_##name } }; \
-  periodic_resource_t periodic_##name = { NULL, &name, period, { { 0 } }, periodic_handler };
+  static periodic_resource_t periodic_##name = { period, { 0 }, periodic_handler }; \
+  resource_t name = { NULL, NULL, IS_OBSERVABLE | IS_PERIODIC, attributes, get_handler, post_handler, put_handler, delete_handler, { .periodic = &periodic_##name } }
 
 struct rest_implementation {
   char *name;
@@ -239,7 +234,7 @@ void rest_init_engine(void);
  * \param path
  *             The local URI path where to provide the resource.
  */
-void rest_activate_resource(resource_t *resource, char *path);
+void rest_activate_resource(resource_t *resource, const char *path);
 /*---------------------------------------------------------------------------*/
 /**
  * \brief      Returns the list of registered RESTful resources.
