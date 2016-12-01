@@ -63,10 +63,11 @@ static void
 setup_lwm2m_servers(void)
 {
 #ifdef LWM2M_SERVER_ADDRESS
-  uip_ipaddr_t addr;
-  if(uiplib_ipaddrconv(LWM2M_SERVER_ADDRESS, &addr)) {
-    lwm2m_rd_client_register_with_bootstrap_server(&addr, 0);
-    lwm2m_rd_client_register_with_server(&addr, 0);
+  coap_endpoint_t server_ep;
+  if(coap_endpoint_parse(LWM2M_SERVER_ADDRESS, strlen(LWM2M_SERVER_ADDRESS),
+                         &server_ep) != 0) {
+    lwm2m_rd_client_register_with_bootstrap_server(&server_ep);
+    lwm2m_rd_client_register_with_server(&server_ep);
   }
 #endif /* LWM2M_SERVER_ADDRESS */
 
