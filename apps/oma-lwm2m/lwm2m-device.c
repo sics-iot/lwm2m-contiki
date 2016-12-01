@@ -85,9 +85,9 @@ set_lwtime(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t insize,
 }
 /*---------------------------------------------------------------------------*/
 #ifdef PLATFORM_REBOOT
-static struct ctimer reboot_timer;
+static ntimer_t reboot_timer;
 static void
-do_the_reboot(void *ptr)
+do_the_reboot(ntimer_t *timer)
 {
   PLATFORM_REBOOT();
 }
@@ -96,7 +96,8 @@ reboot(lwm2m_context_t *ctx, const uint8_t *arg, size_t argsize,
        uint8_t *outbuf, size_t outsize)
 {
   PRINTF("Device will reboot!\n");
-  ctimer_set(&reboot_timer, CLOCK_SECOND / 2, do_the_reboot, NULL);
+  ntimer_set_callback(&reboot_timer, do_the_reboot);
+  ntimer_set(&reboot_timer, 500);
   return 0;
 }
 #endif /* PLATFORM_REBOOT */
