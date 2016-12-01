@@ -92,13 +92,18 @@ coap_separate_accept(void *request, coap_separate_t *separate_store)
     /* send separate ACK for CON */
     if(coap_req->type == COAP_TYPE_CON) {
       coap_packet_t ack[1];
+      const coap_endpoint_t *ep;
 
-      /* ACK with empty code (0) */
-      coap_init_message(ack, COAP_TYPE_ACK, 0, coap_req->mid);
-      /* serializing into IPBUF: Only overwrites header parts that are already parsed into the request struct */
-      coap_send_message(coap_src_endpoint(),
-                        coap_databuf(), coap_serialize_message(ack,
-                                                               coap_databuf()));
+      ep = coap_get_src_endpoint(coap_req);
+      if(ep == NULL) {
+        PRINTF("ERROR: no endpoint in request\n");
+      } else {
+        /* ACK with empty code (0) */
+        coap_init_message(ack, COAP_TYPE_ACK, 0, coap_req->mid);
+        /* serializing into IPBUF: Only overwrites header parts that are already parsed into the request struct */
+        coap_send_message(ep, coap_databuf(),
+                          coap_serialize_message(ack, coap_databuf()));
+      }
     }
 
     /* store remote endpoint address */

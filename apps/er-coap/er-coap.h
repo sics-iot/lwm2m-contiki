@@ -114,6 +114,8 @@ typedef struct {
   const char *uri_query;
   uint8_t if_none_match;
 
+  const coap_endpoint_t *src_ep;
+
   uint16_t payload_len;
   uint8_t *payload;
 } coap_packet_t;
@@ -165,10 +167,10 @@ extern char *coap_error_message;
 void coap_init_connection(void);
 uint16_t coap_get_mid(void);
 
-void coap_init_message(void *packet, coap_message_type_t type, uint8_t code,
-                       uint16_t mid);
-size_t coap_serialize_message(void *packet, uint8_t *buffer);
-coap_status_t coap_parse_message(void *request, uint8_t *data,
+void coap_init_message(coap_packet_t *packet, coap_message_type_t type,
+                       uint8_t code, uint16_t mid);
+size_t coap_serialize_message(coap_packet_t *packet, uint8_t *buffer);
+coap_status_t coap_parse_message(coap_packet_t *request, uint8_t *data,
                                  uint16_t data_len);
 
 int coap_get_query_variable(void *packet, const char *name,
@@ -176,6 +178,17 @@ int coap_get_query_variable(void *packet, const char *name,
 int coap_get_post_variable(void *packet, const char *name,
                            const char **output);
 
+static inline const coap_endpoint_t *
+coap_get_src_endpoint(coap_packet_t *request)
+{
+  return request->src_ep;
+}
+
+static inline void
+coap_set_src_endpoint(coap_packet_t *request, const coap_endpoint_t *ep)
+{
+  request->src_ep = ep;
+}
 /*---------------------------------------------------------------------------*/
 
 int coap_set_status_code(void *packet, unsigned int code);

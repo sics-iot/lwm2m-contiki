@@ -62,7 +62,7 @@ static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
 /*---------------------------------------------------------------------------*/
-const coap_endpoint_t *
+static const coap_endpoint_t *
 coap_src_endpoint(void)
 {
   return &last_source;
