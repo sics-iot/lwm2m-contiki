@@ -86,8 +86,8 @@
 #define LWM2M_OBJECT_PATH_STR_HELPER(x) #x
 #define LWM2M_OBJECT_PATH_STR(x) LWM2M_OBJECT_PATH_STR_HELPER(x)
 
-struct lwm2m_reader;
-struct lwm2m_writer;
+typedef struct lwm2m_reader lwm2m_reader_t;
+typedef struct lwm2m_writer lwm2m_writer_t;
 /* Data model for OMA LWM2M objects */
 typedef struct lwm2m_context {
   uint16_t object_id;
@@ -97,24 +97,24 @@ typedef struct lwm2m_context {
   uint8_t resource_index;
   /* TODO - add uint16_t resource_instance_id */
 
-  const struct lwm2m_reader *reader;
-  const struct lwm2m_writer *writer;
+  const lwm2m_reader_t *reader;
+  const lwm2m_writer_t *writer;
 } lwm2m_context_t;
 
 /* LWM2M format writer for the various formats supported */
-typedef struct lwm2m_writer {
+struct lwm2m_writer {
   size_t (* write_int)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value);
   size_t (* write_string)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, const char *value, size_t strlen);
   size_t (* write_float32fix)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits);
   size_t (* write_boolean)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int value);
-} lwm2m_writer_t;
+};
 
-typedef struct lwm2m_reader {
+struct lwm2m_reader {
   size_t (* read_int)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value);
   size_t (* read_string)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen);
   size_t (* read_float32fix)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits);
   size_t (* read_boolean)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value);
-} lwm2m_reader_t;
+};
 
 typedef struct lwm2m_value_callback {
   int (* read)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen);
