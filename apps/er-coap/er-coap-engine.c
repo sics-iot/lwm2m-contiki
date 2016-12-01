@@ -37,6 +37,7 @@
  */
 
 #include "sys/cc.h"
+#include "lib/list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -54,7 +55,47 @@
 /*---------------------------------------------------------------------------*/
 /*- Variables ---------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
+LIST(coap_handlers);
 static service_callback_t service_cbk = NULL;
+
+/*---------------------------------------------------------------------------*/
+/*- CoAP service handlers---------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+void
+coap_add_handler(coap_handler_t *handler)
+{
+  list_add(coap_handlers, handler);
+}
+/*---------------------------------------------------------------------------*/
+void
+coap_remove_handler(coap_handler_t *handler)
+{
+  list_remove(coap_handlers, handler);
+}
+/*---------------------------------------------------------------------------*/
+static CC_INLINE int
+call_service(coap_packet_t *request, coap_packet_t *response,
+             uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+{
+  coap_handler_t *r;
+
+  for(r = list_head(coap_handlers); r != NULL; r = r->next) {
+    if(r->handler &&
+       r->handler(request, response, buffer, buffer_size, offset)) {
+      /* Request handled. */
+      return 1;
+    }
+  }
+
+  if(service_cbk != NULL &&
+     service_cbk(request, response, buffer, buffer_size, offset)) {
+    return 1;
+  }
+
+  REST.set_response_status(response, REST.status.NOT_FOUND);
+
+  return 0;
+}
 
 /*---------------------------------------------------------------------------*/
 /*- Server Part -------------------------------------------------------------*/
@@ -73,15 +114,12 @@ int
 coap_receive(const coap_endpoint_t *src,
              uint8_t *payload, uint16_t payload_length)
 {
-  erbium_status_code = NO_ERROR;
-
   /* static declaration reduces stack peaks and program code size */
   static coap_packet_t message[1]; /* this way the packet can be treated as pointer as usual */
   static coap_packet_t response[1];
-  static coap_transaction_t *transaction = NULL;
+  coap_transaction_t *transaction = NULL;
 
-  erbium_status_code =
-    coap_parse_message(message, payload, payload_length);
+  erbium_status_code = coap_parse_message(message, payload, payload_length);
 
   if(erbium_status_code == NO_ERROR) {
 
@@ -124,13 +162,10 @@ coap_receive(const coap_endpoint_t *src,
           new_offset = block_offset;
         }
 
-        /* invoke resource handler */
-        if(service_cbk) {
-
           /* call REST framework and check if found and allowed */
-          if(service_cbk
-             (message, response, transaction->packet + COAP_MAX_HEADER_SIZE,
-              block_size, &new_offset)) {
+          if(call_service(message, response,
+                          transaction->packet + COAP_MAX_HEADER_SIZE,
+                          block_size, &new_offset)) {
 
             if(erbium_status_code == NO_ERROR) {
 
@@ -209,10 +244,6 @@ coap_receive(const coap_endpoint_t *src,
               erbium_status_code = PACKET_SERIALIZATION_ERROR;
             }
           }
-        } else {
-          erbium_status_code = NOT_IMPLEMENTED_5_01;
-          coap_error_message = "NoServiceCallbck"; /* no 'a' to fit into 16 bytes */
-        } /* if(service callback) */
       } else {
         erbium_status_code = SERVICE_UNAVAILABLE_5_03;
         coap_error_message = "NoFreeTraBuffer";
@@ -296,6 +327,8 @@ void
 coap_init_engine(void)
 {
   PRINTF("Starting %s receiver...\n", coap_rest_implementation.name);
+
+  list_init(coap_handlers);
 
   rest_activate_resource(&res_well_known_core, ".well-known/core");
 
