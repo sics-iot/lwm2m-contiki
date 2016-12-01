@@ -65,7 +65,7 @@ PERIODIC_RESOURCE(res_temperature,
          NULL,
          NULL,
          NULL,
-         CLOCK_SECOND,
+         1000,
          res_periodic_handler);
 
 static void
