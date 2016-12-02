@@ -60,7 +60,7 @@ static int32_t time_offset = 0;
 static int
 read_lwtime(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outsize)
 {
-  return lwm2m_object_write_int(ctx, outbuf, outsize,
+  return ctx->writer->write_int(ctx, outbuf, outsize,
                                 time_offset + ntimer_seconds());
 }
 /*---------------------------------------------------------------------------*/

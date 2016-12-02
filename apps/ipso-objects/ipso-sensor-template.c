@@ -57,12 +57,10 @@
 
 
 /*---------------------------------------------------------------------------*/
-static int lwm2m_callback(lwm2m_object_instance_t *object,
-                          lwm2m_context_t *ctx,
-                          coap_packet_t *request,
-                          coap_packet_t *response,
-                          uint8_t *buffer, uint16_t buf_size,
-                          int32_t *offset) {
+static int
+lwm2m_callback(lwm2m_object_instance_t *object,
+                          lwm2m_context_t *ctx)
+{
   /* Here we cast to our sensor-template struct */
   ipso_sensor_t *sensor;
   ipso_sensor_value_t *value;
@@ -71,7 +69,7 @@ static int lwm2m_callback(lwm2m_object_instance_t *object,
 
   /* Do the stuff */
   if(ctx->level == 1) {
-    /* Should not happne 3303 */
+    /* Should not happen 3303 */
     return 0;
   }
   if(ctx->level == 2) {
@@ -86,20 +84,16 @@ static int lwm2m_callback(lwm2m_object_instance_t *object,
 
     switch(ctx->resource_id) {
     case IPSO_SENSOR_MAX_RANGE:
-      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
-                                    (sensor->max_range * 1024) / 1000, 10);
+      lwm2m_object_write_float32fix(ctx, (sensor->max_range * 1024) / 1000, 10);
       break;
     case IPSO_SENSOR_MIN_RANGE:
-      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
-                                    (sensor->min_range * 1024) / 1000, 10);
+      lwm2m_object_write_float32fix(ctx, (sensor->min_range * 1024) / 1000, 10);
       break;
     case IPSO_SENSOR_MAX_VALUE:
-      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
-                                    (value->min_value * 1024) / 1000, 10);
+      lwm2m_object_write_float32fix(ctx, (value->min_value * 1024) / 1000, 10);
       break;
     case IPSO_SENSOR_MIN_VALUE:
-      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
-                                    (value->min_value * 1024) / 1000, 10);
+      lwm2m_object_write_float32fix(ctx, (value->min_value * 1024) / 1000, 10);
       break;
     default:
       return 0;

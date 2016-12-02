@@ -140,13 +140,29 @@ parse_next(const char **path, int *path_len, uint16_t *value)
 /*---------------------------------------------------------------------------*/
 static int
 lwm2m_engine_parse_context(const char *path, int path_len,
+                           coap_packet_t *request, coap_packet_t *response,
+                           uint8_t *outbuf, size_t outsize,
                            lwm2m_context_t *context)
 {
   int ret;
   if(context == NULL || path == NULL) {
     return 0;
   }
+
   memset(context, 0, sizeof(lwm2m_context_t));
+
+  /* Set CoAP request/response for now */
+  context->request = request;
+  context->response = response;
+
+  /* Set out buffer */
+  context->outbuf = outbuf;
+  context->outsize = outsize;
+
+  /* Set default reader/writer */
+  context->reader = &lwm2m_plain_text_reader;
+  context->writer = &oma_tlv_writer;
+
   /* get object id */
   ret = 0;
   ret += parse_next(&path, &path_len, &context->object_id);
@@ -156,10 +172,6 @@ lwm2m_engine_parse_context(const char *path, int path_len,
   if(ret > 0) {
     context->level = ret & 0xff;
   }
-
-  /* Set default reader/writer */
-  context->reader = &lwm2m_plain_text_reader;
-  context->writer = &oma_tlv_writer;
 
   return ret;
 }
@@ -537,6 +549,7 @@ lwm2m_engine_select_writer(lwm2m_context_t *context, unsigned int accept)
       accept = LWM2M_TEXT_PLAIN;
       break;
   }
+  context->content_type = accept;
   return accept;
 }
 /*---------------------------------------------------------------------------*/
@@ -575,7 +588,6 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
   const char *url;
   unsigned int format;
   unsigned int accept;
-  unsigned int content_type;
   int depth;
   lwm2m_context_t context;
   rest_resource_flags_t method;
@@ -596,13 +608,16 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
     accept = format;
   }
 
-  depth = lwm2m_engine_parse_context(url, len, &context);
+  depth = lwm2m_engine_parse_context(url, len, request, response,
+                                     buffer, preferred_size,
+                                     &context);
+
   PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
          context.object_instance_id, context.resource_id, depth);
 
   /* Select reader and writer based on provided Content type and Accept headers */
   lwm2m_engine_select_reader(&context, format);
-  content_type = lwm2m_engine_select_writer(&context, accept);
+  lwm2m_engine_select_writer(&context, accept);
 
 #if DEBUG
   /* for debugging */
@@ -786,7 +801,7 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
       }
       if(content_len > 0) {
         REST.set_response_payload(response, buffer, content_len);
-        REST.set_header_content_type(response, content_type);
+        REST.set_header_content_type(response, context.content_type);
       } else {
         /* failed to produce output - it is an internal error */
         REST.set_response_status(response, INTERNAL_SERVER_ERROR_5_00);
@@ -870,7 +885,9 @@ lwm2m_engine_delete_handler(const lwm2m_object_t *object, void *request,
   len = REST.get_url(request, &url);
   PRINTF("*** DELETE URI:'%.*s' called... - responding with DELETED.\n",
          len, url);
-  len = lwm2m_engine_parse_context(url, len, &context);
+  len = lwm2m_engine_parse_context(url, len, request, response,
+                                   buffer, preferred_size,
+                                   &context);
   PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
          context.object_instance_id, context.resource_id, len);
 
@@ -946,7 +963,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   lwm2m_object_instance_t *instance;
 
   url_len = REST.get_url(request, &url);
-  depth = lwm2m_engine_parse_context(url, url_len, &context);
+  depth = lwm2m_engine_parse_context(url, url_len, request, response,
+                                     buffer, buffer_size, &context);
   if(depth < 2) {
     /* No possible object instance id found in URL - ignore request */
     return 0;
@@ -1016,8 +1034,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
 #endif /* DEBUG */
 
-  instance->callback(instance, &context, request, response,
-                     buffer, buffer_size, offset);
+  instance->callback(instance, &context);
   return 1;
 }
 /*---------------------------------------------------------------------------*/
