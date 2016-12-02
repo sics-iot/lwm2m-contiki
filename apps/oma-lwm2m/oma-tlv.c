@@ -243,12 +243,17 @@ oma_tlv_write_float32(int16_t id, int32_t value, int bits,
   /* convert to the thing we should have */
   e = e - bits + 127;
 
+  if(value == 0) {
+    e = 0;
+  }
+
   /* is this the right byte order? */
   b[0] = (value < 0 ? 0x80 : 0) | (e >> 1);
   b[1] = ((e & 1) << 7) | ((val >> 16) & 0x7f);
   b[2] = (val >> 8) & 0xff;
   b[3] = val & 0xff;
 
+  PRINTF("B=%02x%02x%02x%02x\n", b[0], b[1], b[2], b[3]);
   /* construct the TLV */
   tlv.type = OMA_TLV_TYPE_RESOURCE;
   tlv.length = 4;
