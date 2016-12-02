@@ -86,6 +86,16 @@
 #define LWM2M_OBJECT_PATH_STR_HELPER(x) #x
 #define LWM2M_OBJECT_PATH_STR(x) LWM2M_OBJECT_PATH_STR_HELPER(x)
 
+typedef enum {
+  LWM2M_OP_READ,
+  LWM2M_OP_DISCOVER,
+  LWM2M_OP_WRITE,
+  LWM2M_OP_WRITE_ATTR,
+  LWM2M_OP_EXECUTE,
+  LWM2M_OP_CREATE,
+  LWM2M_OP_DELETE
+} lwm2m_operation_t;
+
 typedef struct lwm2m_reader lwm2m_reader_t;
 typedef struct lwm2m_writer lwm2m_writer_t;
 /* Data model for OMA LWM2M objects */
@@ -96,6 +106,7 @@ typedef struct lwm2m_context {
   uint8_t object_instance_index;
   uint8_t resource_index;
   uint8_t level;
+  lwm2m_operation_t operation;
   /* TODO - add uint16_t resource_instance_id */
 
   const lwm2m_reader_t *reader;
