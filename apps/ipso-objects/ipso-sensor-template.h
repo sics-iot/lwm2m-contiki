@@ -47,11 +47,14 @@
 
 #include "lwm2m-engine.h"
 
-typedef int (*ipso_sensor_write_value_callback_t)(lwm2m_context_t *ctr);
+typedef int (*ipso_sensor_write_value_callback_t)(lwm2m_context_t *ctx);
+
+typedef struct ipso_sensor ipso_sensor_t;
 
 /* Values of the IPSO object */
 typedef struct ipso_sensor_value {
   lwm2m_object_instance_t reg_object;
+  ipso_sensor_t *sensor;
   uint8_t flags;
   int32_t last_value;
   int32_t min_value;
@@ -59,18 +62,18 @@ typedef struct ipso_sensor_value {
 } ipso_sensor_value_t;
 
 /* Meta data about an IPSO sensor object */
-typedef struct ipso_sensor {
+struct ipso_sensor {
   /* LWM2M object type */
   uint16_t object_id;
   /* When we read out the value we send in a context to write to */
   ipso_sensor_write_value_callback_t write_callback;
-  int32_t range_min;
-  int32_t range_max;
+  int32_t min_range;
+  int32_t max_range;
   char *unit;
   /* update interval in seconds */
   uint16_t update_interval;
   ipso_sensor_value_t *sensor_value;
-} ipso_sensor_t;
+};
 
 
 int ipso_sensor_add(ipso_sensor_t *sensor);

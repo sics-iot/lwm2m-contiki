@@ -61,7 +61,7 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #else
@@ -979,6 +979,27 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
    */
   lwm2m_engine_select_reader(&context, format);
   lwm2m_engine_select_writer(&context, accept);
+
+  switch(REST.get_method_type(request)) {
+  case METHOD_PUT:
+    /* can also be write atts */
+    context.operation = LWM2M_OP_WRITE;
+    break;
+  case METHOD_POST:
+    if(context.level == 2) {
+      /* write to a instance */
+      context.operation = LWM2M_OP_WRITE;
+    } else if(context.level == 3) {
+      context.operation = LWM2M_OP_EXECUTE;
+    }
+    break;
+  case METHOD_GET:
+    /* Assuming that we haev already taken care of discovery... it will be read q*/
+    context.operation = LWM2M_OP_READ;
+    break;
+  default:
+    break;
+  }
 
 #if DEBUG
   /* for debugging */
