@@ -7,7 +7,7 @@ APPSDIRS = er-coap oma-lwm2m ipso-objects
 TARGETCDIR = oma-lwm2m-src
 TARGETCDIRS = ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}
 SOURCEDIRS = . ${addprefix $(TARGETCDIR)/,. $(APPSDIRS)}
-SOURCE_FILES = posix-main.c posix-ntimer.c custom-device-object.c ipso-generic-sensor.c
+SOURCE_FILES = posix-main.c posix-ntimer.c custom-device-object.c ipso-generic-sensor.c ipso-sensor-temp.c
 
 CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
 
