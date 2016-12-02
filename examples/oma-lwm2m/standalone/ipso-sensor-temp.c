@@ -31,49 +31,36 @@
 /**
  * \addtogroup ipso-objects
  * @{
- *
  */
 
 /**
  * \file
- *         Implementation of OMA LWM2M / IPSO sensor template.
+ *         Implementation of OMA LWM2M / IPSO Generic Sensor
  * \author
  *         Joakim Eriksson <joakime@sics.se>
  *         Niclas Finne <nfi@sics.se>
  */
 
-#ifndef IPSO_SENSOR_TEMPLATE_H_
-#define IPSO_SENSOR_TEMPLATE_H_
-
+#include <stdint.h>
+#include "lwm2m-object.h"
 #include "lwm2m-engine.h"
+#include "er-coap-engine.h"
+#include "ipso-sensor-template.h"
+#include <string.h>
 
-typedef int (*ipso_sensor_write_value_callback_t)(lwm2m_context_t *ctr);
+ipso_sensor_value_t value;
 
-/* Values of the IPSO object */
-typedef struct ipso_sensor_value {
-  lwm2m_object_instance_t reg_object;
-  uint8_t flags;
-  int32_t last_value;
-  int32_t min_value;
-  int32_t max_value;
-} ipso_sensor_value_t;
+ipso_sensor_t temp_sensor = {
+  .sensor_value = &value,
+  .range_max = 120000, /* milli celcius */
+  .range_min = -30000, /* milli celcius */
+};
+/*---------------------------------------------------------------------------*/
 
-/* Meta data about an IPSO sensor object */
-typedef struct ipso_sensor {
-  /* LWM2M object type */
-  uint16_t object_id;
-  /* When we read out the value we send in a context to write to */
-  ipso_sensor_write_value_callback_t write_callback;
-  int32_t range_min;
-  int32_t range_max;
-  char *unit;
-  /* update interval in seconds */
-  uint16_t update_interval;
-  ipso_sensor_value_t *sensor_value;
-} ipso_sensor_t;
-
-
-int ipso_sensor_add(ipso_sensor_t *sensor);
-int ipso_sensor_remove(ipso_sensor_t *sensor);
-
-#endif /* IPSO_SENSOR_TEMPLATE_H_ */
+void
+ipso_sensor_temp_init(void)
+{
+  ipso_sensor_add(&temp_sensor);
+}
+/*---------------------------------------------------------------------------*/
+/** @} */

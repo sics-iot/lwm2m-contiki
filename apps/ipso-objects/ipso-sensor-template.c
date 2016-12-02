@@ -42,36 +42,38 @@
  *         Niclas Finne <nfi@sics.se>
  */
 #include "ipso-sensor-template.h"
+#include "lwm2m-engine.h"
 
 
-#define MAX_SENSORS 8
-/* The sensors... NULL => not used */
-ipso_sensor_t *sensors[MAX_SENSORS];
-
+/*---------------------------------------------------------------------------*/
+static int lwm2m_callback(lwm2m_object_instance_t *object,
+                          lwm2m_context_t *ctx,
+                          coap_packet_t *request,
+                          coap_packet_t *response,
+                          uint8_t *buffer, uint16_t buf_size,
+                          int32_t *offset) {
+  /* Do the stuff */
+  
+  return 1;
+}
 /*---------------------------------------------------------------------------*/
 int
 ipso_sensor_add(ipso_sensor_t *sensor)
 {
-  int i;
-  for(i = 0; i < MAX_SENSORS; i++) {
-    if(sensors[i] == NULL) {
-      sensors[i] = sensor;
-      return 1;
-    }
+  if(sensor->sensor_value == NULL) {
+    return 0;
   }
-  return 0;
+  sensor->sensor_value->reg_object.object_id = sensor->object_id;
+  sensor->sensor_value->reg_object.instance_id = lwm2m_engine_recommend_instance_id(sensor->object_id);
+  sensor->sensor_value->reg_object.callback = lwm2m_callback;
+  lwm2m_engine_add_object(&sensor->sensor_value->reg_object);
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 int
 ipso_sensor_remove(ipso_sensor_t *sensor)
 {
-  int i;
-  for(i = 0; i < MAX_SENSORS; i++) {
-    if(sensors[i] == sensor) {
-      sensors[i] = NULL;
-      return 1;
-    }
-  }
-  return 0;
+  lwm2m_engine_remove_object(&sensor->sensor_value->reg_object);
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
