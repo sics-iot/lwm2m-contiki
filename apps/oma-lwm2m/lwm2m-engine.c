@@ -976,18 +976,21 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return 0;
   }
 
-  PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
+  PRINTF("lwm2m[%.*s] Context: %u/%u/%u  found: %d\n",
+         url_len, url, context.object_id,
          context.object_instance_id, context.resource_id, depth);
 
   if(!REST.get_header_content_type(request, &format)) {
-    PRINTF("lwm2m: No format given. Assume text plain...\n");
+    PRINTF("lwm2m[%.*s]: No format given. Assume text plain...\n",
+           url_len, url);
     format = LWM2M_TEXT_PLAIN;
   } else if(format == TEXT_PLAIN) {
     /* CoAP content format text plain - assume LWM2M text plain */
     format = LWM2M_TEXT_PLAIN;
   }
   if(!REST.get_header_accept(request, &accept)) {
-    PRINTF("lwm2m: No Accept header, using same as Content-format...\n");
+    PRINTF("lwm2m[%.*s]: No Accept header, using same as Content-format...\n",
+           url_len, url);
     accept = format;
   }
 
@@ -1021,8 +1024,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
 
 #if DEBUG
   /* for debugging */
-  PRINTF("%s Called Path:%.*s Format:%d ID:%d bsize:%u\n",
-         get_method_as_string(REST.get_method_type(request)), url_len, url,
+  PRINTF("lwm2m[%.*s] %s Format:%d ID:%d bsize:%u\n",
+         url_len, url, get_method_as_string(REST.get_method_type(request)),
          format, context.object_id, buffer_size);
   if(format == LWM2M_TEXT_PLAIN) {
     /* a string */
@@ -1034,7 +1037,20 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
 #endif /* DEBUG */
 
-  instance->callback(instance, &context);
+  if(instance->callback(instance, &context)) {
+    if(context.outlen > 0) {
+      PRINTF("lwm2m[%.*s]: replying with %u bytes\n", url_len, url,
+             context.outlen);
+      REST.set_response_payload(response, context.outbuf, context.outlen);
+      REST.set_header_content_type(response, context.content_type);
+    } else {
+      PRINTF("lwm2m[%.*s]: no data in reply\n", url_len, url);
+    }
+  } else {
+    /* Failed to handle the request */
+    REST.set_response_status(response, INTERNAL_SERVER_ERROR_5_00);
+    PRINTF("lwm2m[%.*s]: resource failed\n", url_len, url);
+  }
   return 1;
 }
 /*---------------------------------------------------------------------------*/
