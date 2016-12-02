@@ -51,6 +51,7 @@
 #include "oma-tlv.h"
 #include "oma-tlv-reader.h"
 #include "oma-tlv-writer.h"
+#include "lib/list.h"
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
@@ -81,13 +82,36 @@
 #define MAX_OBJECTS 10
 #endif /* LWM2M_ENGINE_CONF_MAX_OBJECTS */
 
-static const lwm2m_object_t *objects[MAX_OBJECTS];
-static char endpoint[32];
-
 void lwm2m_device_init(void);
 void lwm2m_security_init(void);
 void lwm2m_server_init(void);
 
+static int lwm2m_handler_callback(coap_packet_t *request,
+                                  coap_packet_t *response,
+                                  uint8_t *buffer, uint16_t buffer_size,
+                                  int32_t *offset);
+
+COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
+LIST(object_list);
+
+static const lwm2m_object_t *objects[MAX_OBJECTS];
+static char endpoint[32];
+/*---------------------------------------------------------------------------*/
+static inline const char *
+get_method_as_string(rest_resource_flags_t method)
+{
+  if(method == METHOD_GET) {
+    return "GET";
+  } else if(method == METHOD_POST) {
+    return "POST";
+  } else if(method == METHOD_PUT) {
+    return "PUT";
+  } else if(method == METHOD_DELETE) {
+    return "DELETE";
+  } else {
+    return "UNKNOWN";
+  }
+}
 /*---------------------------------------------------------------------------*/
 static int
 parse_next(const char **path, int *path_len, uint16_t *value)
@@ -115,38 +139,26 @@ parse_next(const char **path, int *path_len, uint16_t *value)
 }
 /*---------------------------------------------------------------------------*/
 static int
-lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
-                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+lwm2m_engine_parse_context(const char *path, int path_len,
+                           lwm2m_context_t *context)
 {
-  const char *path = NULL;
-  int path_len, ret;
-  uint16_t object_id, instance_id, resource_id;
-
-  path_len = REST.get_url(request, &path);
-  if(path_len == 0) {
-    PRINTF("lwm2m: no path in CoAP request - ignoring\n");
+  int ret;
+  if(context == NULL || path == NULL) {
     return 0;
   }
-
-  PRINTF("lwm2m: checking %.*s\n", path_len, path);
-
+  memset(context, 0, sizeof(lwm2m_context_t));
+  /* get object id */
   ret = 0;
-  ret += parse_next(&path, &path_len, &object_id);
-  ret += parse_next(&path, &path_len, &instance_id);
-  ret += parse_next(&path, &path_len, &resource_id);
+  ret += parse_next(&path, &path_len, &context->object_id);
+  ret += parse_next(&path, &path_len, &context->object_instance_id);
+  ret += parse_next(&path, &path_len, &context->resource_id);
 
-  if(ret < 0) {
-    /* Probably not a LWM2M object */
-    return 0;
-  }
+  /* Set default reader/writer */
+  context->reader = &lwm2m_plain_text_reader;
+  context->writer = &oma_tlv_writer;
 
-  PRINTF("lwm2m: CoAP request to %u.%u.%u (%d)\n",
-         object_id, instance_id, resource_id, ret);
-
-  return 0;
+  return ret;
 }
-/*---------------------------------------------------------------------------*/
-COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 /*---------------------------------------------------------------------------*/
 int
 lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
@@ -174,6 +186,7 @@ lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
 void
 lwm2m_engine_init(void)
 {
+  list_init(object_list);
 #ifdef LWM2M_ENGINE_CLIENT_ENDPOINT_NAME
 
   snprintf(endpoint, sizeof(endpoint) - 1,
@@ -236,29 +249,6 @@ lwm2m_engine_register_default_objects(void)
   lwm2m_security_init();
   lwm2m_server_init();
   lwm2m_device_init();
-}
-/*---------------------------------------------------------------------------*/
-int
-lwm2m_engine_parse_context(const lwm2m_object_t *object,
-                           const char *path, int path_len,
-                           lwm2m_context_t *context)
-{
-  int ret;
-  if(context == NULL || object == NULL || path == NULL) {
-    return 0;
-  }
-  memset(context, 0, sizeof(lwm2m_context_t));
-  /* get object id */
-  ret = 0;
-  ret += parse_next(&path, &path_len, &context->object_id);
-  ret += parse_next(&path, &path_len, &context->object_instance_id);
-  ret += parse_next(&path, &path_len, &context->resource_id);
-
-  /* Set default reader/writer */
-  context->reader = &lwm2m_plain_text_reader;
-  context->writer = &oma_tlv_writer;
-
-  return ret;
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_object_t *
@@ -586,9 +576,6 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
   lwm2m_context_t context;
   rest_resource_flags_t method;
   const lwm2m_instance_t *instance;
-#if DEBUG
-  const char *method_str;
-#endif /* DEBUG */
 
   method = REST.get_method_type(request);
 
@@ -605,7 +592,7 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
     accept = format;
   }
 
-  depth = lwm2m_engine_parse_context(object, url, len, &context);
+  depth = lwm2m_engine_parse_context(url, len, &context);
   PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
          context.object_instance_id, context.resource_id, depth);
 
@@ -615,18 +602,8 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
 
 #if DEBUG
   /* for debugging */
-  if(method == METHOD_GET) {
-    method_str = "GET";
-  } else if(method == METHOD_POST) {
-    method_str = "POST";
-  } else if(method == METHOD_PUT) {
-    method_str = "PUT";
-  } else if(method == METHOD_DELETE) {
-    method_str = "DELETE";
-  } else {
-    method_str = "UNKNOWN";
-  }
-  PRINTF("%s Called Path:%.*s Format:%d ID:%d bsize:%u\n", method_str, len,
+  PRINTF("%s Called Path:%.*s Format:%d ID:%d bsize:%u\n",
+         get_method_as_string(method), len,
          url, format, object->id, preferred_size);
   if(format == LWM2M_TEXT_PLAIN) {
     /* a string */
@@ -889,11 +866,105 @@ lwm2m_engine_delete_handler(const lwm2m_object_t *object, void *request,
   len = REST.get_url(request, &url);
   PRINTF("*** DELETE URI:'%.*s' called... - responding with DELETED.\n",
          len, url);
-  len = lwm2m_engine_parse_context(object, url, len, &context);
+  len = lwm2m_engine_parse_context(url, len, &context);
   PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
          context.object_instance_id, context.resource_id, len);
 
   REST.set_response_status(response, DELETED_2_02);
+}
+/*---------------------------------------------------------------------------*/
+/* Lightweight object instances */
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_engine_add_object(lwm2m_object_instance_t *object)
+{
+  list_add(object_list, object);
+}
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_engine_remove_object(lwm2m_object_instance_t *object)
+{
+  list_remove(object_list, object);
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+lwm2m_engine_get_object_instance(const lwm2m_context_t *context, int depth)
+{
+  lwm2m_object_instance_t *i;
+  for(i = list_head(object_list); i != NULL ; i = i->next) {
+    if(i->object_id == context->object_id &&
+       i->instance_id == context->object_instance_id) {
+      return i;
+    }
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static int
+lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
+                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+{
+  const char *url;
+  int url_len;
+  unsigned int format;
+  unsigned int accept;
+  int depth;
+  lwm2m_context_t context;
+  lwm2m_object_instance_t *instance;
+
+  url_len = REST.get_url(request, &url);
+  depth = lwm2m_engine_parse_context(url, url_len, &context);
+  if(depth < 2) {
+    /* No possible object instance id found in URL - ignore request */
+    return 0;
+  }
+
+  instance = lwm2m_engine_get_object_instance(&context, depth);
+  if(instance == NULL || instance->callback == NULL) {
+    /* No matching object/instance found - ignore request */
+    return 0;
+  }
+
+  PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
+         context.object_instance_id, context.resource_id, depth);
+
+  if(!REST.get_header_content_type(request, &format)) {
+    PRINTF("lwm2m: No format given. Assume text plain...\n");
+    format = LWM2M_TEXT_PLAIN;
+  } else if(format == TEXT_PLAIN) {
+    /* CoAP content format text plain - assume LWM2M text plain */
+    format = LWM2M_TEXT_PLAIN;
+  }
+  if(!REST.get_header_accept(request, &accept)) {
+    PRINTF("lwm2m: No Accept header, using same as Content-format...\n");
+    accept = format;
+  }
+
+  /*
+   * Select reader and writer based on provided Content type and
+   * Accept headers.
+   */
+  lwm2m_engine_select_reader(&context, format);
+  lwm2m_engine_select_writer(&context, accept);
+
+#if DEBUG
+  /* for debugging */
+  PRINTF("%s Called Path:%.*s Format:%d ID:%d bsize:%u\n",
+         get_method_as_string(REST.get_method_type(request)), url_len, url,
+         format, context.object_id, buffer_size);
+  if(format == LWM2M_TEXT_PLAIN) {
+    /* a string */
+    const uint8_t *data;
+    int plen = REST.get_request_payload(request, &data);
+    if(plen > 0) {
+      PRINTF("Data: '%.*s'\n", plen, (char *)data);
+    }
+  }
+#endif /* DEBUG */
+
+  instance->callback(instance, &context, request, response,
+                     buffer, buffer_size, offset);
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

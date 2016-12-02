@@ -82,5 +82,27 @@ const lwm2m_resource_t *lwm2m_get_resource(const lwm2m_instance_t *instance, lwm
 int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
 
 
+typedef struct lwm2m_object_instance lwm2m_object_instance_t;
+
+typedef int (* lwm2m_object_instance_callback_t)
+(lwm2m_object_instance_t *object,
+ lwm2m_context_t *ctx,
+ coap_packet_t *request,
+ coap_packet_t *response,
+ uint8_t *buffer, uint16_t buf_size,
+ int32_t *offset);
+
+#define LWM2M_OBJECT_INSTANCE_NONE 0xffff
+
+struct lwm2m_object_instance {
+  lwm2m_object_instance_t *next;
+  uint16_t object_id;
+  uint16_t instance_id;
+  lwm2m_object_instance_callback_t callback;
+};
+
+void lwm2m_engine_add_object(lwm2m_object_instance_t *object);
+void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
+
 #endif /* LWM2M_ENGINE_H */
 /** @} */
