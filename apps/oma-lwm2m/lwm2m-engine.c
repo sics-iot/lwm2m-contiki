@@ -178,10 +178,21 @@ lwm2m_engine_parse_context(const char *path, int path_len,
 /*---------------------------------------------------------------------------*/
 int
 lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
+  lwm2m_object_instance_t *o;
   int pos;
   int len, i, j;
 
   pos = 0;
+
+  for(o = list_head(object_list); o != NULL; o = o->next) {
+    len = snprintf((char *)&rd_data[pos], size - pos,
+                   "%s<%d/%d>", pos > 0 ? "," : "",
+                   o->object_id, o->instance_id);
+    if(len > 0 && len < size - pos) {
+      pos += len;
+    }
+  }
+
   for(i = 0; i < MAX_OBJECTS; i++) {
     if(objects[i] != NULL) {
       for(j = 0; j < objects[i]->count; j++) {
