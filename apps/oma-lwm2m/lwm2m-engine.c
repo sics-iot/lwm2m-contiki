@@ -153,6 +153,10 @@ lwm2m_engine_parse_context(const char *path, int path_len,
   ret += parse_next(&path, &path_len, &context->object_instance_id);
   ret += parse_next(&path, &path_len, &context->resource_id);
 
+  if(ret > 0) {
+    context->level = ret & 0xff;
+  }
+
   /* Set default reader/writer */
   context->reader = &lwm2m_plain_text_reader;
   context->writer = &oma_tlv_writer;
@@ -917,7 +921,7 @@ lwm2m_engine_remove_object(lwm2m_object_instance_t *object)
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-lwm2m_engine_get_object_instance(const lwm2m_context_t *context, int depth)
+lwm2m_engine_get_object_instance(const lwm2m_context_t *context)
 {
   lwm2m_object_instance_t *i;
   for(i = list_head(object_list); i != NULL ; i = i->next) {
@@ -948,7 +952,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return 0;
   }
 
-  instance = lwm2m_engine_get_object_instance(&context, depth);
+  instance = lwm2m_engine_get_object_instance(&context);
   if(instance == NULL || instance->callback == NULL) {
     /* No matching object/instance found - ignore request */
     return 0;
