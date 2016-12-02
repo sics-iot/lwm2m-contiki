@@ -43,6 +43,17 @@
  */
 #include "ipso-sensor-template.h"
 #include "lwm2m-engine.h"
+#include <stdio.h>
+
+#define IPSO_SENSOR_MIN_VALUE 5601
+#define IPSO_SENSOR_MAX_VALUE 5602
+#define IPSO_SENSOR_MIN_RANGE 5603
+#define IPSO_SENSOR_MAX_RANGE 5604
+
+#define IPSO_SENSOR_RESET_MINMAX 5605
+
+
+
 
 
 /*---------------------------------------------------------------------------*/
@@ -52,8 +63,48 @@ static int lwm2m_callback(lwm2m_object_instance_t *object,
                           coap_packet_t *response,
                           uint8_t *buffer, uint16_t buf_size,
                           int32_t *offset) {
+  /* Here we cast to our sensor-template struct */
+  ipso_sensor_t *sensor;
+  ipso_sensor_value_t *value;
+  value = (ipso_sensor_value_t *) object;
+  sensor = value->sensor;
+
   /* Do the stuff */
-  
+  if(ctx->level == 1) {
+    /* Should not happne 3303 */
+    return 0;
+  }
+  if(ctx->level == 2) {
+    /* This is a get whole object - or write whole object 3303/0 */
+    return 0;
+  }
+  if(ctx->level == 3) {
+    /* This is a get request on 3303/0/3700 */
+    /* NOW we assume a get.... which might be wrong... */
+    printf("*** Someone called: %d/%d/%d with op=%d\n",
+           ctx->object_id, ctx->object_instance_id, ctx->resource_id, ctx->operation);
+
+    switch(ctx->resource_id) {
+    case IPSO_SENSOR_MAX_RANGE:
+      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
+                                    (sensor->max_range * 1024) / 1000, 10);
+      break;
+    case IPSO_SENSOR_MIN_RANGE:
+      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
+                                    (sensor->min_range * 1024) / 1000, 10);
+      break;
+    case IPSO_SENSOR_MAX_VALUE:
+      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
+                                    (value->min_value * 1024) / 1000, 10);
+      break;
+    case IPSO_SENSOR_MIN_VALUE:
+      lwm2m_object_write_float32fix(ctx, buffer, buf_size,
+                                    (value->min_value * 1024) / 1000, 10);
+      break;
+    default:
+      return 0;
+    }
+  }
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -64,6 +115,7 @@ ipso_sensor_add(ipso_sensor_t *sensor)
     return 0;
   }
   sensor->sensor_value->reg_object.object_id = sensor->object_id;
+  sensor->sensor_value->sensor = sensor;
   sensor->sensor_value->reg_object.instance_id = lwm2m_engine_recommend_instance_id(sensor->object_id);
   sensor->sensor_value->reg_object.callback = lwm2m_callback;
   lwm2m_engine_add_object(&sensor->sensor_value->reg_object);

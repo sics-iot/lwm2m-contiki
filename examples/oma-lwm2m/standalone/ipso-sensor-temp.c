@@ -51,10 +51,16 @@
 ipso_sensor_value_t value;
 
 ipso_sensor_t temp_sensor = {
+  .object_id = 3303,
   .sensor_value = &value,
-  .range_max = 120000, /* milli celcius */
-  .range_min = -30000, /* milli celcius */
+  .max_range = 120000, /* milli celcius */
+  .min_range = -30000, /* milli celcius */
 };
+/*---------------------------------------------------------------------------*/
+int
+write_value()
+{
+}
 /*---------------------------------------------------------------------------*/
 
 void
