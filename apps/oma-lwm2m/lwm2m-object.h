@@ -87,6 +87,7 @@
 #define LWM2M_OBJECT_PATH_STR(x) LWM2M_OBJECT_PATH_STR_HELPER(x)
 
 typedef enum {
+  LWM2M_OP_NONE,
   LWM2M_OP_READ,
   LWM2M_OP_DISCOVER,
   LWM2M_OP_WRITE,
@@ -108,6 +109,14 @@ typedef struct lwm2m_context {
   uint8_t level;
   lwm2m_operation_t operation;
   /* TODO - add uint16_t resource_instance_id */
+
+  coap_packet_t *request;
+  coap_packet_t *response;
+
+  unsigned int content_type;
+  uint8_t *outbuf;
+  size_t   outsize;
+  unsigned outlen;
 
   const lwm2m_reader_t *reader;
   const lwm2m_writer_t *writer;
@@ -387,27 +396,43 @@ lwm2m_object_read_boolean(const lwm2m_context_t *ctx, const uint8_t *inbuf, size
 }
 
 static inline size_t
-lwm2m_object_write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value)
+lwm2m_object_write_int(lwm2m_context_t *ctx, int32_t value)
 {
-  return ctx->writer->write_int(ctx, outbuf, outlen, value);
+  size_t s;
+  s = ctx->writer->write_int(ctx, &ctx->outbuf[ctx->outlen],
+                             ctx->outsize - ctx->outlen, value);
+  ctx->outlen += s;
+  return s;
 }
 
 static inline size_t
-lwm2m_object_write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, const char *value, size_t strlen)
+lwm2m_object_write_string(lwm2m_context_t *ctx, const char *value, size_t strlen)
 {
-  return ctx->writer->write_string(ctx, outbuf, outlen, value, strlen);
+  size_t s;
+  s = ctx->writer->write_string(ctx, &ctx->outbuf[ctx->outlen],
+                                ctx->outsize - ctx->outlen, value, strlen);
+  ctx->outlen += s;
+  return s;
 }
 
 static inline size_t
-lwm2m_object_write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits)
+lwm2m_object_write_float32fix(lwm2m_context_t *ctx, int32_t value, int bits)
 {
-  return ctx->writer->write_float32fix(ctx, outbuf, outlen, value, bits);
+  size_t s;
+  s = ctx->writer->write_float32fix(ctx, &ctx->outbuf[ctx->outlen],
+                                    ctx->outsize - ctx->outlen, value, bits);
+  ctx->outlen += s;
+  return s;
 }
 
 static inline size_t
-lwm2m_object_write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int value)
+lwm2m_object_write_boolean(lwm2m_context_t *ctx, int value)
 {
-  return ctx->writer->write_boolean(ctx, outbuf, outlen, value);
+  size_t s;
+  s = ctx->writer->write_boolean(ctx, &ctx->outbuf[ctx->outlen],
+                                 ctx->outsize - ctx->outlen, value);
+  ctx->outlen += s;
+  return s;
 }
 
 #include "lwm2m-engine.h"

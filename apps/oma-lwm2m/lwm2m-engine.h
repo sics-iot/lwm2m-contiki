@@ -84,13 +84,9 @@ int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
 
 typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 
-typedef int (* lwm2m_object_instance_callback_t)
-(lwm2m_object_instance_t *object,
- lwm2m_context_t *ctx,
- coap_packet_t *request,
- coap_packet_t *response,
- uint8_t *buffer, uint16_t buf_size,
- int32_t *offset);
+typedef int
+(* lwm2m_object_instance_callback_t)(lwm2m_object_instance_t *object,
+                                     lwm2m_context_t *ctx);
 
 #define LWM2M_OBJECT_INSTANCE_NONE 0xffff
 
