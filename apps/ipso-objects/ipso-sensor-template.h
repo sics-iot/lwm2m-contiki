@@ -65,6 +65,7 @@ typedef struct ipso_sensor_value {
 struct ipso_sensor {
   /* LWM2M object type */
   uint16_t object_id;
+  uint16_t instance_id;
   /* When we read out the value we send in a context to write to */
   ipso_sensor_get_value_millis_t get_value_in_millis;
   int32_t min_range;
