@@ -61,7 +61,7 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #else
@@ -404,9 +404,9 @@ write_object_instances_link(const lwm2m_object_t *object,
 }
 /*---------------------------------------------------------------------------*/
 static int
-write_rd_link_data(const lwm2m_object_t *object,
-                   const lwm2m_instance_t *instance,
-                   char *buffer, size_t size)
+write_link_format_data(const lwm2m_object_t *object,
+                       const lwm2m_instance_t *instance,
+                       char *buffer, size_t size)
 {
   const lwm2m_resource_t *resource;
   int len, rdlen, i;
@@ -433,10 +433,10 @@ write_rd_link_data(const lwm2m_object_t *object,
 }
 /*---------------------------------------------------------------------------*/
 static int
-write_rd_json_data(const lwm2m_context_t *context,
-                   const lwm2m_object_t *object,
-                   const lwm2m_instance_t *instance,
-                   char *buffer, size_t size)
+write_json_data(const lwm2m_context_t *context,
+                const lwm2m_object_t *object,
+                const lwm2m_instance_t *instance,
+                char *buffer, size_t size)
 {
   const lwm2m_resource_t *resource;
   const char *s = "";
@@ -846,11 +846,11 @@ lwm2m_engine_handler(const lwm2m_object_t *object,
     } else {
       int rdlen;
       if(accept == APPLICATION_LINK_FORMAT) {
-        rdlen = write_rd_link_data(object, instance,
-                                   (char *)buffer, preferred_size);
+        rdlen = write_link_format_data(object, instance,
+                                       (char *)buffer, preferred_size);
       } else {
-        rdlen = write_rd_json_data(&context, object, instance,
-                                   (char *)buffer, preferred_size);
+        rdlen = write_json_data(&context, object, instance,
+                                (char *)buffer, preferred_size);
       }
       if(rdlen < 0) {
         PRINTF("Failed to generate instance response\n");
@@ -1016,18 +1016,22 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   case METHOD_PUT:
     /* can also be write atts */
     context.operation = LWM2M_OP_WRITE;
+    REST.set_response_status(response, CHANGED_2_04);
     break;
   case METHOD_POST:
     if(context.level == 2) {
       /* write to a instance */
       context.operation = LWM2M_OP_WRITE;
+      REST.set_response_status(response, CHANGED_2_04);
     } else if(context.level == 3) {
       context.operation = LWM2M_OP_EXECUTE;
+      REST.set_response_status(response, CHANGED_2_04);
     }
     break;
   case METHOD_GET:
     /* Assuming that we haev already taken care of discovery... it will be read q*/
     context.operation = LWM2M_OP_READ;
+    REST.set_response_status(response, CONTENT_2_05);
     break;
   default:
     break;

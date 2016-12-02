@@ -57,6 +57,11 @@ typedef enum {
   LWM2M_OPAQUE     = 1544
 } lwm2m_content_format_t;
 
+typedef enum {
+  LWM2M_STATUS_OK,
+  LWM2M_STATUS_ERROR,
+} lwm2m_status_t;
+
 void lwm2m_engine_init(void);
 void lwm2m_engine_register_default_objects(void);
 
