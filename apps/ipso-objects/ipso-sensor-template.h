@@ -42,10 +42,15 @@
  *         Niclas Finne <nfi@sics.se>
  */
 
-typedef int (*ipso_sensor_write_value_callback_t)(lwm2m_context_t *ctr)
+#ifndef IPSO_SENSOR_TEMPLATE_H_
+#define IPSO_SENSOR_TEMPLATE_H_
+
+#include "lwm2m-engine.h"
+
+typedef int (*ipso_sensor_write_value_callback_t)(lwm2m_context_t *ctr);
 
 /* Values of the IPSO object */
-struct ipso_sensor_value {
+typedef struct ipso_sensor_value {
   uint8_t id; /* The instance ID */
   uint8_t flags;
   int32_t last_value;
@@ -54,7 +59,7 @@ struct ipso_sensor_value {
 } ipso_sensor_value_t;
 
 /* Meta data about an IPSO sensor object */
-struct ipso_sensor {
+typedef struct ipso_sensor {
   /* LWM2M object type */
   uint16_t object_id;
   /* When we read out the value we send in a context to write to */
@@ -70,3 +75,5 @@ struct ipso_sensor {
 
 int ipso_sensor_add(ipso_sensor_t *sensor);
 int ipso_sensor_remove(ipso_sensor_t *sensor);
+
+#endif /* IPSO_SENSOR_TEMPLATE_H_ */
