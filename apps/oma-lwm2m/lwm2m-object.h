@@ -95,6 +95,7 @@ typedef struct lwm2m_context {
   uint16_t resource_id;
   uint8_t object_instance_index;
   uint8_t resource_index;
+  uint8_t level;
   /* TODO - add uint16_t resource_instance_id */
 
   const lwm2m_reader_t *reader;
