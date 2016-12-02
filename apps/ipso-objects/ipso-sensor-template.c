@@ -115,7 +115,7 @@ update_last_value(ipso_sensor_value_t *sval, int32_t value)
 /*---------------------------------------------------------------------------*/
 static int
 lwm2m_callback(lwm2m_object_instance_t *object,
-                          lwm2m_context_t *ctx)
+               lwm2m_context_t *ctx)
 {
   /* Here we cast to our sensor-template struct */
   const ipso_sensor_t *sensor;
@@ -191,7 +191,11 @@ ipso_sensor_add(const ipso_sensor_t *sensor)
   }
   sensor->sensor_value->reg_object.object_id = sensor->object_id;
   sensor->sensor_value->sensor = sensor;
-  sensor->sensor_value->reg_object.instance_id = lwm2m_engine_recommend_instance_id(sensor->object_id);
+  if(sensor->instance_id == 0) {
+    sensor->sensor_value->reg_object.instance_id = lwm2m_engine_recommend_instance_id(sensor->object_id);
+  } else {
+    sensor->sensor_value->reg_object.instance_id = sensor->instance_id;
+  }
   sensor->sensor_value->reg_object.callback = lwm2m_callback;
   lwm2m_engine_add_object(&sensor->sensor_value->reg_object);
   return 1;

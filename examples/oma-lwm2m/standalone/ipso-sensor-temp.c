@@ -71,6 +71,7 @@ static const ipso_sensor_t temp_sensor = {
 
 static const ipso_sensor_t hum_sensor = {
   .object_id = 3304,
+  .instance_id = 12,
   .sensor_value = &hum_value,
   .max_range = 100000, /* milli  */
   .min_range = 0, /* milli  */
