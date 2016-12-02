@@ -48,18 +48,51 @@
 #include "ipso-sensor-template.h"
 #include <string.h>
 
-ipso_sensor_value_t value;
+uint32_t temp = 19000;
+uint32_t hum = 30000;
 
-ipso_sensor_t temp_sensor = {
+ipso_sensor_value_t temp_value;
+ipso_sensor_value_t hum_value;
+
+lwm2m_status_t get_temp_value(int32_t *value);
+lwm2m_status_t get_hum_value(int32_t *value);
+
+static const ipso_sensor_t temp_sensor = {
   .object_id = 3303,
-  .sensor_value = &value,
+  .sensor_value = &temp_value,
   .max_range = 120000, /* milli celcius */
   .min_range = -30000, /* milli celcius */
+  .get_value_in_millis = get_temp_value,
+  .unit = "Cel",
+  .update_interval = 10
 };
+
 /*---------------------------------------------------------------------------*/
-int
-write_value()
+
+static const ipso_sensor_t hum_sensor = {
+  .object_id = 3304,
+  .sensor_value = &hum_value,
+  .max_range = 100000, /* milli  */
+  .min_range = 0, /* milli  */
+  .get_value_in_millis = get_hum_value,
+  .unit = "%",
+  .update_interval = 10
+};
+
+/*---------------------------------------------------------------------------*/
+
+lwm2m_status_t
+get_temp_value(int32_t *value)
 {
+  *value = temp++;
+  return LWM2M_STATUS_OK;
+}
+/*---------------------------------------------------------------------------*/
+lwm2m_status_t
+get_hum_value(int32_t *value)
+{
+  *value = temp++;
+  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 
@@ -67,6 +100,7 @@ void
 ipso_sensor_temp_init(void)
 {
   ipso_sensor_add(&temp_sensor);
+  ipso_sensor_add(&hum_sensor);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */
