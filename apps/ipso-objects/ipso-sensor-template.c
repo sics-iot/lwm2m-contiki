@@ -55,15 +55,7 @@
 
 #define IPSO_SENSOR_RESET_MINMAX 5605
 /*---------------------------------------------------------------------------*/
-uint32_t last_value;
-size_t my_write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits) {
-  last_value = value;
-  return 0;
-}
-
-struct lwm2m_writer fake_writer = {
-  .write_float32fix = my_write_float32fix
-};
+static void update_last_value(ipso_sensor_value_t *sval, int32_t value);
 /*---------------------------------------------------------------------------*/
 static int init = 0;
 static ntimer_t nt;
@@ -79,27 +71,25 @@ static void
 timer_callback(ntimer_t *timer)
 {
   int i;
-  printf("timer callback at %"PRIu64"\n", ntimer_uptime());
   ntimer_reset(timer, 1000);
 
   for(i = 0; i < MAX_PERIODIC; i++) {
     if(periodics[i].value != NULL) {
-      printf("*** Sensor periodic - time left:%d\n", periodics[i].ticks_left);
       if(periodics[i].ticks_left > 0) {
         periodics[i].ticks_left--;
       } else {
-        struct lwm2m_context ctx;
-        ctx.writer = &fake_writer;
-        periodics[i].value->sensor->write_callback(&ctx);
-        periodics[i].ticks_left = periodics->value->sensor->update_interval;
-        printf("Got last value: %d\n", last_value);
+        int32_t value;
+        periodics[i].ticks_left = periodics[i].value->sensor->update_interval;
+        if(periodics[i].value->sensor->get_value_in_millis(&value) == LWM2M_STATUS_OK) {
+          update_last_value(periodics[i].value, value);
+        }
       }
     }
   }
 }
 
 static void
-add_periodic(ipso_sensor_t *sensor)
+add_periodic(const ipso_sensor_t *sensor)
 {
   int i;
   for(i = 0; i < MAX_PERIODIC; i++) {
@@ -111,12 +101,24 @@ add_periodic(ipso_sensor_t *sensor)
   }
 }
 /*---------------------------------------------------------------------------*/
+static void
+update_last_value(ipso_sensor_value_t *sval, int32_t value)
+{
+  sval->last_value = value;
+  if(sval->min_value > value) {
+    sval->min_value = value;
+  }
+  if(sval->max_value < value) {
+    sval->max_value = value;
+  }
+}
+/*---------------------------------------------------------------------------*/
 static int
 lwm2m_callback(lwm2m_object_instance_t *object,
                           lwm2m_context_t *ctx)
 {
   /* Here we cast to our sensor-template struct */
-  ipso_sensor_t *sensor;
+  const ipso_sensor_t *sensor;
   ipso_sensor_value_t *value;
   value = (ipso_sensor_value_t *) object;
   sensor = value->sensor;
@@ -133,9 +135,6 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   if(ctx->level == 3) {
     /* This is a get request on 3303/0/3700 */
     /* NOW we assume a get.... which might be wrong... */
-    printf("*** Someone called: %d/%d/%d with op=%d\n",
-           ctx->object_id, ctx->object_instance_id, ctx->resource_id, ctx->operation);
-
     if(ctx->operation == LWM2M_OP_READ) {
       switch(ctx->resource_id) {
       case IPSO_SENSOR_UNIT:
@@ -150,14 +149,18 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         lwm2m_object_write_float32fix(ctx, (sensor->min_range * 1024) / 1000, 10);
         break;
       case IPSO_SENSOR_MAX_VALUE:
-        lwm2m_object_write_float32fix(ctx, (value->min_value * 1024) / 1000, 10);
+        lwm2m_object_write_float32fix(ctx, (value->max_value * 1024) / 1000, 10);
         break;
       case IPSO_SENSOR_MIN_VALUE:
         lwm2m_object_write_float32fix(ctx, (value->min_value * 1024) / 1000, 10);
         break;
       case IPSO_SENSOR_VALUE:
-        if(sensor->write_callback != NULL) {
-          sensor->write_callback(ctx);
+        if(sensor->get_value_in_millis != NULL) {
+          int32_t v;
+          if(sensor->get_value_in_millis(&v) == LWM2M_STATUS_OK) {
+            update_last_value(value, v);
+            lwm2m_object_write_float32fix(ctx, (value->last_value * 1024) / 1000, 10);
+          }
         }
         break;
       default:
@@ -165,7 +168,6 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       }
     } else if(ctx->operation == LWM2M_OP_EXECUTE) {
       if(ctx->resource_id == IPSO_SENSOR_RESET_MINMAX) {
-        printf("Reset to last value");
         value->min_value = value->last_value;
         value->max_value = value->last_value;
       }
@@ -175,7 +177,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 }
 /*---------------------------------------------------------------------------*/
 int
-ipso_sensor_add(ipso_sensor_t *sensor)
+ipso_sensor_add(const ipso_sensor_t *sensor)
 {
   if(!init && sensor->update_interval > 0) {
     ntimer_set_callback(&nt, timer_callback);
@@ -196,7 +198,7 @@ ipso_sensor_add(ipso_sensor_t *sensor)
 }
 /*---------------------------------------------------------------------------*/
 int
-ipso_sensor_remove(ipso_sensor_t *sensor)
+ipso_sensor_remove(const ipso_sensor_t *sensor)
 {
   lwm2m_engine_remove_object(&sensor->sensor_value->reg_object);
   return 1;
