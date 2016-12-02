@@ -875,6 +875,35 @@ lwm2m_engine_delete_handler(const lwm2m_object_t *object, void *request,
 /*---------------------------------------------------------------------------*/
 /* Lightweight object instances */
 /*---------------------------------------------------------------------------*/
+uint16_t
+lwm2m_engine_recommend_instance_id(uint16_t object_id)
+{
+  lwm2m_object_instance_t *i;
+  uint16_t min_id = 0xffff;
+  uint16_t max_id = 0;
+  int found = 0;
+  for(i = list_head(object_list); i != NULL ; i = i->next) {
+    if(i->object_id == object_id
+       && i->instance_id != LWM2M_OBJECT_INSTANCE_NONE) {
+      found++;
+      if(i->instance_id > max_id) {
+        max_id = i->instance_id;
+      }
+      if(i->instance_id < min_id) {
+        min_id = i->instance_id;
+      }
+    }
+  }
+  if(found == 0) {
+    /* No existing instances found */
+    return 0;
+  }
+  if(min_id > 0) {
+    return min_id - 1;
+  }
+  return max_id + 1;
+}
+/*---------------------------------------------------------------------------*/
 void
 lwm2m_engine_add_object(lwm2m_object_instance_t *object)
 {
