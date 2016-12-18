@@ -39,6 +39,7 @@
 #include "sys/ntimer.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
+#include "lwm2m-firmware.h"
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
@@ -98,6 +99,8 @@ start_application(int argc, char *argv[])
   ipso_sensor_temp_init();
   ipso_control_test_init();
   ipso_blockwise_test_init();
+
+  lwm2m_firmware_init();
 
   if(has_server_ep) {
     /* start RD client */

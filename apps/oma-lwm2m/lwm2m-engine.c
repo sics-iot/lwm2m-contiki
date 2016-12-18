@@ -972,6 +972,11 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   int depth;
   lwm2m_context_t context;
   lwm2m_object_instance_t *instance;
+  uint32_t bnum;
+  uint8_t bmore;
+  uint16_t bsize;
+  uint32_t boffset;
+
 
   url_len = REST.get_url(request, &url);
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
@@ -1054,12 +1059,28 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
 #endif /* DEBUG */
 
   context.offset = *offset;
+  context.insize = coap_get_payload(request, (const uint8_t **) &context.inbuf);
+  context.inpos = 0;
+
+  /* PUT/POST - e.g. write will not send in offset here - Maybe in the future? */
+  if(*offset == 0 && IS_OPTION(request, COAP_OPTION_BLOCK1)) {
+    coap_get_header_block1(request, &bnum, &bmore, &bsize, &boffset);
+    context.offset = boffset;
+  }
+
   if(instance->callback(instance, &context)) {
+    /* Handle blockwise 1 */
+    if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
+      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset, *offset);
+      coap_set_header_block1(response, bnum, 0, bsize);
+    }
+
     if(context.outlen > 0) {
       PRINTF("lwm2m[%.*s]: replying with %u bytes\n", url_len, url,
              context.outlen);
       REST.set_response_payload(response, context.outbuf, context.outlen);
       REST.set_header_content_type(response, context.content_type);
+
       *offset = context.offset;
     } else {
       PRINTF("lwm2m[%.*s]: no data in reply\n", url_len, url);

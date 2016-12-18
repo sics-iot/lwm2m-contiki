@@ -118,6 +118,10 @@ typedef struct lwm2m_context {
   size_t   outsize;
   unsigned outlen;
 
+  uint8_t *inbuf;
+  size_t  insize;
+  int     inpos;
+
   uint32_t offset; /* If we do blockwise - this needs to change */
 
   const lwm2m_reader_t *reader;
@@ -435,6 +439,17 @@ lwm2m_object_write_boolean(lwm2m_context_t *ctx, int value)
                                  ctx->outsize - ctx->outlen, value);
   ctx->outlen += s;
   return s;
+}
+
+static inline int
+lwm2m_object_is_final_incoming(lwm2m_context_t *ctx)
+{
+  uint8_t more;
+  if(coap_get_header_block1(ctx->request, NULL, &more, NULL, NULL)) {
+    return !more;
+  }
+  /* If we do not know this is final... it might not be... */
+  return 0;
 }
 
 #include "lwm2m-engine.h"

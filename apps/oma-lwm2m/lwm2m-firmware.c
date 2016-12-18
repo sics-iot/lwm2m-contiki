@@ -29,16 +29,16 @@
  */
 
 /**
- * \addtogroup ipso-objects
+ * \addtogroup
  * @{
  *
- * Code to test blockwise transfer together with the LWM2M-engine.
- * This object tests get with BLOCK2 and put with BLOCK1.
+ * Code for firmware object of lwm2m
  *
  */
 
 #include "lwm2m-engine.h"
 #include "er-coap.h"
+#include "lwm2m-firmware.h"
 #include <string.h>
 
 #define DEBUG 1
@@ -49,9 +49,30 @@
 #define PRINTF(...)
 #endif
 
-lwm2m_object_instance_t reg_object;
+#define UPDATE_PACKAGE     0
+#define UPDATE_PACKAGE_URI 1
+#define UPDATE_UPDATE      2
+#define UPDATE_STATE       3
+#define UPDATE_RESULT      5
 
-static char junk[64];
+#define STATE_IDLE         1
+#define STATE_DOWNLOADING  2
+#define STATE_DOWNLOADED   3
+
+#define RESULT_DEFAULT         0
+#define RESULT_SUCCESS         1
+#define RESULT_NO_STORAGE      2
+#define RESULT_OUT_OF_MEM      3
+#define RESULT_CONNECTION_LOST 4
+#define RESULT_CRC_FAILED      5
+#define RESULT_UNSUPPORTED_FW  6
+#define RESULT_INVALID_URI     7
+
+
+uint8_t state = STATE_IDLE;
+uint8_t result = RESULT_DEFAULT;
+
+lwm2m_object_instance_t reg_object;
 
 /*---------------------------------------------------------------------------*/
 static int
@@ -67,51 +88,67 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 
   PRINTF("Got request at: %d/%d/%d lv:%d\n", ctx->object_id, ctx->object_instance_id, ctx->resource_id, ctx->level);
 
-  if(ctx->level == 1) {
-    /* Should not happen */
-    return 0;
-  }
-  if(ctx->level == 2) {
-    /* This is a get whole object - or write whole object */
+  if(ctx->level == 1 || ctx->level == 2) {
+    /* Should not happen - as it will be taken care of by the lwm2m engine itself. */
     return 0;
   }
 
   if(ctx->operation == LWM2M_OP_READ) {
-#if DEBUG
-    if(coap_get_header_block2(ctx->request, &num, &more, &size, &offset)) {
-      PRINTF("CoAP BLOCK2: %d/%d/%d offset:%d\n", num, more, size, offset);
-    }
-#endif
-
-    lwm2m_object_write_string(ctx, junk, strlen(junk));
-
-    if(ctx->offset < 640) {
-      ctx->offset += 64;
-    } else {
-      ctx->offset = -1;
+    switch(ctx->resource_id) {
+    case UPDATE_STATE:
+      lwm2m_object_write_int(ctx, state); /* 1 means idle */
+      return 1;
+    case UPDATE_RESULT:
+      lwm2m_object_write_int(ctx, result); /* 0 means default */
+      return 1;
     }
   } else if(ctx->operation == LWM2M_OP_WRITE) {
 #if DEBUG
     if(coap_get_header_block1(ctx->request, &num, &more, &size, &offset)) {
       PRINTF("CoAP BLOCK1: %d/%d/%d offset:%d\n", num, more, size, offset);
+      PRINTF("LWM2M CTX->offset= %d\n", ctx->offset);
     }
 #endif
-    coap_set_header_block1(ctx->response, num, 0, size);
+    switch(ctx->resource_id) {
+    case UPDATE_PACKAGE:
+      /* The firmware is written */
+      PRINTF("Firmware received: %d %d fin:%d\n", ctx->offset, (int) ctx->insize,
+             lwm2m_object_is_final_incoming(ctx));
+      if(lwm2m_object_is_final_incoming(ctx)) {
+        state = STATE_DOWNLOADED;
+      } else {
+        state = STATE_DOWNLOADING;
+      }
+      return 1;
+    case UPDATE_PACKAGE_URI:
+      /* The firmware URI is written */
+      PRINTF("Firmware URI received: %d %d fin:%d\n", ctx->offset, (int) ctx->insize,
+             lwm2m_object_is_final_incoming(ctx));
+      if(DEBUG) {
+        int i;
+        PRINTF("Data: '");
+        for(i = 0; i < ctx->insize; i++) {
+          PRINTF("%c", ctx->inbuf[i]);
+        }
+        PRINTF("'\n");
+      }
+      return 1;
+    }
+  } else if(ctx->operation == LWM2M_OP_EXECUTE && ctx->resource_id == UPDATE_UPDATE) {
+    /* Perform the update operation */
+    if(state == STATE_DOWNLOADED) {
+      return 1;
+    }
+    /* Failure... */
   }
-  return 1;
+  return 0;
 }
 
+/*---------------------------------------------------------------------------*/
 void
-ipso_blockwise_test_init(void) {
-  int i;
-  reg_object.object_id = 4711;
+lwm2m_firmware_init(void) {
+  reg_object.object_id = 5;
   reg_object.instance_id = 0;
   reg_object.callback = lwm2m_callback;
-
-  for(i = 0; i < sizeof(junk); i++) {
-    junk[i] = '0' + i;
-  }
-  junk[i - 1] = 0;
-
   lwm2m_engine_add_object(&reg_object);
 }
