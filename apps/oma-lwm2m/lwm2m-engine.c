@@ -61,7 +61,7 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #else
@@ -976,6 +976,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   url_len = REST.get_url(request, &url);
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
                                      buffer, buffer_size, &context);
+
   if(depth < 2) {
     /* No possible object instance id found in URL - ignore request */
     return 0;
@@ -1052,12 +1053,14 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
 #endif /* DEBUG */
 
+  context.offset = *offset;
   if(instance->callback(instance, &context)) {
     if(context.outlen > 0) {
       PRINTF("lwm2m[%.*s]: replying with %u bytes\n", url_len, url,
              context.outlen);
       REST.set_response_payload(response, context.outbuf, context.outlen);
       REST.set_header_content_type(response, context.content_type);
+      *offset = context.offset;
     } else {
       PRINTF("lwm2m[%.*s]: no data in reply\n", url_len, url);
     }

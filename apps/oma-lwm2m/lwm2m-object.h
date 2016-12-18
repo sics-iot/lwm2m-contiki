@@ -118,6 +118,8 @@ typedef struct lwm2m_context {
   size_t   outsize;
   unsigned outlen;
 
+  uint32_t offset; /* If we do blockwise - this needs to change */
+
   const lwm2m_reader_t *reader;
   const lwm2m_writer_t *writer;
 } lwm2m_context_t;

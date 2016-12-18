@@ -47,6 +47,7 @@ void custom_device_object_init(void);
 void ipso_generic_sensor_init(void);
 void ipso_sensor_temp_init(void);
 void ipso_control_test_init(void);
+void ipso_blockwise_test_init(void);
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -96,6 +97,7 @@ start_application(int argc, char *argv[])
 
   ipso_sensor_temp_init();
   ipso_control_test_init();
+  ipso_blockwise_test_init();
 
   if(has_server_ep) {
     /* start RD client */
