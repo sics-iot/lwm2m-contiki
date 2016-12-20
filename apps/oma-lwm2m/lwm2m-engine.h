@@ -87,6 +87,7 @@ const lwm2m_resource_t *lwm2m_get_resource(const lwm2m_instance_t *instance, lwm
 int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
 
 
+
 typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 
 typedef int
@@ -99,6 +100,10 @@ struct lwm2m_object_instance {
   lwm2m_object_instance_t *next;
   uint16_t object_id;
   uint16_t instance_id;
+  /* an array of resource IDs for discovery, etc */
+  uint16_t *resource_ids;
+  uint16_t resource_count;
+  /* the callback for requests */
   lwm2m_object_instance_callback_t callback;
 };
 

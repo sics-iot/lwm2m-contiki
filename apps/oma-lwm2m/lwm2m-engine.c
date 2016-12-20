@@ -90,6 +90,9 @@ static int lwm2m_handler_callback(coap_packet_t *request,
                                   coap_packet_t *response,
                                   uint8_t *buffer, uint16_t buffer_size,
                                   int32_t *offset);
+static lwm2m_object_instance_t *
+lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last);
+
 
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 LIST(object_list);
@@ -907,6 +910,60 @@ lwm2m_engine_delete_handler(const lwm2m_object_t *object, void *request,
 /*---------------------------------------------------------------------------*/
 /* Lightweight object instances */
 /*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *last_ins;
+static int last_rsc_pos;
+
+static int
+perform_discovery(lwm2m_object_instance_t *instance,
+                  lwm2m_context_t *ctx)
+{
+  int pos = 0;
+  int size = ctx->outsize;
+  int len = 0;
+  PRINTF("DISCO - o:%d s:%d lsr:%d\n", ctx->offset, size, last_rsc_pos);
+
+  if(ctx->offset == 0) {
+    last_ins = instance;
+    last_rsc_pos = 0;
+  } else {
+    /* offset > 0 - assume that we are already in a disco */
+    instance = last_ins;
+    PRINTF("Old disco: %x\n", last_ins);
+    if(last_ins == NULL) {
+      ctx->offset = -1;
+      ctx->outbuf[0] = ' ';
+      pos = 1;
+    }
+  }
+
+  while(instance != NULL) {
+    /* Do the discovery */
+    /* Just object this time... */
+    if(instance->resource_ids != NULL && instance->resource_count > 0) {
+      while(last_rsc_pos < instance->resource_count) {
+        len = snprintf((char *) &ctx->outbuf[pos], size - pos, ",<%d/%d/%d>",
+                       instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
+        if(len < 0 || len + pos >= size) {
+          /* ok we trunkated here... */
+          PRINTF("Truncated? len=%d, %s\n", len + pos, ctx->outbuf);
+          ctx->offset += pos;
+          ctx->outlen = pos;
+          return 1;
+        }
+        pos += len;
+        last_rsc_pos++;
+      }
+    }
+    instance = lwm2m_engine_next_object_instance(ctx, instance);
+    last_ins = instance;
+    last_rsc_pos = 0;
+  }
+  /* seems like we are done! */
+  ctx->offset=-1;
+  ctx->outlen = pos;
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
 uint16_t
 lwm2m_engine_recommend_instance_id(uint16_t object_id)
 {
@@ -954,8 +1011,21 @@ lwm2m_engine_get_object_instance(const lwm2m_context_t *context)
   lwm2m_object_instance_t *i;
   for(i = list_head(object_list); i != NULL ; i = i->next) {
     if(i->object_id == context->object_id &&
-       i->instance_id == context->object_instance_id) {
+       ((context->level < 2) || i->instance_id == context->object_instance_id)) {
       return i;
+    }
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last)
+{
+  while(last != NULL) {
+    last = last->next;
+    if(last != NULL && last->object_id == context->object_id &&
+       ((context->level < 2) || last->instance_id == context->object_instance_id)) {
+      return last;
     }
   }
   return NULL;
@@ -976,27 +1046,14 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   uint8_t bmore;
   uint16_t bsize;
   uint32_t boffset;
-
+  uint8_t success = 1; /* the success boolean */
 
   url_len = REST.get_url(request, &url);
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
                                      buffer, buffer_size, &context);
 
-  if(depth < 2) {
-    /* No possible object instance id found in URL - ignore request */
-    return 0;
-  }
 
-  instance = lwm2m_engine_get_object_instance(&context);
-  if(instance == NULL || instance->callback == NULL) {
-    /* No matching object/instance found - ignore request */
-    return 0;
-  }
-
-  PRINTF("lwm2m[%.*s] Context: %u/%u/%u  found: %d\n",
-         url_len, url, context.object_id,
-         context.object_instance_id, context.resource_id, depth);
-
+  /* Get format and accept */
   if(!REST.get_header_content_type(request, &format)) {
     PRINTF("lwm2m[%.*s]: No format given. Assume text plain...\n",
            url_len, url);
@@ -1011,6 +1068,25 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     accept = format;
   }
 
+  /**
+   * 1 => Object only
+   * 2 => Object and Instance
+   * 3 => Object and Instance and Resource
+   */
+  if(depth < 1) {
+    /* No possible object id found in URL - ignore request */
+    return 0;
+  }
+
+  instance = lwm2m_engine_get_object_instance(&context);
+  if(instance == NULL || instance->callback == NULL) {
+    /* No matching object/instance found - ignore request */
+    return 0;
+  }
+
+  PRINTF("lwm2m[%.*s] Context: %u/%u/%u  found: %d\n",
+         url_len, url, context.object_id,
+         context.object_instance_id, context.resource_id, depth);
   /*
    * Select reader and writer based on provided Content type and
    * Accept headers.
@@ -1036,7 +1112,11 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     break;
   case METHOD_GET:
     /* Assuming that we haev already taken care of discovery... it will be read q*/
-    context.operation = LWM2M_OP_READ;
+    if(accept == APPLICATION_LINK_FORMAT) {
+      context.operation = LWM2M_OP_DISCOVER;
+    } else {
+      context.operation = LWM2M_OP_READ;
+    }
     REST.set_response_status(response, CONTENT_2_05);
     break;
   default:
@@ -1068,7 +1148,16 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     context.offset = boffset;
   }
 
-  if(instance->callback(instance, &context)) {
+    /* This is a discovery operation */
+  if(context.operation == LWM2M_OP_DISCOVER) {
+    /* Assume only one disco at a time... */
+    success = perform_discovery(instance, &context);
+  } else {
+    /* If not discovery or create - this is a regular OP - do the callback */
+    success = instance->callback(instance, &context);
+  }
+
+  if(success) {
     /* Handle blockwise 1 */
     if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
       PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset, *offset);
