@@ -83,7 +83,7 @@
 
 static struct lwm2m_session_info session_info;
 
-static uint16_t update_lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME; //in sec
+static uint16_t update_lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME; /*in sec */
 static uint16_t current_ms = 0;
 
 static struct request_state rd_request_state;
@@ -102,7 +102,7 @@ static struct request_state rd_request_state;
 static uint8_t rd_state = 0;
 static uint64_t wait_until_network_check = 0;
 
-//static char *endpoint;
+/*static char *endpoint; */
 static uint8_t path_data[32]; /* allocate some data for building the path */
 static uint8_t query_data[64]; /* allocate some data for queries and updates */
 static uint8_t rd_data[128]; /* allocate some data for the RD */
@@ -178,7 +178,7 @@ update_registration_server(void)
 }
 /*---------------------------------------------------------------------------*/
 void
-lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t  *server)
+lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server)
 {
   coap_endpoint_copy(&session_info.bs_server_ep, server);
   session_info.has_bs_server_info = 1;
@@ -230,26 +230,26 @@ bootstrap_callback(struct request_state *state)
   PRINTF("Bootstrap callback Response: %d, ", state->response != NULL);
   if(state->response) {
     if(CHANGED_2_04 == state->response->code) {
-    	PRINTF("Considered done!\n");
-    	rd_state = BOOTSTRAP_DONE;
-    	return;
+      PRINTF("Considered done!\n");
+      rd_state = BOOTSTRAP_DONE;
+      return;
     }
     /* Possible error response codes are 4.00 Bad request & 4.15 Unsupported content format */
     PRINTF("Failed with code %d. Retrying\n", state->response->code);
     /* TODO Application callback? */
     rd_state = INIT;
-  } else if (BOOTSTRAP_SENT == rd_state){ /* this can handle double invocations */
-      /* Failure! */
-      PRINTF("Bootstrap failed! Retry?");
-  	  rd_state = DO_BOOTSTRAP;
+  } else if(BOOTSTRAP_SENT == rd_state) { /* this can handle double invocations */
+    /* Failure! */
+    PRINTF("Bootstrap failed! Retry?");
+    rd_state = DO_BOOTSTRAP;
   } else {
     PRINTF("Ignore\n");
   }
 }
 /*---------------------------------------------------------------------------*/
 /*
-* Page 65-66 in 07 April 2016 spec.
-*/
+ * Page 65-66 in 07 April 2016 spec.
+ */
 static void
 registration_callback(struct request_state *state)
 {
@@ -257,7 +257,7 @@ registration_callback(struct request_state *state)
   if(state->response) {
     /* check state and possibly set registration to done */
     if(CREATED_2_01 == state->response->code) {
-      strncpy(session_info.assigned_ep, state->response->location_path + 3, ASSIGNED_ENDPOINT_LEN); //TODO better len-check. now using Leshan client id len
+      strncpy(session_info.assigned_ep, state->response->location_path + 3, ASSIGNED_ENDPOINT_LEN); /*TODO better len-check. now using Leshan client id len */
       current_ms = 0; /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
       rd_state = REGISTRATION_DONE;
       PRINTF("Done!\n");
@@ -267,17 +267,17 @@ registration_callback(struct request_state *state)
     PRINTF("Failed with code %d. Re-init network\n", state->response->code);
     /* TODO Application callback? */
     rd_state = INIT;
-  } else if (REGISTRATION_SENT == rd_state){ /* this can handle double invocations */
+  } else if(REGISTRATION_SENT == rd_state) { /* this can handle double invocations */
     /* Failure! */
-      PRINTF("Registration failed! Retry?");
-      rd_state = DO_REGISTRATION;
+    PRINTF("Registration failed! Retry?");
+    rd_state = DO_REGISTRATION;
   } else {
     PRINTF("Ignore\n");
   }
 }
 /*
-* Page 65-66 in 07 April 2016 spec.
-*/
+ * Page 65-66 in 07 April 2016 spec.
+ */
 static void
 update_callback(struct request_state *state)
 {
@@ -292,9 +292,8 @@ update_callback(struct request_state *state)
     /* Possible error response codes are 4.00 Bad request & 4.04 Not Found */
     PRINTF("Failed with code %d. Retrying registration\n", state->response->code);
     rd_state = DO_REGISTRATION;
-
-  } else if (REGISTRATION_SENT == rd_state){ /* this can handle the current double invocation */
-      //Failure!
+  } else if(REGISTRATION_SENT == rd_state) { /* this can handle the current double invocation */
+    /*Failure! */
     PRINTF("Update failed! Retry?");
     rd_state = DO_REGISTRATION;
   } else {
@@ -324,7 +323,7 @@ periodic_process(ntimer_t *timer)
     if(now > wait_until_network_check) {
       /* check each 10 seconds before next check */
       PRINTF("Checking for network... %lu\n",
-          (unsigned long)wait_until_network_check);
+             (unsigned long)wait_until_network_check);
       wait_until_network_check = now + 10000;
       if(has_network_access()) {
         /* Either do bootstrap then registration */
@@ -344,14 +343,14 @@ periodic_process(ntimer_t *timer)
         coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
         coap_set_header_uri_path(request, "/bs");
 
-        snprintf (query_data, sizeof(query_data), "?ep=%s", session_info.ep);
+        snprintf(query_data, sizeof(query_data), "?ep=%s", session_info.ep);
         coap_set_header_uri_query(request, query_data);
         PRINTF("Registering ID with bootstrap server [");
         coap_endpoint_print(&session_info.bs_server_ep);
         PRINTF("] as '%s'\n", session_info.ep);
 
         coap_send_request(&rd_request_state, &session_info.bs_server_ep, request,
-            bootstrap_callback);
+                          bootstrap_callback);
 
         rd_state = BOOTSTRAP_SENT;
       }
@@ -386,7 +385,7 @@ periodic_process(ntimer_t *timer)
           /* Check if secure */
           secure = strncmp((const char *)first, "coaps:", 6) == 0;
 
-          coap_endpoint_parse((const char *) first, len, &session_info.server_ep);
+          coap_endpoint_parse((const char *)first, len, &session_info.server_ep);
           PRINTF("Server address:");
           coap_endpoint_print(&session_info.server_ep);
           PRINTF("\n");
@@ -410,7 +409,7 @@ periodic_process(ntimer_t *timer)
     break;
   case DO_REGISTRATION:
     if(session_info.use_registration && !session_info.registered &&
-        update_registration_server()) {
+       update_registration_server()) {
 
       int len;
 
@@ -418,7 +417,7 @@ periodic_process(ntimer_t *timer)
       coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
       coap_set_header_uri_path(request, "/rd");
 
-      snprintf (query_data, sizeof(query_data), "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
+      snprintf(query_data, sizeof(query_data), "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
       coap_set_header_uri_query(request, query_data);
 
       /* generate the rd data */
@@ -428,11 +427,11 @@ periodic_process(ntimer_t *timer)
       PRINTF("Registering with [");
       coap_endpoint_print(&session_info.server_ep);
       PRINTF("] lwm2m endpoint '%s': '%.*s'\n",
-          query_data, len, (char *) rd_data);
+             query_data, len, (char *)rd_data);
       /* COAP_BLOCKING_REQUEST(&server_endpoint, request, */
       /*                       client_chunk_handler); */
       coap_send_request(&rd_request_state, &session_info.server_ep, request,
-          registration_callback);
+                        registration_callback);
       rd_state = REGISTRATION_SENT;
     }
   case REGISTRATION_SENT:
@@ -444,18 +443,18 @@ periodic_process(ntimer_t *timer)
     check_periodic_observations(); /* TODO: manage periodic observations */
     current_ms += STATE_MACHINE_UPDATE_INTERVAL;
 
-    if(session_info.lifetime*500 <= current_ms) { /* time to send an update to the server, at half-time! sec vs ms */
+    if(session_info.lifetime * 500 <= current_ms) { /* time to send an update to the server, at half-time! sec vs ms */
       current_ms = 0;
       /* prepare request,  */
       coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
-      snprintf (path_data, sizeof(path_data), "/rd/%s/", session_info.assigned_ep);
+      snprintf(path_data, sizeof(path_data), "/rd/%s/", session_info.assigned_ep);
       coap_set_header_uri_path(request, path_data);
 
-      snprintf (query_data, sizeof(query_data), "?lt=%d", session_info.lifetime);
+      snprintf(query_data, sizeof(query_data), "?lt=%d", session_info.lifetime);
       coap_set_header_uri_query(request, query_data);
       PRINTF("Updating\n");
       coap_send_request(&rd_request_state, &session_info.server_ep, request,
-          update_callback);
+                        update_callback);
 
       rd_state = UPDATE_SENT;
     }
@@ -469,8 +468,6 @@ periodic_process(ntimer_t *timer)
     PRINTF("Unhandled state: %d\n", rd_state);
   }
 }
-
-
 void
 lwm2m_rd_client_init(const char *ep, uint16_t lifetime)
 {
@@ -482,8 +479,8 @@ lwm2m_rd_client_init(const char *ep, uint16_t lifetime)
   ntimer_set_callback(&rd_timer, periodic_process);
   ntimer_set(&rd_timer, STATE_MACHINE_UPDATE_INTERVAL); /* call the RD client 2 times per second */
 }
-
 void
-check_periodic_observations() {
+check_periodic_observations()
+{
 /* TODO */
 }
