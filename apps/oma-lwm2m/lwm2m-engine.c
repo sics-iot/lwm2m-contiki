@@ -920,11 +920,12 @@ perform_discovery(lwm2m_object_instance_t *instance,
   int pos = 0;
   int size = ctx->outsize;
   int len = 0;
-  PRINTF("DISCO - o:%d s:%d lsr:%d\n", ctx->offset, size, last_rsc_pos);
+  PRINTF("DISCO - o:%d s:%d lsr:%d lv:%d\n", ctx->offset, size, last_rsc_pos, ctx->level);
 
   if(ctx->offset == 0) {
     last_ins = instance;
     last_rsc_pos = 0;
+    /* Here we should print top node */
   } else {
     /* offset > 0 - assume that we are already in a disco */
     instance = last_ins;
@@ -941,16 +942,18 @@ perform_discovery(lwm2m_object_instance_t *instance,
     /* Just object this time... */
     if(instance->resource_ids != NULL && instance->resource_count > 0) {
       while(last_rsc_pos < instance->resource_count) {
-        len = snprintf((char *) &ctx->outbuf[pos], size - pos, ",<%d/%d/%d>",
-                       instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
-        if(len < 0 || len + pos >= size) {
-          /* ok we trunkated here... */
-          PRINTF("Truncated? len=%d, %s\n", len + pos, ctx->outbuf);
-          ctx->offset += pos;
-          ctx->outlen = pos;
-          return 1;
+        if(ctx->level < 3 || ctx->resource_id == instance->resource_ids[last_rsc_pos]) {
+          len = snprintf((char *) &ctx->outbuf[pos], size - pos,
+                         pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
+                         instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
+          if(len < 0 || len + pos >= size) {
+            /* ok we trunkated here... */
+            ctx->offset += pos;
+            ctx->outlen = pos;
+            return 1;
+          }
+          pos += len;
         }
-        pos += len;
         last_rsc_pos++;
       }
     }
