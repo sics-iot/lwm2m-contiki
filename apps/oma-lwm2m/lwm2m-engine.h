@@ -52,9 +52,11 @@
 /* LWM2M / CoAP Content-Formats */
 typedef enum {
   LWM2M_TEXT_PLAIN = 1541,
-  LWM2M_TLV        = 1542,
-  LWM2M_JSON       = 1543,
-  LWM2M_OPAQUE     = 1544
+  LWM2M_TLV        = 11542,
+  LWM2M_JSON       = 11543,
+  LWM2M_OLD_TLV    = 1542,
+  LWM2M_OLD_JSON   = 1543,
+  LWM2M_OLD_OPAQUE  = 1544
 } lwm2m_content_format_t;
 
 typedef enum {

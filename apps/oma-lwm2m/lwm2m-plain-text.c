@@ -189,11 +189,13 @@ static size_t
 write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
              const char *value, size_t stringlen)
 {
-  int n = snprintf((char *)outbuf, outlen, "%.*s", (int) stringlen, value);
-  if(n < 0 || n >= outlen) {
+  int totlen = stringlen;
+  if(stringlen >= outlen) {
     return 0;
   }
-  return n;
+  memmove(outbuf, value, totlen);
+  outbuf[totlen] = 0;
+  return totlen;
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_writer_t lwm2m_plain_text_writer = {

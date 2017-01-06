@@ -48,8 +48,12 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTS(l,s,f) do { int i;					\
+    for(i = 0; i < l; i++) printf(f, s[i]); \
+    } while(0)
 #else
 #define PRINTF(...)
+#define PRINTS(l,s,f)
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -128,8 +132,11 @@ coap_receive(const coap_endpoint_t *src,
 
     PRINTF("  Parsed: v %u, t %u, tkl %u, c %u, mid %u\n", message->version,
            message->type, message->token_len, message->code, message->mid);
-    PRINTF("  URL: %.*s\n", (int)message->uri_path_len, message->uri_path);
-    PRINTF("  Payload: %.*s\n", message->payload_len, message->payload);
+    PRINTF("  URL:");
+    PRINTS(message->uri_path_len, message->uri_path, "%c");
+    PRINTF("\n  Payload: ");
+    PRINTS(message->payload_len, message->payload, "%c");
+    PRINTF("\n");
 
     /* handle requests */
     if(message->code >= COAP_GET && message->code <= COAP_DELETE) {
