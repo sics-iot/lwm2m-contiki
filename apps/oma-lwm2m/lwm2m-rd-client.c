@@ -68,10 +68,14 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTS(l,s,f) do { int i;					\
+    for(i = 0; i < l; i++) printf(f, s[i]); \
+    } while(0)
 #define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
 #define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
 #else
 #define PRINTF(...)
+#define PRINTS(l,s,f)
 #define PRINT6ADDR(addr)
 #define PRINTLLADDR(addr)
 #endif
@@ -380,7 +384,9 @@ periodic_process(ntimer_t *timer)
         if(first != NULL && len > 0) {
           uint8_t secure = 0;
 
-          PRINTF("**** Found security instance using: %.*s\n", len, first);
+          PRINTF("**** Found security instance using: ");
+          PRINTS(len, first, "%c");
+          PRINTF("\n");
           /* TODO Should verify it is a URI */
           /* Check if secure */
           secure = strncmp((const char *)first, "coaps:", 6) == 0;
@@ -396,7 +402,9 @@ periodic_process(ntimer_t *timer)
             session_info.bootstrapped++;
           }
         } else {
-          PRINTF("** failed to parse URI %.*s\n", len, first);
+          PRINTF("** failed to parse URI ");
+          PRINTS(len, first, "%c");
+          PRINTF("\n");
         }
       }
 
@@ -426,12 +434,11 @@ periodic_process(ntimer_t *timer)
 
       PRINTF("Registering with [");
       coap_endpoint_print(&session_info.server_ep);
-      PRINTF("] lwm2m endpoint '%s': '%.*s'\n",
-             query_data, len, (char *)rd_data);
-      /* COAP_BLOCKING_REQUEST(&server_endpoint, request, */
-      /*                       client_chunk_handler); */
-      coap_send_request(&rd_request_state, &session_info.server_ep, request,
-                        registration_callback);
+      PRINTF("] lwm2m endpoint '%s': '", &session_info.server_ep);
+      PRINTS(len, rd_data, "%c");
+      PRINTF("'\n");
+      coap_send_request(&rd_request_state, &session_info.server_endpoint,
+                        request, registration_callback);
       rd_state = REGISTRATION_SENT;
     }
   case REGISTRATION_SENT:
