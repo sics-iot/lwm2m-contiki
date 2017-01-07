@@ -124,12 +124,16 @@ typedef struct lwm2m_context {
 
   uint32_t offset; /* If we do blockwise - this needs to change */
 
+  /* Info on last_instance read/write */
+  uint16_t last_instance;
   const lwm2m_reader_t *reader;
   const lwm2m_writer_t *writer;
 } lwm2m_context_t;
 
 /* LWM2M format writer for the various formats supported */
 struct lwm2m_writer {
+  size_t (* init_write)(const lwm2m_context_t *ctx);
+  size_t (* end_write)(const lwm2m_context_t *ctx);
   size_t (* write_int)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value);
   size_t (* write_string)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, const char *value, size_t strlen);
   size_t (* write_float32fix)(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits);

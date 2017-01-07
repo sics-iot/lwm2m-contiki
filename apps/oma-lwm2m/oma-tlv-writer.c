@@ -46,6 +46,18 @@
 #include "oma-tlv.h"
 /*---------------------------------------------------------------------------*/
 static size_t
+init_write(const lwm2m_context_t *ctx)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+end_write(const lwm2m_context_t *ctx)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
 write_boolean_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                   int value)
 {
@@ -80,6 +92,8 @@ write_string_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_writer_t oma_tlv_writer = {
+  init_write,
+  end_write,
   write_int_tlv,
   write_string_tlv,
   write_float32fix_tlv,
