@@ -57,10 +57,32 @@
 
 /*---------------------------------------------------------------------------*/
 static size_t
+init_write(const lwm2m_context_t *ctx)
+{
+  int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
+                     ctx->outsize - ctx->outlen, "{\"e\":[");
+  if((len < 0) || (len >= ctx->outsize)) {
+    return 0;
+  }
+  return len;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+end_write(const lwm2m_context_t *ctx)
+{
+  int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
+                     ctx->outsize - ctx->outlen, "]}");
+  if((len < 0) || (len >= ctx->outsize - ctx->outlen)) {
+    return 0;
+  }
+  return len;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
 write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int value)
 {
-  int len = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"bv\":%s}]}\n", ctx->resource_id, value ? "true" : "false");
+  int len = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"bv\":%s}", ctx->resource_id, value ? "true" : "false");
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
@@ -71,7 +93,7 @@ static size_t
 write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
           int32_t value)
 {
-  int len = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"v\":%" PRId32 "}]}\n", ctx->resource_id, value);
+  int len = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"v\":%" PRId32 "}", ctx->resource_id, value);
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
@@ -84,7 +106,7 @@ write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 {
   size_t len = 0;
   int res;
-  res = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"v\":", ctx->resource_id);
+  res = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"v\":", ctx->resource_id);
   if(res <= 0 || res >= outlen) {
     return 0;
   }
@@ -96,7 +118,7 @@ write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   }
   len += res;
   outlen -= res;
-  res = snprintf((char *)&outbuf[len], outlen, "}]}\n");
+  res = snprintf((char *)&outbuf[len], outlen, "}");
   if((res <= 0) || (res >= outlen)) {
     return 0;
   }
@@ -111,8 +133,8 @@ write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   size_t i;
   size_t len = 0;
   int res;
-  PRINTF("{\"e\":[{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
-  res = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
+  PRINTF("{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
+  res = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
   if(res < 0 || res >= outlen) {
     return 0;
   }
@@ -143,8 +165,8 @@ write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
       return 0;
     }
   }
-  PRINTF("\"}]}\n");
-  res = snprintf((char *)&outbuf[len], outlen - len, "\"}]}\n");
+  PRINTF("\"}\n");
+  res = snprintf((char *)&outbuf[len], outlen - len, "\"}");
   if((res < 0) || (res >= (outlen - len))) {
     return 0;
   }
@@ -153,6 +175,8 @@ write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_writer_t lwm2m_json_writer = {
+  init_write,
+  end_write,
   write_int,
   write_string,
   write_float32fix,

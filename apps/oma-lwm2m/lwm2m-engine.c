@@ -988,20 +988,20 @@ static lwm2m_object_instance_t *last_ins;
 static int last_rsc_pos;
 
 static int
-perform_discovery(lwm2m_object_instance_t *instance,
-                  lwm2m_context_t *ctx)
+perform_multi_resource_op(lwm2m_object_instance_t *instance,
+                          lwm2m_context_t *ctx)
 {
   int pos = 0;
   int size = ctx->outsize;
   int len = 0;
-  PRINTF("DISCO - o:%d s:%d lsr:%d lv:%d\n", ctx->offset, size, last_rsc_pos, ctx->level);
+  uint8_t init = 0; /* used for commas, etc */
 
   if(ctx->offset == 0) {
     last_ins = instance;
     last_rsc_pos = 0;
     /* Here we should print top node */
   } else {
-    /* offset > 0 - assume that we are already in a disco */
+    /* offset > 0 - assume that we are already in a disco or multi get*/
     instance = last_ins;
     if(last_ins == NULL) {
       ctx->offset = -1;
@@ -1010,28 +1010,71 @@ perform_discovery(lwm2m_object_instance_t *instance,
     }
   }
 
+  if(ctx->operation == LWM2M_OP_DISCOVER) {
+    PRINTF("DISCO - o:%d s:%d lsr:%d lv:%d\n", ctx->offset, size, last_rsc_pos, ctx->level);
+  }
   while(instance != NULL) {
     /* Do the discovery */
     /* Just object this time... */
     if(instance->resource_ids != NULL && instance->resource_count > 0) {
       while(last_rsc_pos < instance->resource_count) {
         if(ctx->level < 3 || ctx->resource_id == instance->resource_ids[last_rsc_pos]) {
-          len = snprintf((char *) &ctx->outbuf[pos], size - pos,
-                         pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
-                         instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
-          if(len < 0 || len + pos >= size) {
-            /* ok we trunkated here... */
-            ctx->offset += pos;
-            ctx->outlen = pos;
-            return 1;
+          if(ctx->operation == LWM2M_OP_DISCOVER) {
+            len = snprintf((char *) &ctx->outbuf[pos], size - pos,
+                           pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
+                           instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
+            if(len < 0 || len + pos >= size) {
+              /* ok we trunkated here... */
+              ctx->offset += pos;
+              ctx->outlen = pos;
+              return 1;
+            }
+            pos += len;
+          } else if(ctx->operation == LWM2M_OP_READ) {
+            uint8_t success;
+            uint8_t lv;
+            lv = ctx->level;
+            /* Set the resource ID is ctx->level < 3 */
+            if(lv < 3) {
+              ctx->resource_id = instance->resource_ids[last_rsc_pos];
+            }
+            if(lv < 2) {
+              ctx->object_instance_id = instance->instance_id;
+            }
+            ctx->level = 3;
+            if(init) {
+              ctx->outbuf[ctx->outlen++] = ',';
+            } else {
+              len = ctx->writer->init_write(ctx);
+              ctx->outlen += len;
+              PRINTF("INIT WRITE len:%d\n", len);
+              init = 1;
+            }
+
+            /* We will need to handle no-success and other things */
+            PRINTF("Calling %u/%u/%u outlen:%u\n",
+                   ctx->object_id, ctx->object_instance_id,ctx->resource_id,
+                   ctx->outlen);
+            success = instance->callback(instance, ctx);
+
+            /* we need to handle full buffer, etc here also! */
+            ctx->level = lv;
+            pos = ctx->outlen;
           }
-          pos += len;
         }
         last_rsc_pos++;
       }
     }
     instance = lwm2m_engine_next_object_instance(ctx, instance);
     last_ins = instance;
+    if(ctx->operation == LWM2M_OP_READ) {
+      PRINTF("END Writer\n");
+      len = ctx->writer->end_write(ctx);
+      ctx->outlen += len;
+      pos = ctx->outlen;
+    }
+
+    init = 0;
     last_rsc_pos = 0;
   }
   /* seems like we are done! */
@@ -1231,7 +1274,10 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     /* This is a discovery operation */
   if(context.operation == LWM2M_OP_DISCOVER) {
     /* Assume only one disco at a time... */
-    success = perform_discovery(instance, &context);
+    success = perform_multi_resource_op(instance, &context);
+  } else if (context.operation == LWM2M_OP_READ) {
+    PRINTF("Multi GET\n");
+    success = perform_multi_resource_op(instance, &context);
   } else {
     /* If not discovery or create - this is a regular OP - do the callback */
     success = instance->callback(instance, &context);
