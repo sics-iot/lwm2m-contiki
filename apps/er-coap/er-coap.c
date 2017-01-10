@@ -1063,6 +1063,7 @@ coap_set_header_block2(void *packet, uint32_t num, uint8_t more,
   if(size < 16) {
     return 0;
   }
+
   if(size > 2048) {
     return 0;
   }

@@ -61,7 +61,7 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTS(l,s,f) do { int i;					\
@@ -1178,10 +1178,10 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   /* Get format and accept */
   if(!REST.get_header_content_type(request, &format)) {
     PRINTF("lwm2m: No format given. Assume text plain...\n");
-    format = LWM2M_TEXT_PLAIN;
-  } else if(format == TEXT_PLAIN) {
+    format = TEXT_PLAIN;
+  } else if(format == LWM2M_TEXT_PLAIN) {
     /* CoAP content format text plain - assume LWM2M text plain */
-    format = LWM2M_TEXT_PLAIN;
+    format = TEXT_PLAIN;
   }
   if(!REST.get_header_accept(request, &accept)) {
     PRINTF("lwm2m: No Accept header, using same as Content-format...\n");
@@ -1261,12 +1261,13 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
 #endif /* DEBUG */
 
-  context.offset = *offset;
+  context.offset = offset != NULL ? *offset : 0;
   context.insize = coap_get_payload(request, (const uint8_t **) &context.inbuf);
   context.inpos = 0;
 
   /* PUT/POST - e.g. write will not send in offset here - Maybe in the future? */
-  if(*offset == 0 && IS_OPTION(request, COAP_OPTION_BLOCK1)) {
+  if((offset != NULL && *offset == 0) &&
+     IS_OPTION(request, COAP_OPTION_BLOCK1)) {
     coap_get_header_block1(request, &bnum, &bmore, &bsize, &boffset);
     context.offset = boffset;
   }
@@ -1286,7 +1287,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   if(success) {
     /* Handle blockwise 1 */
     if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
-      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset, *offset);
+      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset,
+             (offset != NULL ? *offset : 0));
       coap_set_header_block1(response, bnum, 0, bsize);
     }
 
@@ -1296,7 +1298,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       REST.set_response_payload(response, context.outbuf, context.outlen);
       REST.set_header_content_type(response, context.content_type);
 
-      *offset = context.offset;
+      if(offset != NULL) {
+        *offset = context.offset;
+      }
     } else {
       PRINTPRE("lwm2m: [", url_len, url);
       PRINTF("] no data in reply\n");

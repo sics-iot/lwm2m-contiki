@@ -198,6 +198,9 @@ coap_transport_init(void)
 
   memset((void *)&server, 0, sizeof(server));
 
+#undef  COAP_SERVER_PORT
+#define COAP_SERVER_PORT 4711
+
   server.sin_family = AF_INET;
   server.sin_port = htons(COAP_SERVER_PORT);
   server.sin_addr.s_addr = htonl(INADDR_ANY);

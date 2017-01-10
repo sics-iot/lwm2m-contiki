@@ -124,7 +124,7 @@ LWM2M_RESOURCES(device_resources,
 LWM2M_INSTANCES(device_instances, LWM2M_INSTANCE(0, device_resources));
 LWM2M_OBJECT(device, 3, device_instances);
 /*---------------------------------------------------------------------------*/
-void
+lwm2m_object_t *
 custom_device_object_init(void)
 {
   /**
@@ -138,6 +138,7 @@ custom_device_object_init(void)
 
   PRINTF("*** Init lwm2m-device\n");
   lwm2m_engine_register_object(&device);
+  return &device;
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

@@ -77,20 +77,34 @@ coap_remove_handler(coap_handler_t *handler)
   list_remove(coap_handlers, handler);
 }
 /*---------------------------------------------------------------------------*/
-static CC_INLINE int
-call_service(coap_packet_t *request, coap_packet_t *response,
-             uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+CC_INLINE int
+er_coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
+                      uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
   coap_handler_t *r;
-
   for(r = list_head(coap_handlers); r != NULL; r = r->next) {
     if(r->handler &&
        r->handler(request, response, buffer, buffer_size, offset)) {
       /* Request handled. */
+
+      /* Check response code before doing observe! */
+      if(request->code == COAP_GET) {
+        coap_observe_handler(NULL, request, response);
+      }
+
       return 1;
     }
   }
-
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static CC_INLINE int
+call_service(coap_packet_t *request, coap_packet_t *response,
+             uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+{
+  if(er_coap_call_handlers(request, response, buffer, buffer_size, offset)) {
+    return 1;
+  }
   if(service_cbk != NULL &&
      service_cbk(request, response, buffer, buffer_size, offset)) {
     return 1;

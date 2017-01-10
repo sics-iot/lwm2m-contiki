@@ -381,6 +381,12 @@ lwm2m_object_notify_observers(const lwm2m_object_t *object, char *path)
   coap_notify_observers_sub(lwm2m_object_get_coap_resource(object), path);
 }
 
+static inline void
+lwm2m_notify_observers(char *path)
+{
+  coap_notify_observers_sub(NULL, path);
+}
+
 static inline size_t
 lwm2m_object_read_int(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value)
 {
