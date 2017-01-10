@@ -69,6 +69,11 @@ void coap_init_engine(void);
 
 int coap_receive(const coap_endpoint_t *src,
                  uint8_t *payload, uint16_t payload_length);
+
+int er_coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
+                          uint8_t *buffer, uint16_t buffer_size,
+                          int32_t *offset);
+
 /*---------------------------------------------------------------------------*/
 
 #endif /* ER_COAP_ENGINE_H_ */

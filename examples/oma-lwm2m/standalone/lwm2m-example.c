@@ -44,17 +44,21 @@
 #include <string.h>
 #include <stdlib.h>
 
-void custom_device_object_init(void);
+lwm2m_object_t *custom_device_object_init(void);
 void ipso_generic_sensor_init(void);
 void ipso_sensor_temp_init(void);
 void ipso_control_test_init(void);
 void ipso_blockwise_test_init(void);
 
+static lwm2m_object_t *device;
+
 /*---------------------------------------------------------------------------*/
 static void
 callback(ntimer_t *timer)
 {
-  printf("uptime: %"PRIu64"\n", ntimer_uptime());
+  /* Automatic notifcation on two things... for test!*/
+  lwm2m_notify_observers("3303/0/5700");
+  lwm2m_object_notify_observers(device, "/0/13");
   ntimer_reset(timer, 10000);
 }
 /*---------------------------------------------------------------------------*/
@@ -93,7 +97,7 @@ start_application(int argc, char *argv[])
   /* lwm2m_engine_register_default_objects(); */
 
   /* Init our own custom device object */
-  custom_device_object_init();
+  device = custom_device_object_init();
   ipso_generic_sensor_init();
 
   ipso_sensor_temp_init();
