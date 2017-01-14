@@ -57,10 +57,11 @@
 
 /*---------------------------------------------------------------------------*/
 static size_t
-init_write(const lwm2m_context_t *ctx)
+init_write(lwm2m_context_t *ctx)
 {
   int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
                      ctx->outsize - ctx->outlen, "{\"e\":[");
+  ctx->writer_flags = 0; /* set flags to zero */
   if((len < 0) || (len >= ctx->outsize)) {
     return 0;
   }
@@ -68,7 +69,7 @@ init_write(const lwm2m_context_t *ctx)
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-end_write(const lwm2m_context_t *ctx)
+end_write(lwm2m_context_t *ctx)
 {
   int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
                      ctx->outsize - ctx->outlen, "]}");
@@ -79,34 +80,39 @@ end_write(const lwm2m_context_t *ctx)
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_boolean(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int value)
 {
-  int len = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"bv\":%s}", ctx->resource_id, value ? "true" : "false");
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
+  int len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"bv\":%s}", sep, ctx->resource_id, value ? "true" : "false");
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_int(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
           int32_t value)
 {
-  int len = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"v\":%" PRId32 "}", ctx->resource_id, value);
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
+  int len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":%" PRId32 "}", sep, ctx->resource_id, value);
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_float32fix(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                  int32_t value, int bits)
 {
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
   size_t len = 0;
   int res;
-  res = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"v\":", ctx->resource_id);
+  res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":", sep, ctx->resource_id);
   if(res <= 0 || res >= outlen) {
     return 0;
   }
@@ -123,18 +129,21 @@ write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
     return 0;
   }
   len += res;
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
              const char *value, size_t stringlen)
 {
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
   size_t i;
   size_t len = 0;
   int res;
   PRINTF("{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
-  res = snprintf((char *)outbuf, outlen, "{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
+  res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"sv\":\"", sep,
+                 ctx->resource_id);
   if(res < 0 || res >= outlen) {
     return 0;
   }
@@ -171,6 +180,7 @@ write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
     return 0;
   }
   len += res;
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
