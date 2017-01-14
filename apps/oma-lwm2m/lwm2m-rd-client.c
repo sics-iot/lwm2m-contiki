@@ -340,6 +340,7 @@ periodic_process(ntimer_t *timer)
       /* Otherwise wait until for a network to join */
     }
     break;
+#ifdef BOOTSTRAP_ENABLED
   case DO_BOOTSTRAP:
     if(session_info.use_bootstrap && session_info.bootstrapped == 0) {
       if(update_bootstrap_server()) {
@@ -415,6 +416,7 @@ periodic_process(ntimer_t *timer)
       }
     }
     break;
+#endif
   case DO_REGISTRATION:
     if(session_info.use_registration && !session_info.registered &&
        update_registration_server()) {
