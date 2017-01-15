@@ -96,6 +96,7 @@
 void lwm2m_device_init(void);
 void lwm2m_security_init(void);
 void lwm2m_server_init(void);
+static lwm2m_object_instance_t *lwm2m_engine_get_object_instance(const lwm2m_context_t *context);
 
 static int lwm2m_handler_callback(coap_packet_t *request,
                                   coap_packet_t *response,
@@ -131,7 +132,7 @@ append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
   int pos = 0;
   rd_data[pos++] = '<';
   pos += u16toa(&rd_data[pos], oid);
-  if(iid > -1 && size > pos) {
+  if(iid > -1 && iid != 0xffff && size > pos) {
     rd_data[pos++] = '/';
     pos += u16toa(&rd_data[pos], iid);
     if(rid > -1 && size > pos) {
@@ -160,16 +161,52 @@ get_method_as_string(rest_resource_flags_t method)
 }
 /*--------------------------------------------------------------------------*/
 static int
-lwm2m_engine_parse_context(const char *path, int path_len,
-                           coap_packet_t *request, coap_packet_t *response,
-                           uint8_t *outbuf, size_t outsize,
-                           lwm2m_context_t *context)
+parse_path(const char *path, int path_len,
+           uint16_t *oid, uint16_t *iid, uint16_t *rid)
 {
   int len;
   int ret;
   int pos;
   uint16_t val;
   char c;
+
+  /* get object id */
+  PRINTF("Parse PATH:");
+  PRINTS(path_len, path, "%c");
+  PRINTF("\n");
+
+  ret = 0;
+  pos = 0;
+  do {
+    val = 0;
+    /* we should get a value first - consume all numbers */
+    while(pos < path_len && (c = path[pos]) >= '0' && c <= '9') {
+      val = val * 10 + (c - '0');
+      pos++;
+    }
+    /* Slash will mote thing forward - and the end will be when pos == pl */
+    if(c == '/' || pos == path_len) {
+      PRINTF("Setting %u = %u\n", ret, val);
+      if(ret == 0) *oid = val;
+      if(ret == 1) *iid = val;
+      if(ret == 2) *rid = val;
+      ret++;
+      pos++;
+    } else {
+      PRINTF("Error: illegal char '%c' at pos:%d\n", c, pos);
+      return -1;
+    }
+  } while(pos < path_len);
+  return ret;
+}
+/*--------------------------------------------------------------------------*/
+static int
+lwm2m_engine_parse_context(const char *path, int path_len,
+                           coap_packet_t *request, coap_packet_t *response,
+                           uint8_t *outbuf, size_t outsize,
+                           lwm2m_context_t *context)
+{
+  int ret;
   if(context == NULL || path == NULL) {
     return 0;
   }
@@ -188,33 +225,8 @@ lwm2m_engine_parse_context(const char *path, int path_len,
   context->reader = &lwm2m_plain_text_reader;
   context->writer = &oma_tlv_writer;
 
-  /* get object id */
-  PRINTF("Parse PATH:");
-  PRINTS(path_len, path, "%c");
-  PRINTF("\n");
-
-  ret = 0;
-  pos = 0;
-  do {
-    val = 0;
-    /* we should get a value first - consume all numbers */
-    while(pos < path_len && (c = path[pos]) >= '0' && c <= '9') {
-      val = val * 10 + (c - '0');
-      pos++;
-    }
-    /* Slash will mote thing forward - and the end will be when pos == pl */
-    if(c == '/' || pos == path_len) {
-      if(ret == 0) context->object_id = val;
-      if(ret == 1) context->object_instance_id = val;
-      if(ret == 2) context->resource_id = val;
-      ret++;
-      pos++;
-    } else {
-      PRINTF("Error: illegal char '%c' at pos:%d\n", c, pos);
-      return -1;
-    }
-  } while(pos < path_len);
-  
+  ret = parse_path(path, path_len, &context->object_id,
+                   &context->object_instance_id, &context->resource_id);
 
   if(ret > 0) {
     context->level = ret;
@@ -380,9 +392,10 @@ lwm2m_engine_select_reader(lwm2m_context_t *context, unsigned int content_format
 static lwm2m_object_instance_t *last_ins;
 static int last_rsc_pos;
 
+/* Multi read will handle read of JSON / TLV or Discovery (Link Format) */
 static int
-perform_multi_resource_op(lwm2m_object_instance_t *instance,
-                          lwm2m_context_t *ctx)
+perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
+                               lwm2m_context_t *ctx)
 {
   int pos = 0;
   int size = ctx->outsize;
@@ -403,12 +416,8 @@ perform_multi_resource_op(lwm2m_object_instance_t *instance,
     }
   }
 
-  if(ctx->operation == LWM2M_OP_DISCOVER) {
-    PRINTF("DISCO - o:%d s:%d lsr:%d lv:%d\n", ctx->offset, size, last_rsc_pos, ctx->level);
-  }
   while(instance != NULL) {
-    /* Do the discovery */
-    /* Just object this time... */
+    /* Do the discovery or read */
     if(instance->resource_ids != NULL && instance->resource_count > 0) {
       /* show all the available resources (or read all) */
       while(last_rsc_pos < instance->resource_count) {
@@ -475,6 +484,178 @@ perform_multi_resource_op(lwm2m_object_instance_t *instance,
   ctx->outlen = pos;
   return 1;
 }
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+create_instance(lwm2m_context_t *context,
+                lwm2m_object_instance_t *instance)
+{
+  /* If not discovery or create - this is a regular OP - do the callback */
+  PRINTF("CREATE OP on object:%d\n", instance->object_id);
+  context->operation = LWM2M_OP_CREATE;
+  /* NOTE: this is a special case - create will return -1 if failing */
+  int new_instance_id = instance->callback(instance, context);
+  if(new_instance_id >= 0) {
+    PRINTF("Created instance: %d\n", new_instance_id);
+    context->object_instance_id = new_instance_id;
+    instance = lwm2m_engine_get_object_instance(context);
+    context->operation = LWM2M_OP_WRITE;
+    REST.set_response_status(context->response, CREATED_2_01);
+    return instance;
+  } else {
+    /* Can not create... */
+    return NULL;
+  }
+}
+/*---------------------------------------------------------------------------*/
+#define MODE_NONE      0
+#define MODE_INSTANCE  1
+#define MODE_VALUE     2
+#define MODE_READY     3
+
+static lwm2m_object_instance_t *
+get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid)
+{
+  lwm2m_object_instance_t *instance;
+  int lv = ctx->level;
+  instance = lwm2m_engine_get_object_instance(ctx);
+  PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
+         ctx->object_instance_id, ctx->resource_id, instance);
+  if(instance == NULL) {
+    /* Find a generic instance for create */
+    ctx->object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    instance = lwm2m_engine_get_object_instance(ctx);
+    if(instance == NULL) {
+      return NULL;
+    }
+    ctx->level = 2; /* create use 2? */
+    ctx->object_instance_id = oid;
+    if((instance = create_instance(ctx, instance)) != NULL) {
+      PRINTF("Instance %d created\n", instance->instance_id);
+    }
+    ctx->level = lv;
+  }
+  return instance;
+}
+
+static int
+process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
+{
+  lwm2m_object_instance_t *instance;
+  int success = 0;
+  ctx->inbuf = data;
+  ctx->inpos = 0;
+  ctx->insize = len;
+  ctx->level = 3;
+  ctx->resource_id = rid;
+  PRINTF("  Doing callback to %u/%u/%u\n", ctx->object_id,
+         ctx->object_instance_id, ctx->resource_id);
+  instance = get_or_create_instance(ctx, ctx->object_instance_id);
+  if(instance != NULL) {
+    success = instance->callback(instance, ctx);
+  }
+  return success;
+}
+
+static int
+perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
+                                lwm2m_context_t *ctx, int format)
+{
+  /* Only for JSON and TLV formats */
+  uint16_t oid = 0, iid = 0, rid = 0;
+  uint16_t ooid = 0, oiid = 0, orid = 0;
+  uint8_t olv = 0;
+  uint8_t mode = 0;
+  uint8_t *inbuf;
+  int inpos;
+  size_t insize;
+
+  ooid = ctx->object_id;
+  oiid = ctx->object_instance_id;
+  orid = ctx->resource_id;
+  olv = ctx->level;
+  inbuf = ctx->inbuf;
+  inpos = ctx->inpos;
+  insize = ctx->insize;
+
+  PRINTF("Multi Write \n");
+  if(format == LWM2M_JSON) {
+    struct json_data json;
+
+    while(lwm2m_json_next_token(ctx, &json)) {
+      int i;
+      PRINTF("JSON: '");
+      for(i = 0; i < json.name_len; i++) PRINTF("%c", json.name[i]);
+      PRINTF("':'");
+      for(i = 0; i < json.value_len; i++) PRINTF("%c", json.value[i]);
+      PRINTF("'\n");
+      if(json.name[0] == 'n') {
+        i = parse_path((const char *) json.value, json.value_len, &oid, &iid, &rid);
+        if(i > 0) {
+          if(ctx->level == 1) {
+            ctx->level = 3;
+            ctx->object_instance_id = oid;
+            ctx->resource_id = iid;
+
+            instance = get_or_create_instance(ctx, oid);
+          }
+          if(instance != NULL && instance->callback != NULL) {
+            mode |= MODE_INSTANCE;
+          } else {
+            /* Failure... */
+            return 0;
+          }
+        }
+      } else {
+        /* HACK - assume value node - can it be anything else? */
+        mode |= MODE_VALUE;
+        /* update values */
+        inbuf = ctx->inbuf;
+        inpos = ctx->inpos;
+
+        ctx->inbuf = json.value;
+        ctx->inpos = 0;
+        ctx->insize = json.value_len;
+      }
+
+      if(mode == MODE_READY) {
+        int success;
+        success = instance->callback(instance, ctx);
+        mode = MODE_NONE;
+        ctx->inbuf = inbuf;
+        ctx->inpos = inpos;
+        ctx->insize = insize;
+        ctx->level = olv;
+      }
+    }
+  } else if(format == LWM2M_TLV) {
+    size_t len;
+    oma_tlv_t tlv;
+    len = oma_tlv_read(&tlv, inbuf, insize);
+    PRINTF("Got TLV format First is: type:%d id:%d len:%d (len:%d/%d)\n",
+           tlv.type, tlv.id, tlv.length, (int) len, (int) insize);
+    if(tlv.type == OMA_TLV_TYPE_OBJECT_INSTANCE) {
+      oma_tlv_t tlv2;
+      int len2;
+      int pos = 0;
+      ctx->object_instance_id = tlv.id;
+      while(pos < tlv.length && (len2 = oma_tlv_read(&tlv2, &tlv.value[pos],
+                                                     tlv.length - pos))) {
+        if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
+          process_tlv_write(ctx, tlv2.id, (uint8_t *)&tlv.value[pos],
+                            tlv.length - pos);
+        }
+        pos += len2;
+        PRINTF("   TLV type:%d id:%d len:%d (len:%d/%d)\n",
+               tlv2.type, tlv2.id, tlv2.length, (int) len2, (int) insize);
+      }
+    } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
+      process_tlv_write(ctx, tlv.id, inbuf, insize);
+    }
+  }
+  /* Here we have a success! */
+  return 1;
+}
+
 /*---------------------------------------------------------------------------*/
 uint16_t
 lwm2m_engine_recommend_instance_id(uint16_t object_id)
@@ -614,7 +795,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     REST.set_response_status(response, CHANGED_2_04);
     break;
   case METHOD_POST:
-    if(context.level == 2) {
+    if(context.level < 2) {
       /* write to a instance */
       context.operation = LWM2M_OP_WRITE;
       REST.set_response_status(response, CHANGED_2_04);
@@ -624,7 +805,6 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     }
     break;
   case METHOD_GET:
-    /* Assuming that we haev already taken care of discovery... it will be read q*/
     if(accept == APPLICATION_LINK_FORMAT) {
       context.operation = LWM2M_OP_DISCOVER;
     } else {
@@ -634,6 +814,14 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     break;
   default:
     break;
+  }
+
+  /* Create might be made here - or anywhere at the write ? */
+  if(instance->instance_id == LWM2M_OBJECT_INSTANCE_NONE &&
+     context.level == 2 && context.operation == LWM2M_OP_WRITE) {
+    if((instance = create_instance(&context, instance)) == NULL) {
+      return 0;
+    }
   }
 
 #if DEBUG
@@ -668,12 +856,14 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     /* This is a discovery operation */
   if(context.operation == LWM2M_OP_DISCOVER) {
     /* Assume only one disco at a time... */
-    success = perform_multi_resource_op(instance, &context);
-  } else if (context.operation == LWM2M_OP_READ) {
-    PRINTF("Multi GET\n");
-    success = perform_multi_resource_op(instance, &context);
+    success = perform_multi_resource_read_op(instance, &context);
+  } else if(context.operation == LWM2M_OP_READ) {
+    PRINTF("Multi READ\n");
+    success = perform_multi_resource_read_op(instance, &context);
+  } else if(context.operation == LWM2M_OP_WRITE) {
+    success = perform_multi_resource_write_op(instance, &context, format);
   } else {
-    /* If not discovery or create - this is a regular OP - do the callback */
+    /* If not discovery - this is a regular OP - do the callback */
     success = instance->callback(instance, &context);
   }
 

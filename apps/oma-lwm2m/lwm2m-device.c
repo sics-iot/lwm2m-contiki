@@ -94,8 +94,6 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     return 0;
   }
 
-  PRINTF("Callback to %d\n", ctx->resource_id);
-
   if(ctx->level == 3) {
     /* NOW we assume a get.... which might be wrong... */
     char *str = NULL;

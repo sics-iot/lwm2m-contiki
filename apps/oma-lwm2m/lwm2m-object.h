@@ -71,6 +71,9 @@
 #define LWM2M_SECURITY_KEY                      5
 #define LWM2M_SECURITY_SHORT_SERVER_ID         10
 
+#define LWM2M_SERVER_SHORT_SERVER_ID            0
+#define LWM2M_SERVER_LIFETIME_ID                1
+
 #define LWM2M_DEVICE_MANUFACTURER_ID            0
 #define LWM2M_DEVICE_MODEL_NUMBER_ID            1
 #define LWM2M_DEVICE_SERIAL_NUMBER_ID           2

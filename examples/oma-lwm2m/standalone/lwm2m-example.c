@@ -40,6 +40,7 @@
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
 #include "lwm2m-firmware.h"
+#include "lwm2m-server.h"
 #include "lwm2m-device.h"
 #include <inttypes.h>
 #include <string.h>
@@ -99,6 +100,7 @@ start_application(int argc, char *argv[])
 
   lwm2m_firmware_init();
   lwm2m_device_init();
+  lwm2m_server_init();
 
   if(has_server_ep) {
     /* start RD client */
