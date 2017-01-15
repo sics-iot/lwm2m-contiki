@@ -56,13 +56,13 @@
 
 /*---------------------------------------------------------------------------*/
 static size_t
-init_write(const lwm2m_context_t *ctx)
+init_write(lwm2m_context_t *ctx)
 {
   return 0;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-end_write(const lwm2m_context_t *ctx)
+end_write(lwm2m_context_t *ctx)
 {
   return 0;
 }
@@ -165,7 +165,7 @@ lwm2m_plain_text_write_float32fix(uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_boolean(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int value)
 {
   if(outlen > 0) {
@@ -180,7 +180,7 @@ write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_int(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
           int32_t value)
 {
   int n = snprintf((char *)outbuf, outlen, "%ld", (long)value);
@@ -191,14 +191,14 @@ write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_float32fix(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                  int32_t value, int bits)
 {
   return lwm2m_plain_text_write_float32fix(outbuf, outlen, value, bits);
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
              const char *value, size_t stringlen)
 {
   int totlen = stringlen;

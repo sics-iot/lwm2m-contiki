@@ -38,6 +38,7 @@
  *         Implementation of the Contiki OMA LWM2M JSON writer
  * \author
  *         Joakim Nohlgård <joakim.nohlgard@eistec.se>
+ *         Joakim Eriksson <joakime@sics.se> added JSON reader parts
  */
 
 #include "lwm2m-object.h"
@@ -54,7 +55,101 @@
 #else
 #define PRINTF(...)
 #endif
+/*---------------------------------------------------------------------------*/
 
+/* {"e":[{"n":"111/1","v":123},{"n":"111/2","v":42}]} */
+
+/* Begin String */
+#define T_NONE       0
+#define T_STRING_B   1
+#define T_STRING     2
+#define T_NAME       4
+#define T_VNUM       5
+#define T_OBJ        6
+#define T_VAL        7
+
+/* Simlified JSON style reader for reading in values from a LWM2M JSON
+   string */
+int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
+  int pos = ctx->inpos;
+  uint8_t type = T_NONE;
+  uint8_t vpos_start = 0;
+  uint8_t vpos_end = 0;
+  uint8_t cont;
+  uint8_t wscount = 0;
+
+  json->name_len = 0;
+  json->value_len = 0;
+
+  cont = 1;
+  /* We will be either at start, or at a specific position */
+  while(pos < ctx->insize && cont) {
+    uint8_t c = ctx->inbuf[pos++];
+    switch(c) {
+    case '{': type = T_OBJ; break;
+    case '}':
+    case ',':
+      if(type == T_VAL || type == T_STRING) {
+        json->value = &ctx->inbuf[vpos_start];
+        json->value_len = vpos_end - vpos_start - wscount;
+        type = T_NONE;
+        cont = 0;
+      }
+      wscount = 0;
+      break;
+    case '\\':
+      /* stuffing */
+      if(pos < ctx->insize) {
+        pos++;
+        vpos_end = pos;
+      }
+      break;
+    case '"':
+      if(type == T_STRING_B) {
+        int i;
+        type = T_STRING;
+        vpos_end = pos - 1;
+        wscount = 0;
+      } else {
+        type = T_STRING_B;
+        vpos_start = pos;
+      }
+      break;
+    case ':':
+      if(type == T_STRING) {
+        json->name = &ctx->inbuf[vpos_start];
+        json->name_len = vpos_end - vpos_start;
+        vpos_start = vpos_end = pos;
+        type = T_VAL;
+      } else {
+        /* Could be in string or at illegal pos */
+        if(type != T_STRING_B) {
+          PRINTF("ERROR - illegal ':'\n");
+        }
+      }
+      break;
+      /* ignore whitespace */
+    case ' ':
+    case '\n':
+    case '\t':
+      if(type != T_STRING_B) {
+        if(vpos_start == pos - 1) {
+          vpos_start = pos;
+        } else {
+          wscount++;
+        }
+      }
+    default:
+      vpos_end = pos;
+    }
+  }
+
+  if(cont == 0 && pos < ctx->insize) {
+    ctx->inpos = pos;
+  }
+  /* OK if cont == 0 othewise we failed */
+  return cont == 0 && pos < ctx->insize;
+}
 /*---------------------------------------------------------------------------*/
 static size_t
 init_write(lwm2m_context_t *ctx)
@@ -192,5 +287,7 @@ const lwm2m_writer_t lwm2m_json_writer = {
   write_float32fix,
   write_boolean
 };
+/*---------------------------------------------------------------------------*/
+
 /*---------------------------------------------------------------------------*/
 /** @} */
