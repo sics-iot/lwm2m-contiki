@@ -107,11 +107,35 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
   /* text = format coap://host:port/... we assume */
   /* will not work for know - on the TODO */
   /* set server and port */
+  char host[32];
+  int hlen = 0;
+
+  int secure;
+  int offset = 0;
+  int i;
+  printf("Parsing: %.*s\n", (int)size, text);
+  if(strncmp("coap://", text, 7) == 0) {
+    secure = 0;
+    offset = 7;
+    PRINTF("COAP found\n");
+  } else if(strncmp("coaps://", text, 8) == 0) {
+    secure = 1;
+    offset = 8;
+    PRINTF("COAPS found\n");
+  }
+
+  for(int i = offset; i < size && text[i] != ':' && text[i] != '/';
+      i++) {
+    host[hlen++] = text[i];
+  }
+  host[hlen] = 0;
+
+  PRINTF("HOST:%s\n", host);
 
   ep->addr.sin_family = AF_INET;
   ep->addr.sin_port = htons(COAP_DEFAULT_PORT);
   ep->addr_len = sizeof(ep->addr);
-  if(inet_aton(text, &ep->addr.sin_addr) == 0) {
+  if(inet_aton(host, &ep->addr.sin_addr) == 0) {
     /* Failed to parse the address */
     return 0;
   }

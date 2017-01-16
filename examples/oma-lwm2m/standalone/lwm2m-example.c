@@ -41,6 +41,7 @@
 #include "lwm2m-rd-client.h"
 #include "lwm2m-firmware.h"
 #include "lwm2m-server.h"
+#include "lwm2m-security.h"
 #include "lwm2m-device.h"
 #include <inttypes.h>
 #include <string.h>
@@ -100,6 +101,7 @@ start_application(int argc, char *argv[])
 
   lwm2m_firmware_init();
   lwm2m_device_init();
+  lwm2m_security_init();
   lwm2m_server_init();
 
   if(has_server_ep) {
@@ -108,9 +110,12 @@ start_application(int argc, char *argv[])
     coap_endpoint_print(&server_ep);
     printf("\n");
 
-    lwm2m_rd_client_register_with_server(&server_ep);
+    lwm2m_rd_client_register_with_bootstrap_server(&server_ep);
+    lwm2m_rd_client_use_bootstrap_server(1);
+
+    //    lwm2m_rd_client_register_with_server(&server_ep);
     lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("?ep=abcde");
+    lwm2m_rd_client_init("abcde");
   } else {
     fprintf(stderr, "No registration server specified.\n");
   }

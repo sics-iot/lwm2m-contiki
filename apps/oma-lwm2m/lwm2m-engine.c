@@ -630,26 +630,37 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
   } else if(format == LWM2M_TLV) {
     size_t len;
     oma_tlv_t tlv;
-    len = oma_tlv_read(&tlv, inbuf, insize);
-    PRINTF("Got TLV format First is: type:%d id:%d len:%d (len:%d/%d)\n",
-           tlv.type, tlv.id, tlv.length, (int) len, (int) insize);
-    if(tlv.type == OMA_TLV_TYPE_OBJECT_INSTANCE) {
-      oma_tlv_t tlv2;
-      int len2;
-      int pos = 0;
-      ctx->object_instance_id = tlv.id;
-      while(pos < tlv.length && (len2 = oma_tlv_read(&tlv2, &tlv.value[pos],
-                                                     tlv.length - pos))) {
-        if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
-          process_tlv_write(ctx, tlv2.id, (uint8_t *)&tlv.value[pos],
-                            tlv.length - pos);
+    int tlvpos = 0;
+    while(tlvpos < insize) {
+      len = oma_tlv_read(&tlv, &inbuf[tlvpos], insize - tlvpos);
+      PRINTF("Got TLV format First is: type:%d id:%d len:%d (p:%d len:%d/%d)\n",
+             tlv.type, tlv.id, tlv.length, tlvpos, (int) len, (int) insize);
+      if(tlv.type == OMA_TLV_TYPE_OBJECT_INSTANCE) {
+        oma_tlv_t tlv2;
+        int len2;
+        int pos = 0;
+        ctx->object_instance_id = tlv.id;
+        if(tlv.length == 0) {
+          /* Create only - no data */
+          if((instance = create_instance(ctx, instance)) == NULL) {
+          return 0;
+          }
         }
-        pos += len2;
-        PRINTF("   TLV type:%d id:%d len:%d (len:%d/%d)\n",
-               tlv2.type, tlv2.id, tlv2.length, (int) len2, (int) insize);
+        while(pos < tlv.length && (len2 = oma_tlv_read(&tlv2, &tlv.value[pos],
+                                                       tlv.length - pos))) {
+          PRINTF("   TLV type:%d id:%d len:%d (len:%d/%d)\n",
+                 tlv2.type, tlv2.id, tlv2.length, (int) len2, (int) insize);
+          if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
+            process_tlv_write(ctx, tlv2.id, (uint8_t *)&tlv.value[pos],
+                              len2);
+          }
+          pos += len2;
+        }
+      } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
+        process_tlv_write(ctx, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
+        REST.set_response_status(ctx->response, CHANGED_2_04);
       }
-    } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
-      process_tlv_write(ctx, tlv.id, inbuf, insize);
+      tlvpos += len;
     }
   }
   /* Here we have a success! */
@@ -742,13 +753,20 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   uint8_t success = 1; /* the success boolean */
 
   url_len = REST.get_url(request, &url);
+
+  if(url_len == 2 && strncmp("bs", url, 2) == 0) {
+    PRINTF("BOOTSTRAPPED!!!\n");
+    REST.set_response_status(response, CHANGED_2_04);
+    return 1;
+  }
+
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
                                      buffer, buffer_size, &context);
 
-  PRINTF("URL:");
+  PRINTF("URL:'");
   PRINTS(url_len, url, "%c");
-  PRINTF(" CTX:%u/%u/%u\n", context.object_id, context.object_instance_id,
-	 context.resource_id);
+  PRINTF("' CTX:%u/%u/%u dp:%u\n", context.object_id, context.object_instance_id,
+	 context.resource_id, depth);
   /* Get format and accept */
   if(!REST.get_header_content_type(request, &format)) {
     PRINTF("lwm2m: No format given. Assume text plain...\n");
@@ -758,7 +776,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     format = TEXT_PLAIN;
   }
   if(!REST.get_header_accept(request, &accept)) {
-    PRINTF("lwm2m: No Accept header, using same as Content-format...\n");
+    PRINTF("lwm2m: No Accept header, using same as Content-format %d\n",
+           format);
     accept = format;
   }
 
@@ -769,10 +788,24 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
    */
   if(depth < 1) {
     /* No possible object id found in URL - ignore request */
+    if(REST.get_method_type(request) == METHOD_DELETE) {
+      PRINTF("This is a delete all - for bootstrap...\n");
+      context.operation = LWM2M_OP_DELETE;
+      REST.set_response_status(response, DELETED_2_02);
+      return 1;
+    }
     return 0;
   }
 
   instance = lwm2m_engine_get_object_instance(&context);
+  if(instance == NULL && REST.get_method_type(request) == METHOD_PUT) {
+    /* ALLOW generic instance if CREATE / WRITE*/
+    int iid = context.object_instance_id;
+    context.object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    instance = lwm2m_engine_get_object_instance(&context);
+    context.object_instance_id = iid;
+  }
+
   if(instance == NULL || instance->callback == NULL) {
     /* No matching object/instance found - ignore request */
     return 0;
@@ -811,6 +844,10 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       context.operation = LWM2M_OP_READ;
     }
     REST.set_response_status(response, CONTENT_2_05);
+    break;
+  case METHOD_DELETE:
+    context.operation = LWM2M_OP_DELETE;
+    REST.set_response_status(response, DELETED_2_02);
     break;
   default:
     break;

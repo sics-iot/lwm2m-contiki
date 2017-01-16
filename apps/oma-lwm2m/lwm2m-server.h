@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, SICS Swedish ICT AB.
+ * Copyright (c) 2017, SICS Swedish ICT
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,39 +28,21 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef LWM2M_RD_CLIENT_H_
-#define LWM2M_RD_CLIENT_H_
+/**
+ * \addtogroup oma-lwm2m
+ * @{
+ *
+ */
+#ifndef LWM2M_SERVER_H
+#define LWM2M_SERVER_H
 
-void lwm2m_rd_client_use_bootstrap_server(int use);
-void lwm2m_rd_client_use_registration_server(int use);
-void lwm2m_rd_client_register_with_server(const coap_endpoint_t *server);
-void lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server);
-uint16_t lwm2m_rd_client_get_lifetime(void);
-void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
+typedef struct server_value {
+  lwm2m_object_instance_t reg_object;
+  uint16_t server_id;
+  uint32_t lifetime;
+} server_value_t;
 
-void lwm2m_rd_client_init(const char *ep);
 
-#ifndef LWM2M_DEFAULT_CLIENT_LIFETIME
-#define LWM2M_DEFAULT_CLIENT_LIFETIME 10 //sec
-#endif
+void lwm2m_server_init(void);
 
-#define LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN    15
-
-/*---------------------------------------------------------------------------*/
-/*- Server session-*Currently single session only*---------------------------*/
-/*---------------------------------------------------------------------------*/
-struct lwm2m_session_info {
-  const char *ep;
-  char assigned_ep[LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN];
-  uint16_t lifetime;
-  coap_endpoint_t bs_server_ep;
-  coap_endpoint_t server_ep;
-  uint8_t use_bootstrap;
-  uint8_t has_bs_server_info;
-  uint8_t use_registration;
-  uint8_t has_registration_server_info;
-  uint8_t registered;
-  uint8_t bootstrapped; /* bootstrap done */
-};
-
-#endif /* LWM2M_RD_CLIENT_H_ */
+#endif /* LWM2M_SERVER_H */

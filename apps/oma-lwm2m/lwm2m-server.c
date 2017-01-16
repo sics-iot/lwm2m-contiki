@@ -45,6 +45,7 @@
 #include <stdint.h>
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-server.h"
 
 #define DEBUG 1
 #if DEBUG
@@ -67,12 +68,6 @@ static const uint16_t resources[] = {LWM2M_SERVER_SHORT_SERVER_ID,
                                      LWM2M_SERVER_LIFETIME_ID};
 
 lwm2m_object_instance_t server_object;
-
-typedef struct server_value {
-  lwm2m_object_instance_t reg_object;
-  uint16_t server_id;
-  uint32_t lifetime;
-} server_value_t;
 
 static server_value_t server_instances[MAX_COUNT];
 
