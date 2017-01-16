@@ -63,12 +63,12 @@
 #define LWM2M_OBJECT_LOCATION_ID                6
 #define LWM2M_OBJECT_CONNECTIVITY_STATISTICS_ID 7
 
-#define LWM2M_SECURITY_SERVER_URI               0
-#define LWM2M_SECURITY_BOOTSTRAP_SERVER         1
-#define LWM2M_SECURITY_MODE                     2
-#define LWM2M_SECURITY_CLIENT_PKI               3
-#define LWM2M_SECURITY_SERVER_PKI               4
-#define LWM2M_SECURITY_KEY                      5
+#define LWM2M_SECURITY_SERVER_URI_ID            0
+#define LWM2M_SECURITY_BOOTSTRAP_SERVER_ID      1
+#define LWM2M_SECURITY_MODE_ID                  2
+#define LWM2M_SECURITY_CLIENT_PKI_ID            3
+#define LWM2M_SECURITY_SERVER_PKI_ID            4
+#define LWM2M_SECURITY_KEY_ID                   5
 #define LWM2M_SECURITY_SHORT_SERVER_ID         10
 
 #define LWM2M_SERVER_SHORT_SERVER_ID            0

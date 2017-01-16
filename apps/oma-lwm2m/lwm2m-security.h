@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, SICS Swedish ICT AB.
+ * Copyright (c) 2017, SICS Swedish ICT
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,39 +28,34 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef LWM2M_RD_CLIENT_H_
-#define LWM2M_RD_CLIENT_H_
+/**
+ * \addtogroup oma-lwm2m
+ * @{
+ *
+ */
+#ifndef LWM2M_SECURITY_H
+#define LWM2M_SECURITY_H
 
-void lwm2m_rd_client_use_bootstrap_server(int use);
-void lwm2m_rd_client_use_registration_server(int use);
-void lwm2m_rd_client_register_with_server(const coap_endpoint_t *server);
-void lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server);
-uint16_t lwm2m_rd_client_get_lifetime(void);
-void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
+#define URI_SIZE 64
+#define KEY_SIZE 32
 
-void lwm2m_rd_client_init(const char *ep);
+typedef struct security_value {
+  lwm2m_object_instance_t reg_object;
+  uint16_t server_id;
+  uint8_t bootstrap;
+  uint8_t security_mode;
+  uint8_t server_uri[URI_SIZE];
+  uint8_t server_uri_len;
+  uint8_t public_key[KEY_SIZE];
+  uint8_t public_key_len;
+  uint8_t secret_key[KEY_SIZE];
+  uint8_t secret_key_len;
+  uint8_t server_public_key[KEY_SIZE];
+  uint8_t server_public_key_len;
+} lwm2m_security_value_t;
 
-#ifndef LWM2M_DEFAULT_CLIENT_LIFETIME
-#define LWM2M_DEFAULT_CLIENT_LIFETIME 10 //sec
-#endif
+int lwm2m_security_instance_count(void);
+lwm2m_security_value_t *lwm2m_security_get_instance(int index);
+void lwm2m_security_init(void);
 
-#define LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN    15
-
-/*---------------------------------------------------------------------------*/
-/*- Server session-*Currently single session only*---------------------------*/
-/*---------------------------------------------------------------------------*/
-struct lwm2m_session_info {
-  const char *ep;
-  char assigned_ep[LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN];
-  uint16_t lifetime;
-  coap_endpoint_t bs_server_ep;
-  coap_endpoint_t server_ep;
-  uint8_t use_bootstrap;
-  uint8_t has_bs_server_info;
-  uint8_t use_registration;
-  uint8_t has_registration_server_info;
-  uint8_t registered;
-  uint8_t bootstrapped; /* bootstrap done */
-};
-
-#endif /* LWM2M_RD_CLIENT_H_ */
+#endif /* LWM2M_SECURITY_H */
