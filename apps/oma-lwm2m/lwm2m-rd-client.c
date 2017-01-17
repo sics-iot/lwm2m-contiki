@@ -270,21 +270,31 @@ registration_callback(struct request_state *state)
   if(state->response) {
     /* check state and possibly set registration to done */
     if(CREATED_2_01 == state->response->code) {
-      /* TODO better len-check. using handler from remote server */
-      strncpy(session_info.assigned_ep, state->response->location_path + 3,
-              LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN);
-      current_ms = 0; /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
-      rd_state = REGISTRATION_DONE;
-      PRINTF("Done!\n");
-      return;
+      if(strncmp("rd/", state->response->location_path, 3) == 0 &&
+         state->response->location_path_len > 3 &&
+         state->response->location_path_len < 3 + LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN) {
+        memcpy(session_info.assigned_ep, state->response->location_path + 3,
+               state->response->location_path_len - 3);
+        session_info.assigned_ep[state->response->location_path_len - 3] = 0;
+        current_ms = 0; /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
+        rd_state = REGISTRATION_DONE;
+        PRINTF("Done (assigned EP='%s')!\n", session_info.assigned_ep);
+        return;
+      }
+
+      PRINTF("failed to handle assigned EP: '");
+      PRINTS(state->response->location_path_len,
+             state->response->location_path, "%c");
+      PRINTF("'. Re-init network.\n");
+    } else {
+      /* Possible error response codes are 4.00 Bad request & 4.03 Forbidden */
+      PRINTF("failed with code %d. Re-init network\n", state->response->code);
     }
-    /* Possible error response codes are 4.00 Bad request & 4.03 Forbidden */
-    PRINTF("Failed with code %d. Re-init network\n", state->response->code);
     /* TODO Application callback? */
     rd_state = INIT;
   } else if(REGISTRATION_SENT == rd_state) { /* this can handle double invocations */
     /* Failure! */
-    PRINTF("Registration failed! Retry?");
+    PRINTF("Registration failed! Retry?\n");
     rd_state = DO_REGISTRATION;
   } else {
     PRINTF("Ignore\n");
@@ -359,11 +369,11 @@ periodic_process(ntimer_t *timer)
         coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
         coap_set_header_uri_path(request, "/bs");
 
-        snprintf(query_data, sizeof(query_data), "?ep=%s", session_info.ep);
+        snprintf(query_data, sizeof(query_data) - 1, "?ep=%s", session_info.ep);
         coap_set_header_uri_query(request, query_data);
         PRINTF("Registering ID with bootstrap server [");
         coap_endpoint_print(&session_info.bs_server_ep);
-        PRINTF("] as '%s'\n", session_info.ep);
+        PRINTF("] as '%s'\n", query_data);
 
         coap_send_request(&rd_request_state, &session_info.bs_server_ep,
                           request, bootstrap_callback);
@@ -402,17 +412,20 @@ periodic_process(ntimer_t *timer)
           secure = strncmp((const char *)security->server_uri,
                            "coaps:", 6) == 0;
 
-          coap_endpoint_parse((const char *)security->server_uri,
-                              security->server_uri_len,
-                              &session_info.server_ep);
-          PRINTF("Server address:");
-          coap_endpoint_print(&session_info.server_ep);
-          PRINTF("\n");
-          if(secure) {
-            PRINTF("Secure CoAP requested but not supported - can not bootstrap\n");
+          if(!coap_endpoint_parse((const char *)security->server_uri,
+                                  security->server_uri_len,
+                                  &session_info.server_ep)) {
+            PRINTF("Failed to parse server URI!\n");
           } else {
-            lwm2m_rd_client_register_with_server(&session_info.server_ep);
-            session_info.bootstrapped++;
+            PRINTF("Server address:");
+            coap_endpoint_print(&session_info.server_ep);
+            PRINTF("\n");
+            if(secure) {
+              PRINTF("Secure CoAP requested but not supported - can not bootstrap\n");
+            } else {
+              lwm2m_rd_client_register_with_server(&session_info.server_ep);
+              session_info.bootstrapped++;
+            }
           }
         } else {
           PRINTF("** failed to parse URI ");
@@ -440,7 +453,7 @@ periodic_process(ntimer_t *timer)
       coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
       coap_set_header_uri_path(request, "/rd");
 
-      snprintf(query_data, sizeof(query_data), "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
+      snprintf(query_data, sizeof(query_data) - 1, "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
       coap_set_header_uri_query(request, query_data);
 
       /* generate the rd data */
@@ -449,7 +462,7 @@ periodic_process(ntimer_t *timer)
 
       PRINTF("Registering with [");
       coap_endpoint_print(&session_info.server_ep);
-      PRINTF("] lwm2m endpoint '%s': '", session_info.ep);
+      PRINTF("] lwm2m endpoint '%s': '", query_data);
       PRINTS(len, rd_data, "%c");
       PRINTF("'\n");
       coap_send_request(&rd_request_state, &session_info.server_ep,
@@ -469,12 +482,11 @@ periodic_process(ntimer_t *timer)
       current_ms = 0;
       /* prepare request,  */
       coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
-      snprintf(path_data, sizeof(path_data), "/rd/%s/", session_info.assigned_ep);
+      snprintf(path_data, sizeof(path_data) - 1, "/rd/%s/", session_info.assigned_ep);
       coap_set_header_uri_path(request, path_data);
 
-      snprintf(query_data, sizeof(query_data), "?lt=%d", session_info.lifetime);
+      snprintf(query_data, sizeof(query_data) - 1, "?lt=%d", session_info.lifetime);
       coap_set_header_uri_query(request, query_data);
-      PRINTF("Updating\n");
       coap_send_request(&rd_request_state, &session_info.server_ep, request,
                         update_callback);
 
