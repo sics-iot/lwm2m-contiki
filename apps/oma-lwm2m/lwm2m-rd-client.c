@@ -87,8 +87,8 @@
 #define STATE_MACHINE_UPDATE_INTERVAL 500
 
 static struct lwm2m_session_info session_info;
-static uint16_t current_ms = 0;
 static struct request_state rd_request_state;
+static uint32_t current_ms = 0;
 
 /* The states for the RD client state machine */
 #define INIT               0
@@ -338,7 +338,8 @@ periodic_process(ntimer_t *timer)
   ntimer_reset(&rd_timer, STATE_MACHINE_UPDATE_INTERVAL);
   now = ntimer_uptime();
 
-  PRINTF("RD Client - state: %d, ms: %d\n", rd_state, current_ms);
+  PRINTF("RD Client - state: %d, ms: %lu\n", rd_state,
+         (unsigned long)current_ms);
 
   switch(rd_state) {
   case INIT:
