@@ -109,7 +109,6 @@ lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_i
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 LIST(object_list);
 
-static char endpoint[32];
 /*---------------------------------------------------------------------------*/
 static int
 u16toa(uint8_t *buf, uint16_t v)
@@ -261,24 +260,22 @@ void
 lwm2m_engine_init(void)
 {
   list_init(object_list);
-#ifdef LWM2M_ENGINE_CLIENT_ENDPOINT_NAME
 
-  snprintf(endpoint, sizeof(endpoint) - 1,
-           "?ep=" LWM2M_ENGINE_CLIENT_ENDPOINT_NAME);
+#ifdef LWM2M_ENGINE_CLIENT_ENDPOINT_NAME
+  const char *endpoint = LWM2M_ENGINE_CLIENT_ENDPOINT_NAME;
 
 #else /* LWM2M_ENGINE_CLIENT_ENDPOINT_NAME */
-
+  static char endpoint[32];
   int len, i;
   uint8_t state;
   uip_ipaddr_t *ipaddr;
-  char client[sizeof(endpoint)];
 
   len = strlen(LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX);
   /* ensure that this fits with the hex-nums */
-  if(len > sizeof(client) - 13) {
-    len = sizeof(client) - 13;
+  if(len > sizeof(endpoint) - 13) {
+    len = sizeof(endpoint) - 13;
   }
-  memcpy(client, LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX, len);
+  memcpy(endpoint, LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX, len);
 
   /* pick an IP address that is PREFERRED or TENTATIVE */
   ipaddr = NULL;
@@ -295,15 +292,13 @@ lwm2m_engine_init(void)
     for(i = 0; i < 6; i++) {
       /* assume IPv6 for now */
       uint8_t b = ipaddr->u8[10 + i];
-      client[len++] = (b >> 4) > 9 ? 'A' - 10 + (b >> 4) : '0' + (b >> 4);
-      client[len++] = (b & 0xf) > 9 ? 'A' - 10 + (b & 0xf) : '0' + (b & 0xf);
+      endpoint[len++] = (b >> 4) > 9 ? 'A' - 10 + (b >> 4) : '0' + (b >> 4);
+      endpoint[len++] = (b & 0xf) > 9 ? 'A' - 10 + (b & 0xf) : '0' + (b & 0xf);
     }
   }
 
   /* a zero at end of string */
-  client[len] = 0;
-  /* create endpoint */
-  snprintf(endpoint, sizeof(endpoint) - 1, "?ep=%s", client);
+  endpoint[len] = 0;
 
 #endif /* LWM2M_ENGINE_CLIENT_ENDPOINT_NAME */
 
