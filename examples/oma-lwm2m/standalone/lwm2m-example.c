@@ -110,10 +110,13 @@ start_application(int argc, char *argv[])
     coap_endpoint_print(&server_ep);
     printf("\n");
 
+#define BOOTSTRAP 0
+#if BOOTSTRAP
     lwm2m_rd_client_register_with_bootstrap_server(&server_ep);
     lwm2m_rd_client_use_bootstrap_server(1);
-
-    //    lwm2m_rd_client_register_with_server(&server_ep);
+#else
+    lwm2m_rd_client_register_with_server(&server_ep);
+#endif
     lwm2m_rd_client_use_registration_server(1);
     lwm2m_rd_client_init("abcde");
   } else {
