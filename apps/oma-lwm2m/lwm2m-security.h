@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Eistec AB.
+ * Copyright (c) 2017, SICS Swedish ICT
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,31 +31,31 @@
 /**
  * \addtogroup oma-lwm2m
  * @{
+ *
  */
+#ifndef LWM2M_SECURITY_H
+#define LWM2M_SECURITY_H
 
-/**
- * \file
- *         Header file for the Contiki OMA LWM2M JSON writer
- * \author
- *         Joakim Nohlgård <joakim.nohlgard@eistec.se>
- */
+#define URI_SIZE 64
+#define KEY_SIZE 32
 
-#ifndef LWM2M_JSON_H_
-#define LWM2M_JSON_H_
+typedef struct security_value {
+  lwm2m_object_instance_t reg_object;
+  uint16_t server_id;
+  uint8_t bootstrap;
+  uint8_t security_mode;
+  uint8_t server_uri[URI_SIZE];
+  uint8_t server_uri_len;
+  uint8_t public_key[KEY_SIZE];
+  uint8_t public_key_len;
+  uint8_t secret_key[KEY_SIZE];
+  uint8_t secret_key_len;
+  uint8_t server_public_key[KEY_SIZE];
+  uint8_t server_public_key_len;
+} lwm2m_security_value_t;
 
-#include "lwm2m-object.h"
+int lwm2m_security_instance_count(void);
+lwm2m_security_value_t *lwm2m_security_get_instance(int index);
+void lwm2m_security_init(void);
 
-struct json_data {
-  uint8_t type; /* S,B,V */
-  uint8_t *name;
-  uint8_t *value;
-  uint8_t name_len;
-  uint8_t value_len;
-};
-
-extern const lwm2m_writer_t lwm2m_json_writer;
-
-int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json);
-
-#endif /* LWM2M_JSON_H_ */
-/** @} */
+#endif /* LWM2M_SECURITY_H */

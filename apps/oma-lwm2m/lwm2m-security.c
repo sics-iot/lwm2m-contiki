@@ -45,8 +45,9 @@
 #include <stdint.h>
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-security.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -60,53 +61,106 @@
 #define MAX_COUNT 2
 #endif
 
-/* hoping that we do not get more than 64 bytes... */
-#define MAX_SIZE 64
+lwm2m_object_instance_t security_object;
 
-static int32_t bs_arr[MAX_COUNT];
-static int32_t secmode_arr[MAX_COUNT];
-static int32_t sid_arr[MAX_COUNT];
+static lwm2m_security_value_t security_instances[MAX_COUNT];
+static int lwm2m_callback(lwm2m_object_instance_t *object,
+                          lwm2m_context_t *ctx);
+static const uint16_t resources[] = {LWM2M_SECURITY_SERVER_URI_ID,
+                                     LWM2M_SECURITY_BOOTSTRAP_SERVER_ID};
 
-static char server_uri[MAX_COUNT][MAX_SIZE];
-static uint16_t su_len[MAX_COUNT];
-static char client_id[MAX_COUNT][MAX_SIZE];
-static uint16_t client_id_len[MAX_COUNT];
-static char server_id[MAX_COUNT][MAX_SIZE];
-static uint16_t server_id_len[MAX_COUNT];
-static char psk_key[MAX_COUNT][MAX_SIZE];
-static uint16_t psk_key_len[MAX_COUNT];
-static lwm2m_instance_t security_instances[MAX_COUNT];
+/*---------------------------------------------------------------------------*/
+int
+lwm2m_security_instance_count(void)
+{
+  return MAX_COUNT;
+}
 
-LWM2M_RESOURCES(security_resources,
-                LWM2M_RESOURCE_STRING_VAR_ARR(0, MAX_COUNT, MAX_SIZE, su_len, server_uri),
-                LWM2M_RESOURCE_INTEGER_VAR_ARR(1, MAX_COUNT, bs_arr),
-                LWM2M_RESOURCE_INTEGER_VAR_ARR(2, MAX_COUNT, secmode_arr),
-                LWM2M_RESOURCE_STRING_VAR_ARR(3, MAX_COUNT, MAX_SIZE, client_id_len, client_id),
-                LWM2M_RESOURCE_STRING_VAR_ARR(4, MAX_COUNT, MAX_SIZE, server_id_len, server_id),
-                /* TODO This should not be readable! */
-                LWM2M_RESOURCE_STRING_VAR_ARR(5, MAX_COUNT, MAX_SIZE, psk_key_len, psk_key),
-                LWM2M_RESOURCE_INTEGER_VAR_ARR(10, MAX_COUNT, sid_arr)
-                );
-LWM2M_OBJECT(security, 0, security_instances);
+lwm2m_security_value_t *lwm2m_security_get_instance(int index) {
+  if(index < MAX_COUNT &&
+     security_instances[index].reg_object.callback != NULL) {
+    return &security_instances[index];
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static int
+lwm2m_security_create(int instance_id)
+{
+  int i;
+  for(i = 0; i < MAX_COUNT; i++) {
+    /* Not used if callback is non-existend */
+    if(security_instances[i].reg_object.callback == NULL) {
+      security_instances[i].reg_object.callback = lwm2m_callback;
+      security_instances[i].reg_object.object_id = LWM2M_OBJECT_SECURITY_ID;
+      security_instances[i].reg_object.instance_id = instance_id;
+      security_instances[i].reg_object.resource_ids = resources;
+      security_instances[i].reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+      lwm2m_engine_add_object((lwm2m_object_instance_t *) &security_instances[i]);
+      PRINTF("SEC: Create new security instance\n");
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static int
+lwm2m_callback(lwm2m_object_instance_t *object,
+               lwm2m_context_t *ctx)
+{
+  /* NOTE: the create operation will only create an instance and should
+     avoid reading out data */
+  int32_t value;
+  int iv;
+  lwm2m_security_value_t *security;
+  security = (lwm2m_security_value_t *) object;
+
+  if(ctx->operation == LWM2M_OP_CREATE) {
+    PRINTF("SEC: Creating new instance: %d\n", ctx->object_instance_id);
+    if(lwm2m_security_create(ctx->object_instance_id)) {
+      return ctx->object_instance_id;
+    }
+    return 0;
+  } else if(ctx->operation == LWM2M_OP_WRITE) {
+    /* Handle the writes */
+    switch(ctx->resource_id) {
+    case LWM2M_SECURITY_SERVER_URI_ID:
+      PRINTF("Writing security URI value: len: %d\n", (int)ctx->insize);
+      value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->server_uri, URI_SIZE);
+      security->server_uri_len = value;
+      break;
+    case LWM2M_SECURITY_BOOTSTRAP_SERVER_ID:
+      value = lwm2m_object_read_boolean(ctx, ctx->inbuf, ctx->insize, &iv);
+      PRINTF("Set Bootstrap: %d\n", iv);
+      if(value > 0) {
+        security->bootstrap = (uint8_t) iv;
+      }
+      break;
+    }
+  } else if(ctx->operation == LWM2M_OP_READ) {
+    switch(ctx->resource_id) {
+    case LWM2M_SECURITY_SERVER_URI_ID:
+      lwm2m_object_write_string(ctx, (const char *) security->server_uri,
+                                security->server_uri_len);
+      break;
+    }
+  }
+  return 1;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 lwm2m_security_init(void)
 {
-  lwm2m_instance_t template = LWM2M_INSTANCE_UNUSED(0, security_resources);
-  int i;
+  /* Register the generic object */
+  security_object.object_id = LWM2M_OBJECT_SECURITY_ID;
+  security_object.instance_id = 0xffff; /* Generic instance */
+  security_object.resource_ids = resources;
+  security_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+  security_object.callback = lwm2m_callback;
 
-  /* Initialize the instances */
-  for(i = 0; i < MAX_COUNT; i++) {
-    security_instances[i] = template;
-    security_instances[i].id = i;
-  }
-
-  /**
-   * Register this device and its handlers - the handlers
-   * automatically sends in the object to handle.
-   */
   PRINTF("*** Init lwm2m-security\n");
-  lwm2m_engine_register_object(&security);
+  lwm2m_engine_add_object(&security_object);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

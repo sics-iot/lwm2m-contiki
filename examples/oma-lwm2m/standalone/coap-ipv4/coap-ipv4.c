@@ -107,12 +107,46 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
   /* text = format coap://host:port/... we assume */
   /* will not work for know - on the TODO */
   /* set server and port */
+  char host[32];
+  uint16_t port;
+  int hlen = 0;
+
+  /* int secure; */
+  int offset = 0;
+  int i;
+  PRINTF("CoAP-IPv4: Parsing endpoint: %.*s\n", (int)size, text);
+  if(strncmp("coap://", text, 7) == 0) {
+    /* secure = 0; */
+    offset = 7;
+    PRINTF("COAP found\n");
+  } else if(strncmp("coaps://", text, 8) == 0) {
+    /* secure = 1; */
+    offset = 8;
+    PRINTF("COAPS found\n");
+  } else {
+    /* secure = 0; */
+  }
+
+  for(i = offset; i < size && text[i] != ':' && text[i] != '/' &&
+        hlen < sizeof(host) - 1; i++) {
+    host[hlen++] = text[i];
+  }
+  host[hlen] = 0;
+
+  port = COAP_DEFAULT_PORT;
+  if(text[i] == ':') {
+    /* Parse IPv4 endpoint port */
+    port = atoi(&text[i + 1]);
+  }
+
+  PRINTF("CoAP-IPv4: endpoint %s:%u\n", host, port);
 
   ep->addr.sin_family = AF_INET;
-  ep->addr.sin_port = htons(COAP_DEFAULT_PORT);
+  ep->addr.sin_port = htons(port);
   ep->addr_len = sizeof(ep->addr);
-  if(inet_aton(text, &ep->addr.sin_addr) == 0) {
+  if(inet_aton(host, &ep->addr.sin_addr) == 0) {
     /* Failed to parse the address */
+    PRINTF("CoAP-IPv4: Failed to parse endpoint host '%s'\n", host);
     return 0;
   }
   return 1;
@@ -158,7 +192,7 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
     if(errno == EAGAIN) {
       return;
     }
-    err(1, "coap-ipv4: recv");
+    err(1, "CoAP-IPv4: recv");
     return;
   }
   PRINTF("RECV from ");
@@ -197,6 +231,9 @@ coap_transport_init(void)
   }
 
   memset((void *)&server, 0, sizeof(server));
+
+#undef  COAP_SERVER_PORT
+#define COAP_SERVER_PORT 4711
 
   server.sin_family = AF_INET;
   server.sin_port = htons(COAP_SERVER_PORT);

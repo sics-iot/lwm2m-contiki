@@ -52,9 +52,11 @@
 /* LWM2M / CoAP Content-Formats */
 typedef enum {
   LWM2M_TEXT_PLAIN = 1541,
-  LWM2M_TLV        = 1542,
-  LWM2M_JSON       = 1543,
-  LWM2M_OPAQUE     = 1544
+  LWM2M_TLV        = 11542,
+  LWM2M_JSON       = 11543,
+  LWM2M_OLD_TLV    = 1542,
+  LWM2M_OLD_JSON   = 1543,
+  LWM2M_OLD_OPAQUE  = 1544
 } lwm2m_content_format_t;
 
 typedef enum {
@@ -64,25 +66,6 @@ typedef enum {
 
 void lwm2m_engine_init(void);
 void lwm2m_engine_register_default_objects(void);
-
-const lwm2m_object_t *lwm2m_engine_get_object(uint16_t id);
-
-int lwm2m_engine_register_object(const lwm2m_object_t *object);
-
-void lwm2m_engine_handler(const lwm2m_object_t *object,
-                          void *request, void *response,
-                          uint8_t *buffer, uint16_t preferred_size,
-                          int32_t *offset);
-
-void lwm2m_engine_delete_handler(const lwm2m_object_t *object,
-                                 void *request, void *response,
-                                 uint8_t *buffer, uint16_t preferred_size,
-                                 int32_t *offset);
-
-
-const lwm2m_instance_t *lwm2m_engine_get_first_instance_of_object(uint16_t id, lwm2m_context_t *context);
-const lwm2m_instance_t *lwm2m_engine_get_instance(const lwm2m_object_t *object, lwm2m_context_t *context, int depth);
-const lwm2m_resource_t *lwm2m_get_resource(const lwm2m_instance_t *instance, lwm2m_context_t *context);
 
 int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
 
@@ -99,6 +82,10 @@ struct lwm2m_object_instance {
   lwm2m_object_instance_t *next;
   uint16_t object_id;
   uint16_t instance_id;
+  /* an array of resource IDs for discovery, etc */
+  const uint16_t *resource_ids;
+  uint16_t resource_count;
+  /* the callback for requests */
   lwm2m_object_instance_callback_t callback;
 };
 

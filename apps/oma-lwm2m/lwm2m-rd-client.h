@@ -28,24 +28,30 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef LWM2M_RD_CLIENT_H_
+#define LWM2M_RD_CLIENT_H_
+
 void lwm2m_rd_client_use_bootstrap_server(int use);
 void lwm2m_rd_client_use_registration_server(int use);
 void lwm2m_rd_client_register_with_server(const coap_endpoint_t *server);
 void lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server);
+uint16_t lwm2m_rd_client_get_lifetime(void);
+void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
 
-void lwm2m_rd_client_init(const char *ep, uint16_t lifetime);
+void lwm2m_rd_client_init(const char *ep);
 
 #ifndef LWM2M_DEFAULT_CLIENT_LIFETIME
 #define LWM2M_DEFAULT_CLIENT_LIFETIME 10 //sec
 #endif
 
-#define ASSIGNED_ENDPOINT_LEN    15
+#define LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN    15
+
 /*---------------------------------------------------------------------------*/
 /*- Server session-*Currently single session only*---------------------------*/
 /*---------------------------------------------------------------------------*/
 struct lwm2m_session_info {
-  char *ep;
-  char assigned_ep[ASSIGNED_ENDPOINT_LEN];
+  const char *ep;
+  char assigned_ep[LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN];
   uint16_t lifetime;
   coap_endpoint_t bs_server_ep;
   coap_endpoint_t server_ep;
@@ -55,5 +61,6 @@ struct lwm2m_session_info {
   uint8_t has_registration_server_info;
   uint8_t registered;
   uint8_t bootstrapped; /* bootstrap done */
-
 };
+
+#endif /* LWM2M_RD_CLIENT_H_ */

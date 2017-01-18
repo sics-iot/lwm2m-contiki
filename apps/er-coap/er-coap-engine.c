@@ -48,8 +48,12 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTS(l,s,f) do { int i;					\
+    for(i = 0; i < l; i++) printf(f, s[i]); \
+    } while(0)
 #else
 #define PRINTF(...)
+#define PRINTS(l,s,f)
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -73,20 +77,34 @@ coap_remove_handler(coap_handler_t *handler)
   list_remove(coap_handlers, handler);
 }
 /*---------------------------------------------------------------------------*/
-static CC_INLINE int
-call_service(coap_packet_t *request, coap_packet_t *response,
-             uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+CC_INLINE int
+er_coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
+                      uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
   coap_handler_t *r;
-
   for(r = list_head(coap_handlers); r != NULL; r = r->next) {
     if(r->handler &&
        r->handler(request, response, buffer, buffer_size, offset)) {
       /* Request handled. */
+
+      /* Check response code before doing observe! */
+      if(request->code == COAP_GET) {
+        coap_observe_handler(NULL, request, response);
+      }
+
       return 1;
     }
   }
-
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static CC_INLINE int
+call_service(coap_packet_t *request, coap_packet_t *response,
+             uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+{
+  if(er_coap_call_handlers(request, response, buffer, buffer_size, offset)) {
+    return 1;
+  }
   if(service_cbk != NULL &&
      service_cbk(request, response, buffer, buffer_size, offset)) {
     return 1;
@@ -128,8 +146,11 @@ coap_receive(const coap_endpoint_t *src,
 
     PRINTF("  Parsed: v %u, t %u, tkl %u, c %u, mid %u\n", message->version,
            message->type, message->token_len, message->code, message->mid);
-    PRINTF("  URL: %.*s\n", (int)message->uri_path_len, message->uri_path);
-    PRINTF("  Payload: %.*s\n", message->payload_len, message->payload);
+    PRINTF("  URL:");
+    PRINTS(message->uri_path_len, message->uri_path, "%c");
+    PRINTF("\n  Payload: ");
+    PRINTS(message->payload_len, message->payload, "%c");
+    PRINTF("\n");
 
     /* handle requests */
     if(message->code >= COAP_GET && message->code <= COAP_DELETE) {

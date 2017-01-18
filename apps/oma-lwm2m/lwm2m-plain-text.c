@@ -55,6 +55,18 @@
 #endif
 
 /*---------------------------------------------------------------------------*/
+static size_t
+init_write(lwm2m_context_t *ctx)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+end_write(lwm2m_context_t *ctx)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
 size_t
 lwm2m_plain_text_read_int(const uint8_t *inbuf, size_t len, int32_t *value)
 {
@@ -153,7 +165,7 @@ lwm2m_plain_text_write_float32fix(uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_boolean(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int value)
 {
   if(outlen > 0) {
@@ -168,7 +180,7 @@ write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_int(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
           int32_t value)
 {
   int n = snprintf((char *)outbuf, outlen, "%ld", (long)value);
@@ -179,24 +191,28 @@ write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_float32fix(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                  int32_t value, int bits)
 {
   return lwm2m_plain_text_write_float32fix(outbuf, outlen, value, bits);
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
              const char *value, size_t stringlen)
 {
-  int n = snprintf((char *)outbuf, outlen, "%.*s", (int) stringlen, value);
-  if(n < 0 || n >= outlen) {
+  int totlen = stringlen;
+  if(stringlen >= outlen) {
     return 0;
   }
-  return n;
+  memmove(outbuf, value, totlen);
+  outbuf[totlen] = 0;
+  return totlen;
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_writer_t lwm2m_plain_text_writer = {
+  init_write,
+  end_write,
   write_int,
   write_string,
   write_float32fix,

@@ -64,8 +64,14 @@
 #define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTS(l,s,f) do { int i;					\
+    for(i = 0; i < l; i++) printf(f, s[i]); \
+    } while(0)
+#define PRINTPRE(p,l,s) do { PRINTF(p);PRINTS(l,s,"%c"); } while(0);
 #else
 #define PRINTF(...)
+#define PRINTS(l,s,f)
+#define PRINTPRE(p,l,s);
 #endif
 
 #ifndef LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX
@@ -76,26 +82,66 @@
 #endif /* LWM2M_DEVICE_MODEL_NUMBER */
 #endif /* LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX */
 
-#ifdef LWM2M_ENGINE_CONF_MAX_OBJECTS
-#define MAX_OBJECTS LWM2M_ENGINE_CONF_MAX_OBJECTS
-#else /* LWM2M_ENGINE_CONF_MAX_OBJECTS */
-#define MAX_OBJECTS 10
-#endif /* LWM2M_ENGINE_CONF_MAX_OBJECTS */
+#ifdef LWM2M_ENGINE_CONF_USE_RD_CLIENT
+#define USE_RD_CLIENT LWM2M_ENGINE_CONF_USE_RD_CLIENT
+#else
+#define USE_RD_CLIENT 1
+#endif /* LWM2M_ENGINE_CONF_USE_RD_CLIENT */
+
+#if USE_RD_CLIENT
+#include "lwm2m-rd-client.h"
+#endif
+
 
 void lwm2m_device_init(void);
 void lwm2m_security_init(void);
 void lwm2m_server_init(void);
+static lwm2m_object_instance_t *lwm2m_engine_get_object_instance(const lwm2m_context_t *context);
 
 static int lwm2m_handler_callback(coap_packet_t *request,
                                   coap_packet_t *response,
                                   uint8_t *buffer, uint16_t buffer_size,
                                   int32_t *offset);
+static lwm2m_object_instance_t *
+lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last);
+
 
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 LIST(object_list);
 
-static const lwm2m_object_t *objects[MAX_OBJECTS];
-static char endpoint[32];
+/*---------------------------------------------------------------------------*/
+static int
+u16toa(uint8_t *buf, uint16_t v)
+{
+  int pos = 0;
+  int div = 10000;
+  /* Max size = 5 */
+  while(div > 0) {
+    buf[pos] = '0' + (v / div) % 10;
+    /* if first non-zero found or we have found that before */
+    if(buf[pos] > '0' || pos > 0 || div == 1) pos++;
+    div = div / 10;
+  }
+  return pos;
+}
+
+static int
+append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
+{
+  int pos = 0;
+  rd_data[pos++] = '<';
+  pos += u16toa(&rd_data[pos], oid);
+  if(iid > -1 && iid != 0xffff && size > pos) {
+    rd_data[pos++] = '/';
+    pos += u16toa(&rd_data[pos], iid);
+    if(rid > -1 && size > pos) {
+      rd_data[pos++] = '/';
+      pos += u16toa(&rd_data[pos], rid);
+    }
+  }
+  rd_data[pos++] = '>';
+  return pos;
+}
 /*---------------------------------------------------------------------------*/
 static inline const char *
 get_method_as_string(rest_resource_flags_t method)
@@ -112,32 +158,47 @@ get_method_as_string(rest_resource_flags_t method)
     return "UNKNOWN";
   }
 }
-/*---------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
 static int
-parse_next(const char **path, int *path_len, uint16_t *value)
+parse_path(const char *path, int path_len,
+           uint16_t *oid, uint16_t *iid, uint16_t *rid)
 {
+  int len;
+  int ret;
+  int pos;
+  uint16_t val;
   char c;
-  *value = 0;
-  /* printf("parse_next: %p %d\n", *path, *path_len); */
-  if(*path_len == 0) {
-    return 0;
-  }
-  while(*path_len > 0) {
-    c = **path;
-    (*path)++;
-    *path_len = *path_len - 1;
-    if(c >= '0' && c <= '9') {
-      *value = *value * 10 + (c - '0');
-    } else if(c == '/') {
-      return 1;
-    } else {
-      /* error */
-      return -4;
+
+  /* get object id */
+  PRINTF("Parse PATH:");
+  PRINTS(path_len, path, "%c");
+  PRINTF("\n");
+
+  ret = 0;
+  pos = 0;
+  do {
+    val = 0;
+    /* we should get a value first - consume all numbers */
+    while(pos < path_len && (c = path[pos]) >= '0' && c <= '9') {
+      val = val * 10 + (c - '0');
+      pos++;
     }
-  }
-  return 1;
+    /* Slash will mote thing forward - and the end will be when pos == pl */
+    if(c == '/' || pos == path_len) {
+      PRINTF("Setting %u = %u\n", ret, val);
+      if(ret == 0) *oid = val;
+      if(ret == 1) *iid = val;
+      if(ret == 2) *rid = val;
+      ret++;
+      pos++;
+    } else {
+      PRINTF("Error: illegal char '%c' at pos:%d\n", c, pos);
+      return -1;
+    }
+  } while(pos < path_len);
+  return ret;
 }
-/*---------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
 static int
 lwm2m_engine_parse_context(const char *path, int path_len,
                            coap_packet_t *request, coap_packet_t *response,
@@ -163,14 +224,11 @@ lwm2m_engine_parse_context(const char *path, int path_len,
   context->reader = &lwm2m_plain_text_reader;
   context->writer = &oma_tlv_writer;
 
-  /* get object id */
-  ret = 0;
-  ret += parse_next(&path, &path_len, &context->object_id);
-  ret += parse_next(&path, &path_len, &context->object_instance_id);
-  ret += parse_next(&path, &path_len, &context->resource_id);
+  ret = parse_path(path, path_len, &context->object_id,
+                   &context->object_instance_id, &context->resource_id);
 
   if(ret > 0) {
-    context->level = ret & 0xff;
+    context->level = ret;
   }
 
   return ret;
@@ -185,28 +243,16 @@ lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
   pos = 0;
 
   for(o = list_head(object_list); o != NULL; o = o->next) {
-    len = snprintf((char *)&rd_data[pos], size - pos,
-                   "%s<%d/%d>", pos > 0 ? "," : "",
-                   o->object_id, o->instance_id);
+    if(pos > 0) {
+      rd_data[pos++] = ',';
+    }
+    len = append_reg_tag(&rd_data[pos], size - pos,
+                         o->object_id, o->instance_id, -1);
     if(len > 0 && len < size - pos) {
       pos += len;
     }
   }
-
-  for(i = 0; i < MAX_OBJECTS; i++) {
-    if(objects[i] != NULL) {
-      for(j = 0; j < objects[i]->count; j++) {
-        if(objects[i]->instances[j].flag & LWM2M_INSTANCE_FLAG_USED) {
-          len = snprintf((char *)&rd_data[pos], size - pos,
-                         "%s<%d/%d>", pos > 0 ? "," : "",
-                         objects[i]->id, objects[i]->instances[j].id);
-          if(len > 0 && len < size - pos) {
-            pos += len;
-          }
-        }
-      }
-    }
-  }
+  rd_data[pos] = 0;
   return pos;
 }
 /*---------------------------------------------------------------------------*/
@@ -214,24 +260,22 @@ void
 lwm2m_engine_init(void)
 {
   list_init(object_list);
-#ifdef LWM2M_ENGINE_CLIENT_ENDPOINT_NAME
 
-  snprintf(endpoint, sizeof(endpoint) - 1,
-           "?ep=" LWM2M_ENGINE_CLIENT_ENDPOINT_NAME);
+#ifdef LWM2M_ENGINE_CLIENT_ENDPOINT_NAME
+  const char *endpoint = LWM2M_ENGINE_CLIENT_ENDPOINT_NAME;
 
 #else /* LWM2M_ENGINE_CLIENT_ENDPOINT_NAME */
-
+  static char endpoint[32];
   int len, i;
   uint8_t state;
   uip_ipaddr_t *ipaddr;
-  char client[sizeof(endpoint)];
 
   len = strlen(LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX);
   /* ensure that this fits with the hex-nums */
-  if(len > sizeof(client) - 13) {
-    len = sizeof(client) - 13;
+  if(len > sizeof(endpoint) - 13) {
+    len = sizeof(endpoint) - 13;
   }
-  memcpy(client, LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX, len);
+  memcpy(endpoint, LWM2M_ENGINE_CLIENT_ENDPOINT_PREFIX, len);
 
   /* pick an IP address that is PREFERRED or TENTATIVE */
   ipaddr = NULL;
@@ -248,15 +292,13 @@ lwm2m_engine_init(void)
     for(i = 0; i < 6; i++) {
       /* assume IPv6 for now */
       uint8_t b = ipaddr->u8[10 + i];
-      client[len++] = (b >> 4) > 9 ? 'A' - 10 + (b >> 4) : '0' + (b >> 4);
-      client[len++] = (b & 0xf) > 9 ? 'A' - 10 + (b & 0xf) : '0' + (b & 0xf);
+      endpoint[len++] = (b >> 4) > 9 ? 'A' - 10 + (b >> 4) : '0' + (b >> 4);
+      endpoint[len++] = (b & 0xf) > 9 ? 'A' - 10 + (b & 0xf) : '0' + (b & 0xf);
     }
   }
 
   /* a zero at end of string */
-  client[len] = 0;
-  /* create endpoint */
-  snprintf(endpoint, sizeof(endpoint) - 1, "?ep=%s", client);
+  endpoint[len] = 0;
 
 #endif /* LWM2M_ENGINE_CLIENT_ENDPOINT_NAME */
 
@@ -273,261 +315,9 @@ lwm2m_engine_init(void)
 void
 lwm2m_engine_register_default_objects(void)
 {
-  lwm2m_security_init();
-  lwm2m_server_init();
+  //  lwm2m_security_init();
+  //  lwm2m_server_init();
   lwm2m_device_init();
-}
-/*---------------------------------------------------------------------------*/
-const lwm2m_object_t *
-lwm2m_engine_get_object(uint16_t id)
-{
-  int i;
-  for(i = 0; i < MAX_OBJECTS; i++) {
-    if(objects[i] != NULL && objects[i]->id == id) {
-      return objects[i];
-    }
-  }
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
-int
-lwm2m_engine_register_object(const lwm2m_object_t *object)
-{
-  int i;
-  int found = 0;
-  for(i = 0; i < MAX_OBJECTS; i++) {
-    if(objects[i] == NULL) {
-      objects[i] = object;
-      found = 1;
-      break;
-    }
-  }
-  rest_activate_resource(lwm2m_object_get_coap_resource(object),
-                         (char *)object->path);
-  return found;
-}
-/*---------------------------------------------------------------------------*/
-const lwm2m_instance_t *
-lwm2m_engine_get_first_instance_of_object(uint16_t id, lwm2m_context_t *context)
-{
-  const lwm2m_object_t *object;
-  int i;
-
-  object = lwm2m_engine_get_object(id);
-  if(object == NULL) {
-    /* No object with the specified id found */
-    return NULL;
-  }
-
-  /* Initialize the context */
-  memset(context, 0, sizeof(lwm2m_context_t));
-  context->object_id = id;
-
-  for(i = 0; i < object->count; i++) {
-    if(object->instances[i].flag & LWM2M_INSTANCE_FLAG_USED) {
-      context->object_instance_id = object->instances[i].id;
-      context->object_instance_index = i;
-      return &object->instances[i];
-    }
-  }
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
-const lwm2m_instance_t *
-lwm2m_engine_get_instance(const lwm2m_object_t *object, lwm2m_context_t *context, int depth)
-{
-  int i;
-  if(depth > 1) {
-    PRINTF("lwm2m: searching for instance %u\n", context->object_instance_id);
-    for(i = 0; i < object->count; i++) {
-      PRINTF("  Instance %d -> %u (used: %d)\n", i, object->instances[i].id,
-             (object->instances[i].flag & LWM2M_INSTANCE_FLAG_USED) != 0);
-      if(object->instances[i].id == context->object_instance_id &&
-         object->instances[i].flag & LWM2M_INSTANCE_FLAG_USED) {
-        context->object_instance_index = i;
-        return &object->instances[i];
-      }
-    }
-  }
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
-const lwm2m_resource_t *
-lwm2m_get_resource(const lwm2m_instance_t *instance, lwm2m_context_t *context)
-{
-  int i;
-  if(instance != NULL) {
-    PRINTF("lwm2m: searching for resource %u\n", context->resource_id);
-    for(i = 0; i < instance->count; i++) {
-      PRINTF("  Resource %d -> %u\n", i, instance->resources[i].id);
-      if(instance->resources[i].id == context->resource_id) {
-        context->resource_index = i;
-        return &instance->resources[i];
-      }
-    }
-  }
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
-/**
- * @brief Write a list of object instances as a CoRE Link-format list
- */
-static int
-write_object_instances_link(const lwm2m_object_t *object,
-                            char *buffer, size_t size)
-{
-  const lwm2m_instance_t *instance;
-  int len, rdlen, i;
-
-  PRINTF("</%d>", object->id);
-  rdlen = snprintf(buffer, size, "</%d>",
-                   object->id);
-  if(rdlen < 0 || rdlen >= size) {
-    return -1;
-  }
-
-  for(i = 0; i < object->count; i++) {
-    if((object->instances[i].flag & LWM2M_INSTANCE_FLAG_USED) == 0) {
-      continue;
-    }
-    instance = &object->instances[i];
-    PRINTF(",</%d/%d>", object->id, instance->id);
-
-    len = snprintf(&buffer[rdlen], size - rdlen,
-                   ",<%d/%d>", object->id, instance->id);
-    rdlen += len;
-    if(len < 0 || rdlen >= size) {
-      return -1;
-    }
-  }
-  return rdlen;
-}
-/*---------------------------------------------------------------------------*/
-static int
-write_link_format_data(const lwm2m_object_t *object,
-                       const lwm2m_instance_t *instance,
-                       char *buffer, size_t size)
-{
-  const lwm2m_resource_t *resource;
-  int len, rdlen, i;
-
-  PRINTF("<%d/%d>", object->id, instance->id);
-  rdlen = snprintf(buffer, size, "<%d/%d>",
-                   object->id, instance->id);
-  if(rdlen < 0 || rdlen >= size) {
-    return -1;
-  }
-
-  for(i = 0; i < instance->count; i++) {
-    resource = &instance->resources[i];
-    PRINTF(",<%d/%d/%d>", object->id, instance->id, resource->id);
-
-    len = snprintf(&buffer[rdlen], size - rdlen,
-                   ",<%d/%d/%d>", object->id, instance->id, resource->id);
-    rdlen += len;
-    if(len < 0 || rdlen >= size) {
-      return -1;
-    }
-  }
-  return rdlen;
-}
-/*---------------------------------------------------------------------------*/
-static int
-write_json_data(const lwm2m_context_t *context,
-                const lwm2m_object_t *object,
-                const lwm2m_instance_t *instance,
-                char *buffer, size_t size)
-{
-  const lwm2m_resource_t *resource;
-  const char *s = "";
-  int len, rdlen, i;
-
-  PRINTF("{\"e\":[");
-  rdlen = snprintf(buffer, size, "{\"e\":[");
-  if(rdlen < 0 || rdlen >= size) {
-    PRINTF("#<truncated>\n");
-    return -1;
-  }
-
-  for(i = 0, len = 0; i < instance->count; i++) {
-    resource = &instance->resources[i];
-    len = 0;
-    if(lwm2m_object_is_resource_string(resource)) {
-      const uint8_t *value;
-      uint16_t slen;
-      value = lwm2m_object_get_resource_string(resource, context);
-      slen = lwm2m_object_get_resource_strlen(resource, context);
-      if(value != NULL) {
-        PRINTF("%s{\"n\":\"%u\",\"sv\":\"%.*s\"}", s,
-               resource->id, slen, value);
-        len = snprintf(&buffer[rdlen], size - rdlen,
-                       "%s{\"n\":\"%u\",\"sv\":\"%.*s\"}", s,
-                       resource->id, slen, value);
-      }
-    } else if(lwm2m_object_is_resource_int(resource)) {
-      int32_t value;
-      if(lwm2m_object_get_resource_int(resource, context, &value)) {
-        PRINTF("%s{\"n\":\"%u\",\"v\":%" PRId32 "}", s,
-               resource->id, value);
-        len = snprintf(&buffer[rdlen], size - rdlen,
-                       "%s{\"n\":\"%u\",\"v\":%" PRId32 "}", s,
-                       resource->id, value);
-      }
-    } else if(lwm2m_object_is_resource_floatfix(resource)) {
-      int32_t value;
-      if(lwm2m_object_get_resource_floatfix(resource, context, &value)) {
-        PRINTF("%s{\"n\":\"%u\",\"v\":%" PRId32 "}", s, resource->id,
-               value / (int32_t)LWM2M_FLOAT32_FRAC);
-        len = snprintf(&buffer[rdlen], size - rdlen,
-                       "%s{\"n\":\"%u\",\"v\":", s, resource->id);
-        rdlen += len;
-        if(len < 0 || rdlen >= size) {
-          PRINTF("#<truncated>\n");
-          return -1;
-        }
-
-        len = lwm2m_plain_text_write_float32fix((uint8_t *)&buffer[rdlen],
-                                                size - rdlen,
-                                                value, LWM2M_FLOAT32_BITS);
-        if(len == 0) {
-          PRINTF("#<truncated>\n");
-          return -1;
-        }
-        rdlen += len;
-
-        if(rdlen < size) {
-          buffer[rdlen] = '}';
-        }
-        len = 1;
-      }
-    } else if(lwm2m_object_is_resource_boolean(resource)) {
-      int value;
-      if(lwm2m_object_get_resource_boolean(resource, context, &value)) {
-        PRINTF("%s{\"n\":\"%u\",\"bv\":%s}", s, resource->id,
-               value ? "true" : "false");
-        len = snprintf(&buffer[rdlen], size - rdlen,
-                       "%s{\"n\":\"%u\",\"bv\":%s}", s, resource->id,
-                       value ? "true" : "false");
-      }
-    }
-    rdlen += len;
-    if(len < 0 || rdlen >= size) {
-      PRINTF("#<truncated>\n");
-      return -1;
-    }
-    if(len > 0) {
-      s = ",";
-    }
-  }
-  PRINTF("]}\n");
-  len = snprintf(&buffer[rdlen], size - rdlen, "]}");
-  rdlen += len;
-  if(len < 0 || rdlen >= size) {
-    PRINTF("#<truncated>\n");
-    return -1;
-  }
-
-  return rdlen;
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -543,6 +333,7 @@ lwm2m_engine_select_writer(lwm2m_context_t *context, unsigned int accept)
 {
   switch(accept) {
     case LWM2M_TLV:
+    case LWM2M_OLD_TLV:
       context->writer = &oma_tlv_writer;
       break;
     case LWM2M_TEXT_PLAIN:
@@ -550,6 +341,7 @@ lwm2m_engine_select_writer(lwm2m_context_t *context, unsigned int accept)
       context->writer = &lwm2m_plain_text_writer;
       break;
     case LWM2M_JSON:
+    case LWM2M_OLD_JSON:
     case APPLICATION_JSON:
       context->writer = &lwm2m_json_writer;
       break;
@@ -588,324 +380,288 @@ lwm2m_engine_select_reader(lwm2m_context_t *context, unsigned int content_format
       break;
   }
 }
-/*---------------------------------------------------------------------------*/
-void
-lwm2m_engine_handler(const lwm2m_object_t *object,
-                     void *request, void *response,
-                     uint8_t *buffer, uint16_t preferred_size,
-                     int32_t *offset)
-{
-  int len;
-  const char *url;
-  unsigned int format;
-  unsigned int accept;
-  int depth;
-  lwm2m_context_t context;
-  rest_resource_flags_t method;
-  const lwm2m_instance_t *instance;
 
-  method = REST.get_method_type(request);
-
-  len = REST.get_url(request, &url);
-  if(!REST.get_header_content_type(request, &format)) {
-    PRINTF("No format given. Assume text plain...\n");
-    format = LWM2M_TEXT_PLAIN;
-  } else if(format == TEXT_PLAIN) {
-    /* CoAP content format text plain - assume LWM2M text plain */
-    format = LWM2M_TEXT_PLAIN;
-  }
-  if(!REST.get_header_accept(request, &accept)) {
-    PRINTF("No Accept header, using same as Content-format...\n");
-    accept = format;
-  }
-
-  depth = lwm2m_engine_parse_context(url, len, request, response,
-                                     buffer, preferred_size,
-                                     &context);
-
-  PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
-         context.object_instance_id, context.resource_id, depth);
-
-  /* Select reader and writer based on provided Content type and Accept headers */
-  lwm2m_engine_select_reader(&context, format);
-  lwm2m_engine_select_writer(&context, accept);
-
-#if DEBUG
-  /* for debugging */
-  PRINTF("%s Called Path:%.*s Format:%d ID:%d bsize:%u\n",
-         get_method_as_string(method), len,
-         url, format, object->id, preferred_size);
-  if(format == LWM2M_TEXT_PLAIN) {
-    /* a string */
-    const uint8_t *data;
-    int plen = REST.get_request_payload(request, &data);
-    if(plen > 0) {
-      PRINTF("Data: '%.*s'\n", plen, (char *)data);
-    }
-  }
-#endif /* DEBUG */
-
-  instance = lwm2m_engine_get_instance(object, &context, depth);
-
-  /* from POST */
-  if(depth > 1 && instance == NULL) {
-    if(method != METHOD_PUT && method != METHOD_POST) {
-      PRINTF("Error - do not have instance %d\n", context.object_instance_id);
-      REST.set_response_status(response, NOT_FOUND_4_04);
-      return;
-    } else {
-      const uint8_t *data;
-      int i, len, plen, pos;
-      oma_tlv_t tlv;
-      PRINTF(">>> CREATE ? %d/%d\n", context.object_id,
-             context.object_instance_id);
-
-      for(i = 0; i < object->count; i++) {
-        if((object->instances[i].flag & LWM2M_INSTANCE_FLAG_USED) == 0) {
-          /* allocate this instance */
-          object->instances[i].flag |= LWM2M_INSTANCE_FLAG_USED;
-          object->instances[i].id = context.object_instance_id;
-          context.object_instance_index = i;
-          PRINTF("Created instance: %d\n", context.object_instance_id);
-          REST.set_response_status(response, CREATED_2_01);
-          instance = &object->instances[i];
-          break;
-        }
-      }
-
-      if(instance == NULL) {
-        /* could for some reason not create the instance */
-        REST.set_response_status(response, NOT_ACCEPTABLE_4_06);
-        return;
-      }
-
-      plen = REST.get_request_payload(request, &data);
-      if(plen == 0) {
-        /* do nothing more */
-        return;
-      }
-      PRINTF("Payload: ");
-      for(i = 0; i < plen; i++) {
-        PRINTF("%02x", data[i]);
-      }
-      PRINTF("\n");
-
-      pos = 0;
-      do {
-        len = oma_tlv_read(&tlv, (uint8_t *)&data[pos], plen - pos);
-        PRINTF("Found TLV type=%u id=%u len=%lu\n",
-               tlv.type, tlv.id, (unsigned long)tlv.length);
-        /* here we need to do callbacks or write value */
-        if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
-          context.resource_id = tlv.id;
-          const lwm2m_resource_t *rsc = lwm2m_get_resource(instance, &context);
-          if(rsc != NULL) {
-            /* write the value to the resource */
-            if(lwm2m_object_is_resource_string(rsc)) {
-              PRINTF("  new string value for /%d/%d/%d = %.*s\n",
-                     context.object_id, context.object_instance_id,
-                     context.resource_id, (int)tlv.length, tlv.value);
-              lwm2m_object_set_resource_string(rsc, &context,
-                                               tlv.length, tlv.value);
-            } else if(lwm2m_object_is_resource_int(rsc)) {
-              PRINTF("  new int value for /%d/%d/%d = %" PRId32 "\n",
-                     context.object_id, context.object_instance_id,
-                     context.resource_id, oma_tlv_get_int32(&tlv));
-              lwm2m_object_set_resource_int(rsc, &context,
-                                            oma_tlv_get_int32(&tlv));
-            } else if(lwm2m_object_is_resource_floatfix(rsc)) {
-              int32_t value;
-              if(oma_tlv_float32_to_fix(&tlv, &value, LWM2M_FLOAT32_BITS)) {
-                PRINTF("  new float value for /%d/%d/%d = %" PRId32 "\n",
-                     context.object_id, context.object_instance_id,
-                     context.resource_id, value >> LWM2M_FLOAT32_BITS);
-                lwm2m_object_set_resource_floatfix(rsc, &context, value);
-              } else {
-                PRINTF("  new float value for /%d/%d/%d: FAILED\n",
-                     context.object_id, context.object_instance_id,
-                     context.resource_id);
-              }
-            } else if(lwm2m_object_is_resource_boolean(rsc)) {
-              PRINTF("  new boolean value for /%d/%d/%d = %" PRId32 "\n",
-                     context.object_id, context.object_instance_id,
-                     context.resource_id, oma_tlv_get_int32(&tlv));
-              lwm2m_object_set_resource_boolean(rsc, &context,
-                                                oma_tlv_get_int32(&tlv) != 0);
-            }
-          }
-        }
-        pos = pos + len;
-      } while(len > 0 && pos < plen);
-    }
-    return;
-  }
-
-  if(depth == 3) {
-    const lwm2m_resource_t *resource = lwm2m_get_resource(instance, &context);
-    size_t content_len = 0;
-    if(resource == NULL) {
-      PRINTF("Error - do not have resource %d\n", context.resource_id);
-      REST.set_response_status(response, NOT_FOUND_4_04);
-      return;
-    }
-    /* HANDLE PUT */
-    if(method == METHOD_PUT) {
-      if(lwm2m_object_is_resource_callback(resource)) {
-        if(resource->value.callback.write != NULL) {
-          /* pick a reader ??? */
-          if(format == LWM2M_TEXT_PLAIN) {
-            /* a string */
-            const uint8_t *data;
-            int plen = REST.get_request_payload(request, &data);
-            context.reader = &lwm2m_plain_text_reader;
-            PRINTF("PUT Callback with data: '%.*s'\n", plen, data);
-            /* no specific reader for plain text */
-            content_len = resource->value.callback.write(&context, data, plen,
-                                                    buffer, preferred_size);
-            PRINTF("content_len:%u\n", (unsigned int)content_len);
-            REST.set_response_status(response, CHANGED_2_04);
-          } else {
-            PRINTF("PUT callback with format %d\n", format);
-            REST.set_response_status(response, NOT_ACCEPTABLE_4_06);
-          }
-        } else {
-          PRINTF("PUT - no write callback\n");
-          REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-        }
-      } else {
-        PRINTF("PUT on non-callback resource!\n");
-        REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-      }
-      /* HANDLE GET */
-    } else if(method == METHOD_GET) {
-      if(lwm2m_object_is_resource_string(resource)) {
-        const uint8_t *value;
-        value = lwm2m_object_get_resource_string(resource, &context);
-        if(value != NULL) {
-          uint16_t len = lwm2m_object_get_resource_strlen(resource, &context);
-          PRINTF("Get string value: %.*s\n", (int)len, (char *)value);
-          content_len = context.writer->write_string(&context, buffer,
-            preferred_size, (const char *)value, len);
-        }
-      } else if(lwm2m_object_is_resource_int(resource)) {
-        int32_t value;
-        if(lwm2m_object_get_resource_int(resource, &context, &value)) {
-          content_len = context.writer->write_int(&context, buffer, preferred_size, value);
-        }
-      } else if(lwm2m_object_is_resource_floatfix(resource)) {
-        int32_t value;
-        if(lwm2m_object_get_resource_floatfix(resource, &context, &value)) {
-          /* export FLOATFIX */
-          PRINTF("Exporting %d-bit fix as float: %" PRId32 "\n",
-                 LWM2M_FLOAT32_BITS, value);
-          content_len = context.writer->write_float32fix(&context, buffer,
-            preferred_size, value, LWM2M_FLOAT32_BITS);
-        }
-      } else if(lwm2m_object_is_resource_callback(resource)) {
-        if(resource->value.callback.read != NULL) {
-          content_len = resource->value.callback.read(&context,
-                                                 buffer, preferred_size);
-        } else {
-          REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-          return;
-        }
-      }
-      if(content_len > 0) {
-        REST.set_response_payload(response, buffer, content_len);
-        REST.set_header_content_type(response, context.content_type);
-      } else {
-        /* failed to produce output - it is an internal error */
-        REST.set_response_status(response, INTERNAL_SERVER_ERROR_5_00);
-      }
-      /* Handle POST */
-    } else if(method == METHOD_POST) {
-      if(lwm2m_object_is_resource_callback(resource)) {
-        if(resource->value.callback.exec != NULL) {
-          const uint8_t *data;
-          int plen = REST.get_request_payload(request, &data);
-          PRINTF("Execute Callback with data: '%.*s'\n", plen, data);
-          content_len = resource->value.callback.exec(&context,
-                                                 data, plen,
-                                                 buffer, preferred_size);
-          REST.set_response_status(response, CHANGED_2_04);
-        } else {
-          PRINTF("Execute callback - no exec callback\n");
-          REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-        }
-      } else {
-        PRINTF("Resource post but no callback resource\n");
-        REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-      }
-    }
-  } else if(depth == 2) {
-    /* produce an instance response */
-    if(method != METHOD_GET) {
-      REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-    } else if(instance == NULL) {
-      REST.set_response_status(response, NOT_FOUND_4_04);
-    } else {
-      int rdlen;
-      if(accept == APPLICATION_LINK_FORMAT) {
-        rdlen = write_link_format_data(object, instance,
-                                       (char *)buffer, preferred_size);
-      } else {
-        rdlen = write_json_data(&context, object, instance,
-                                (char *)buffer, preferred_size);
-      }
-      if(rdlen < 0) {
-        PRINTF("Failed to generate instance response\n");
-        REST.set_response_status(response, SERVICE_UNAVAILABLE_5_03);
-        return;
-      }
-      REST.set_response_payload(response, buffer, rdlen);
-      if(accept == APPLICATION_LINK_FORMAT) {
-        REST.set_header_content_type(response, REST.type.APPLICATION_LINK_FORMAT);
-      } else {
-        REST.set_header_content_type(response, LWM2M_JSON);
-      }
-    }
-  } else if(depth == 1) {
-    /* produce a list of instances */
-    if(method != METHOD_GET) {
-      REST.set_response_status(response, METHOD_NOT_ALLOWED_4_05);
-    } else {
-      int rdlen;
-      PRINTF("Sending instance list for object %u\n", object->id);
-      /* TODO: if(accept == APPLICATION_LINK_FORMAT) { */
-      rdlen = write_object_instances_link(object, (char *)buffer, preferred_size);
-      if(rdlen < 0) {
-        PRINTF("Failed to generate object response\n");
-        REST.set_response_status(response, SERVICE_UNAVAILABLE_5_03);
-        return;
-      }
-      REST.set_header_content_type(response, REST.type.APPLICATION_LINK_FORMAT);
-      REST.set_response_payload(response, buffer, rdlen);
-    }
-  }
-}
-/*---------------------------------------------------------------------------*/
-void
-lwm2m_engine_delete_handler(const lwm2m_object_t *object, void *request,
-                            void *response, uint8_t *buffer,
-                            uint16_t preferred_size, int32_t *offset)
-{
-  int len;
-  const char *url;
-  lwm2m_context_t context;
-
-  len = REST.get_url(request, &url);
-  PRINTF("*** DELETE URI:'%.*s' called... - responding with DELETED.\n",
-         len, url);
-  len = lwm2m_engine_parse_context(url, len, request, response,
-                                   buffer, preferred_size,
-                                   &context);
-  PRINTF("Context: %u/%u/%u  found: %d\n", context.object_id,
-         context.object_instance_id, context.resource_id, len);
-
-  REST.set_response_status(response, DELETED_2_02);
-}
 /*---------------------------------------------------------------------------*/
 /* Lightweight object instances */
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *last_ins;
+static int last_rsc_pos;
+
+/* Multi read will handle read of JSON / TLV or Discovery (Link Format) */
+static int
+perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
+                               lwm2m_context_t *ctx)
+{
+  int pos = 0;
+  int size = ctx->outsize;
+  int len = 0;
+  uint8_t initialized = 0; /* used for commas, etc */
+
+  if(ctx->offset == 0) {
+    last_ins = instance;
+    last_rsc_pos = 0;
+    /* Here we should print top node */
+  } else {
+    /* offset > 0 - assume that we are already in a disco or multi get*/
+    instance = last_ins;
+    if(last_ins == NULL) {
+      ctx->offset = -1;
+      ctx->outbuf[0] = ' ';
+      pos = 1;
+    }
+  }
+
+  while(instance != NULL) {
+    /* Do the discovery or read */
+    if(instance->resource_ids != NULL && instance->resource_count > 0) {
+      /* show all the available resources (or read all) */
+      while(last_rsc_pos < instance->resource_count) {
+        if(ctx->level < 3 || ctx->resource_id == instance->resource_ids[last_rsc_pos]) {
+          if(ctx->operation == LWM2M_OP_DISCOVER) {
+            len = snprintf((char *) &ctx->outbuf[pos], size - pos,
+                           pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
+                           instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
+            if(len < 0 || len + pos >= size) {
+              /* ok we trunkated here... */
+              ctx->offset += pos;
+              ctx->outlen = pos;
+              return 1;
+            }
+            pos += len;
+          } else if(ctx->operation == LWM2M_OP_READ) {
+            uint8_t lv;
+            uint8_t success;
+            lv = ctx->level;
+            /* Set the resource ID is ctx->level < 3 */
+            if(lv < 3) {
+              ctx->resource_id = instance->resource_ids[last_rsc_pos];
+            }
+            if(lv < 2) {
+              ctx->object_instance_id = instance->instance_id;
+            }
+            ctx->level = 3;
+            if(!initialized) {
+              len = ctx->writer->init_write(ctx);
+              ctx->outlen += len;
+              PRINTF("INIT WRITE len:%d\n", len);
+              initialized = 1;
+            }
+
+            success = instance->callback(instance, ctx);
+
+            /* We will need to handle no-success and other things */
+            PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
+                   ctx->object_id, ctx->object_instance_id,ctx->resource_id,
+                   ctx->outlen, success);
+
+            /* we need to handle full buffer, etc here also! */
+            ctx->level = lv;
+            pos = ctx->outlen;
+          }
+        }
+        last_rsc_pos++;
+      }
+    }
+    instance = lwm2m_engine_next_object_instance(ctx, instance);
+    last_ins = instance;
+    if(ctx->operation == LWM2M_OP_READ) {
+      PRINTF("END Writer\n");
+      len = ctx->writer->end_write(ctx);
+      ctx->outlen += len;
+      pos = ctx->outlen;
+    }
+
+    initialized = 0;
+    last_rsc_pos = 0;
+  }
+  /* seems like we are done! */
+  ctx->offset=-1;
+  ctx->outlen = pos;
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+create_instance(lwm2m_context_t *context,
+                lwm2m_object_instance_t *instance)
+{
+  /* If not discovery or create - this is a regular OP - do the callback */
+  PRINTF("CREATE OP on object:%d\n", instance->object_id);
+  context->operation = LWM2M_OP_CREATE;
+  /* NOTE: this is a special case - create will return -1 if failing */
+  int new_instance_id = instance->callback(instance, context);
+  if(new_instance_id >= 0) {
+    PRINTF("Created instance: %d\n", new_instance_id);
+    context->object_instance_id = new_instance_id;
+    instance = lwm2m_engine_get_object_instance(context);
+    context->operation = LWM2M_OP_WRITE;
+    REST.set_response_status(context->response, CREATED_2_01);
+    return instance;
+  } else {
+    /* Can not create... */
+    return NULL;
+  }
+}
+/*---------------------------------------------------------------------------*/
+#define MODE_NONE      0
+#define MODE_INSTANCE  1
+#define MODE_VALUE     2
+#define MODE_READY     3
+
+static lwm2m_object_instance_t *
+get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid)
+{
+  lwm2m_object_instance_t *instance;
+  int lv = ctx->level;
+  instance = lwm2m_engine_get_object_instance(ctx);
+  PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
+         ctx->object_instance_id, ctx->resource_id, instance);
+  if(instance == NULL) {
+    /* Find a generic instance for create */
+    ctx->object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    instance = lwm2m_engine_get_object_instance(ctx);
+    if(instance == NULL) {
+      return NULL;
+    }
+    ctx->level = 2; /* create use 2? */
+    ctx->object_instance_id = oid;
+    if((instance = create_instance(ctx, instance)) != NULL) {
+      PRINTF("Instance %d created\n", instance->instance_id);
+    }
+    ctx->level = lv;
+  }
+  return instance;
+}
+
+static int
+process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
+{
+  lwm2m_object_instance_t *instance;
+  int success = 0;
+  ctx->inbuf = data;
+  ctx->inpos = 0;
+  ctx->insize = len;
+  ctx->level = 3;
+  ctx->resource_id = rid;
+  PRINTF("  Doing callback to %u/%u/%u\n", ctx->object_id,
+         ctx->object_instance_id, ctx->resource_id);
+  instance = get_or_create_instance(ctx, ctx->object_instance_id);
+  if(instance != NULL) {
+    success = instance->callback(instance, ctx);
+  }
+  return success;
+}
+
+static int
+perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
+                                lwm2m_context_t *ctx, int format)
+{
+  /* Only for JSON and TLV formats */
+  uint16_t oid = 0, iid = 0, rid = 0;
+  uint16_t ooid = 0, oiid = 0, orid = 0;
+  uint8_t olv = 0;
+  uint8_t mode = 0;
+  uint8_t *inbuf;
+  int inpos;
+  size_t insize;
+
+  ooid = ctx->object_id;
+  oiid = ctx->object_instance_id;
+  orid = ctx->resource_id;
+  olv = ctx->level;
+  inbuf = ctx->inbuf;
+  inpos = ctx->inpos;
+  insize = ctx->insize;
+
+  PRINTF("Multi Write \n");
+  if(format == LWM2M_JSON) {
+    struct json_data json;
+
+    while(lwm2m_json_next_token(ctx, &json)) {
+      int i;
+      PRINTF("JSON: '");
+      for(i = 0; i < json.name_len; i++) PRINTF("%c", json.name[i]);
+      PRINTF("':'");
+      for(i = 0; i < json.value_len; i++) PRINTF("%c", json.value[i]);
+      PRINTF("'\n");
+      if(json.name[0] == 'n') {
+        i = parse_path((const char *) json.value, json.value_len, &oid, &iid, &rid);
+        if(i > 0) {
+          if(ctx->level == 1) {
+            ctx->level = 3;
+            ctx->object_instance_id = oid;
+            ctx->resource_id = iid;
+
+            instance = get_or_create_instance(ctx, oid);
+          }
+          if(instance != NULL && instance->callback != NULL) {
+            mode |= MODE_INSTANCE;
+          } else {
+            /* Failure... */
+            return 0;
+          }
+        }
+      } else {
+        /* HACK - assume value node - can it be anything else? */
+        mode |= MODE_VALUE;
+        /* update values */
+        inbuf = ctx->inbuf;
+        inpos = ctx->inpos;
+
+        ctx->inbuf = json.value;
+        ctx->inpos = 0;
+        ctx->insize = json.value_len;
+      }
+
+      if(mode == MODE_READY) {
+        int success;
+        success = instance->callback(instance, ctx);
+        mode = MODE_NONE;
+        ctx->inbuf = inbuf;
+        ctx->inpos = inpos;
+        ctx->insize = insize;
+        ctx->level = olv;
+      }
+    }
+  } else if(format == LWM2M_TLV) {
+    size_t len;
+    oma_tlv_t tlv;
+    int tlvpos = 0;
+    while(tlvpos < insize) {
+      len = oma_tlv_read(&tlv, &inbuf[tlvpos], insize - tlvpos);
+      PRINTF("Got TLV format First is: type:%d id:%d len:%d (p:%d len:%d/%d)\n",
+             tlv.type, tlv.id, tlv.length, tlvpos, (int) len, (int) insize);
+      if(tlv.type == OMA_TLV_TYPE_OBJECT_INSTANCE) {
+        oma_tlv_t tlv2;
+        int len2;
+        int pos = 0;
+        ctx->object_instance_id = tlv.id;
+        if(tlv.length == 0) {
+          /* Create only - no data */
+          if((instance = create_instance(ctx, instance)) == NULL) {
+          return 0;
+          }
+        }
+        while(pos < tlv.length && (len2 = oma_tlv_read(&tlv2, &tlv.value[pos],
+                                                       tlv.length - pos))) {
+          PRINTF("   TLV type:%d id:%d len:%d (len:%d/%d)\n",
+                 tlv2.type, tlv2.id, tlv2.length, (int) len2, (int) insize);
+          if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
+            process_tlv_write(ctx, tlv2.id, (uint8_t *)&tlv.value[pos],
+                              len2);
+          }
+          pos += len2;
+        }
+      } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
+        process_tlv_write(ctx, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
+        REST.set_response_status(ctx->response, CHANGED_2_04);
+      }
+      tlvpos += len;
+    }
+  }
+  /* Here we have a success! */
+  return 1;
+}
+
 /*---------------------------------------------------------------------------*/
 uint16_t
 lwm2m_engine_recommend_instance_id(uint16_t object_id)
@@ -954,8 +710,21 @@ lwm2m_engine_get_object_instance(const lwm2m_context_t *context)
   lwm2m_object_instance_t *i;
   for(i = list_head(object_list); i != NULL ; i = i->next) {
     if(i->object_id == context->object_id &&
-       i->instance_id == context->object_instance_id) {
+       ((context->level < 2) || i->instance_id == context->object_instance_id)) {
       return i;
+    }
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last)
+{
+  while(last != NULL) {
+    last = last->next;
+    if(last != NULL && last->object_id == context->object_id &&
+       ((context->level < 2) || last->instance_id == context->object_instance_id)) {
+      return last;
     }
   }
   return NULL;
@@ -976,41 +745,70 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   uint8_t bmore;
   uint16_t bsize;
   uint32_t boffset;
-
+  uint8_t success = 1; /* the success boolean */
 
   url_len = REST.get_url(request, &url);
+
+  if(url_len == 2 && strncmp("bs", url, 2) == 0) {
+    PRINTF("BOOTSTRAPPED!!!\n");
+    REST.set_response_status(response, CHANGED_2_04);
+    return 1;
+  }
+
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
                                      buffer, buffer_size, &context);
 
-  if(depth < 2) {
-    /* No possible object instance id found in URL - ignore request */
+  PRINTF("URL:'");
+  PRINTS(url_len, url, "%c");
+  PRINTF("' CTX:%u/%u/%u dp:%u\n", context.object_id, context.object_instance_id,
+	 context.resource_id, depth);
+  /* Get format and accept */
+  if(!REST.get_header_content_type(request, &format)) {
+    PRINTF("lwm2m: No format given. Assume text plain...\n");
+    format = TEXT_PLAIN;
+  } else if(format == LWM2M_TEXT_PLAIN) {
+    /* CoAP content format text plain - assume LWM2M text plain */
+    format = TEXT_PLAIN;
+  }
+  if(!REST.get_header_accept(request, &accept)) {
+    PRINTF("lwm2m: No Accept header, using same as Content-format %d\n",
+           format);
+    accept = format;
+  }
+
+  /**
+   * 1 => Object only
+   * 2 => Object and Instance
+   * 3 => Object and Instance and Resource
+   */
+  if(depth < 1) {
+    /* No possible object id found in URL - ignore request */
+    if(REST.get_method_type(request) == METHOD_DELETE) {
+      PRINTF("This is a delete all - for bootstrap...\n");
+      context.operation = LWM2M_OP_DELETE;
+      REST.set_response_status(response, DELETED_2_02);
+      return 1;
+    }
     return 0;
   }
 
   instance = lwm2m_engine_get_object_instance(&context);
+  if(instance == NULL && REST.get_method_type(request) == METHOD_PUT) {
+    /* ALLOW generic instance if CREATE / WRITE*/
+    int iid = context.object_instance_id;
+    context.object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    instance = lwm2m_engine_get_object_instance(&context);
+    context.object_instance_id = iid;
+  }
+
   if(instance == NULL || instance->callback == NULL) {
     /* No matching object/instance found - ignore request */
     return 0;
   }
 
-  PRINTF("lwm2m[%.*s] Context: %u/%u/%u  found: %d\n",
-         url_len, url, context.object_id,
+  PRINTF("lwm2m Context: %u/%u/%u  found: %d\n",
+         context.object_id,
          context.object_instance_id, context.resource_id, depth);
-
-  if(!REST.get_header_content_type(request, &format)) {
-    PRINTF("lwm2m[%.*s]: No format given. Assume text plain...\n",
-           url_len, url);
-    format = LWM2M_TEXT_PLAIN;
-  } else if(format == TEXT_PLAIN) {
-    /* CoAP content format text plain - assume LWM2M text plain */
-    format = LWM2M_TEXT_PLAIN;
-  }
-  if(!REST.get_header_accept(request, &accept)) {
-    PRINTF("lwm2m[%.*s]: No Accept header, using same as Content-format...\n",
-           url_len, url);
-    accept = format;
-  }
-
   /*
    * Select reader and writer based on provided Content type and
    * Accept headers.
@@ -1025,7 +823,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     REST.set_response_status(response, CHANGED_2_04);
     break;
   case METHOD_POST:
-    if(context.level == 2) {
+    if(context.level < 2) {
       /* write to a instance */
       context.operation = LWM2M_OP_WRITE;
       REST.set_response_status(response, CHANGED_2_04);
@@ -1035,60 +833,98 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     }
     break;
   case METHOD_GET:
-    /* Assuming that we haev already taken care of discovery... it will be read q*/
-    context.operation = LWM2M_OP_READ;
+    if(accept == APPLICATION_LINK_FORMAT) {
+      context.operation = LWM2M_OP_DISCOVER;
+    } else {
+      context.operation = LWM2M_OP_READ;
+    }
     REST.set_response_status(response, CONTENT_2_05);
+    break;
+  case METHOD_DELETE:
+    context.operation = LWM2M_OP_DELETE;
+    REST.set_response_status(response, DELETED_2_02);
     break;
   default:
     break;
   }
 
+  /* Create might be made here - or anywhere at the write ? */
+  if(instance->instance_id == LWM2M_OBJECT_INSTANCE_NONE &&
+     context.level == 2 && context.operation == LWM2M_OP_WRITE) {
+    if((instance = create_instance(&context, instance)) == NULL) {
+      return 0;
+    }
+  }
+
 #if DEBUG
   /* for debugging */
-  PRINTF("lwm2m[%.*s] %s Format:%d ID:%d bsize:%u\n",
-         url_len, url, get_method_as_string(REST.get_method_type(request)),
+  PRINTPRE("lwm2m: [", url_len, url);
+  PRINTF("] %s Format:%d ID:%d bsize:%u\n",
+         get_method_as_string(REST.get_method_type(request)),
          format, context.object_id, buffer_size);
   if(format == LWM2M_TEXT_PLAIN) {
     /* a string */
     const uint8_t *data;
     int plen = REST.get_request_payload(request, &data);
     if(plen > 0) {
-      PRINTF("Data: '%.*s'\n", plen, (char *)data);
+      PRINTF("Data: '");
+      PRINTS(plen, data, "%c");
+      PRINTF("'\n");
     }
   }
 #endif /* DEBUG */
 
-  context.offset = *offset;
+  context.offset = offset != NULL ? *offset : 0;
   context.insize = coap_get_payload(request, (const uint8_t **) &context.inbuf);
   context.inpos = 0;
 
   /* PUT/POST - e.g. write will not send in offset here - Maybe in the future? */
-  if(*offset == 0 && IS_OPTION(request, COAP_OPTION_BLOCK1)) {
+  if((offset != NULL && *offset == 0) &&
+     IS_OPTION(request, COAP_OPTION_BLOCK1)) {
     coap_get_header_block1(request, &bnum, &bmore, &bsize, &boffset);
     context.offset = boffset;
   }
 
-  if(instance->callback(instance, &context)) {
+    /* This is a discovery operation */
+  if(context.operation == LWM2M_OP_DISCOVER) {
+    /* Assume only one disco at a time... */
+    success = perform_multi_resource_read_op(instance, &context);
+  } else if(context.operation == LWM2M_OP_READ) {
+    PRINTF("Multi READ\n");
+    success = perform_multi_resource_read_op(instance, &context);
+  } else if(context.operation == LWM2M_OP_WRITE) {
+    success = perform_multi_resource_write_op(instance, &context, format);
+  } else {
+    /* If not discovery - this is a regular OP - do the callback */
+    success = instance->callback(instance, &context);
+  }
+
+  if(success) {
     /* Handle blockwise 1 */
     if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
-      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset, *offset);
+      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset,
+             (offset != NULL ? *offset : 0));
       coap_set_header_block1(response, bnum, 0, bsize);
     }
 
     if(context.outlen > 0) {
-      PRINTF("lwm2m[%.*s]: replying with %u bytes\n", url_len, url,
-             context.outlen);
+      PRINTPRE("lwm2m: [", url_len, url);
+      PRINTF("] replying with %u bytes\n", context.outlen);
       REST.set_response_payload(response, context.outbuf, context.outlen);
       REST.set_header_content_type(response, context.content_type);
 
-      *offset = context.offset;
+      if(offset != NULL) {
+        *offset = context.offset;
+      }
     } else {
-      PRINTF("lwm2m[%.*s]: no data in reply\n", url_len, url);
+      PRINTPRE("lwm2m: [", url_len, url);
+      PRINTF("] no data in reply\n");
     }
   } else {
     /* Failed to handle the request */
     REST.set_response_status(response, INTERNAL_SERVER_ERROR_5_00);
-    PRINTF("lwm2m[%.*s]: resource failed\n", url_len, url);
+    PRINTPRE("lwm2m: [", url_len, url);
+    PRINTF("] resource failed\n");
   }
   return 1;
 }

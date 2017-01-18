@@ -46,7 +46,19 @@
 #include "oma-tlv.h"
 /*---------------------------------------------------------------------------*/
 static size_t
-write_boolean_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+init_write(lwm2m_context_t *ctx)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+end_write(lwm2m_context_t *ctx)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+write_boolean_tlv(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                   int value)
 {
   return oma_tlv_write_int32(ctx->resource_id, value != 0 ? 1 : 0,
@@ -54,21 +66,21 @@ write_boolean_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_int_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_int_tlv(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int32_t value)
 {
   return oma_tlv_write_int32(ctx->resource_id, value, outbuf, outlen);
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_float32fix_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf,
+write_float32fix_tlv(lwm2m_context_t *ctx, uint8_t *outbuf,
                      size_t outlen, int32_t value, int bits)
 {
   return oma_tlv_write_float32(ctx->resource_id, value, bits, outbuf, outlen);
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_string_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_string_tlv(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                  const char *value, size_t stringlen)
 {
   oma_tlv_t tlv;
@@ -80,6 +92,8 @@ write_string_tlv(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_writer_t oma_tlv_writer = {
+  init_write,
+  end_write,
   write_int_tlv,
   write_string_tlv,
   write_float32fix_tlv,

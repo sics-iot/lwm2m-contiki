@@ -40,12 +40,13 @@
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
 #include "lwm2m-firmware.h"
+#include "lwm2m-server.h"
+#include "lwm2m-security.h"
+#include "lwm2m-device.h"
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
 
-void custom_device_object_init(void);
-void ipso_generic_sensor_init(void);
 void ipso_sensor_temp_init(void);
 void ipso_control_test_init(void);
 void ipso_blockwise_test_init(void);
@@ -54,7 +55,9 @@ void ipso_blockwise_test_init(void);
 static void
 callback(ntimer_t *timer)
 {
-  printf("uptime: %"PRIu64"\n", ntimer_uptime());
+  /* Automatic notifcation on two things... for test!*/
+  lwm2m_notify_observers("3303/0/5700");
+  lwm2m_notify_observers("3/0/13");
   ntimer_reset(timer, 10000);
 }
 /*---------------------------------------------------------------------------*/
@@ -92,15 +95,14 @@ start_application(int argc, char *argv[])
   /* Register default LWM2M objects */
   /* lwm2m_engine_register_default_objects(); */
 
-  /* Init our own custom device object */
-  custom_device_object_init();
-  ipso_generic_sensor_init();
-
   ipso_sensor_temp_init();
   ipso_control_test_init();
   ipso_blockwise_test_init();
 
   lwm2m_firmware_init();
+  lwm2m_device_init();
+  lwm2m_security_init();
+  lwm2m_server_init();
 
   if(has_server_ep) {
     /* start RD client */
@@ -108,9 +110,15 @@ start_application(int argc, char *argv[])
     coap_endpoint_print(&server_ep);
     printf("\n");
 
+#define BOOTSTRAP 0
+#if BOOTSTRAP
+    lwm2m_rd_client_register_with_bootstrap_server(&server_ep);
+    lwm2m_rd_client_use_bootstrap_server(1);
+#else
     lwm2m_rd_client_register_with_server(&server_ep);
+#endif
     lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("?ep=abcde");
+    lwm2m_rd_client_init("abcde");
   } else {
     fprintf(stderr, "No registration server specified.\n");
   }

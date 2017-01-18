@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "er-coap-observe.h"
+#include "er-coap-engine.h"
 #include "lib/memb.h"
 
 #define DEBUG 0
@@ -183,6 +184,8 @@ coap_notify_observers(resource_t *resource)
 {
   coap_notify_observers_sub(resource, NULL);
 }
+/* Can be used either for sub - or when there is not resource - just
+   a handler */
 void
 coap_notify_observers_sub(resource_t *resource, const char *subpath)
 {
@@ -192,12 +195,19 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
   coap_observer_t *obs = NULL;
   int url_len, obs_url_len;
   char url[COAP_OBSERVER_URL_LEN];
+  uint8_t sub_ok = 0;
 
-  url_len = strlen(resource->url);
-  strncpy(url, resource->url, COAP_OBSERVER_URL_LEN - 1);
-  if(url_len < COAP_OBSERVER_URL_LEN - 1 && subpath != NULL) {
-    strncpy(&url[url_len], subpath, COAP_OBSERVER_URL_LEN - url_len - 1);
+  if(resource != NULL) {
+    url_len = strlen(resource->url);
+    strncpy(url, resource->url, COAP_OBSERVER_URL_LEN - 1);
+    if(url_len < COAP_OBSERVER_URL_LEN - 1 && subpath != NULL) {
+      strncpy(&url[url_len], subpath, COAP_OBSERVER_URL_LEN - url_len - 1);
+    }
+  } else {
+    url_len = strlen(subpath);
+    strncpy(url, subpath, COAP_OBSERVER_URL_LEN - 1);
   }
+
   /* Ensure url is null terminated because strncpy does not guarantee this */
   url[COAP_OBSERVER_URL_LEN - 1] = '\0';
   /* url now contains the notify URL that needs to match the observer */
@@ -210,15 +220,20 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
 
   /* iterate over observers */
   url_len = strlen(url);
+  /* Assumes lazy evaluation... */
+  sub_ok = (resource == NULL) || (resource->flags & HAS_SUB_RESOURCES);
   for(obs = (coap_observer_t *)list_head(observers_list); obs;
       obs = obs->next) {
     obs_url_len = strlen(obs->url);
 
     /* Do a match based on the parent/sub-resource match so that it is
        possible to do parent-node observe */
+
+    /***** TODO fix here so that we handle the notofication correctly ******/
+    /* All the new-style ... is assuming that the URL might be within */
     if((obs_url_len == url_len
         || (obs_url_len > url_len
-            && (resource->flags & HAS_SUB_RESOURCES)
+            && sub_ok
             && obs->url[url_len] == '/'))
        && strncmp(url, obs->url, url_len) == 0) {
       coap_transaction_t *transaction = NULL;
@@ -241,9 +256,21 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
         /* prepare response */
         notification->mid = transaction->mid;
 
-        resource->get_handler(request, notification,
-                              transaction->packet + COAP_MAX_HEADER_SIZE,
-                              REST_MAX_CHUNK_SIZE, NULL);
+        /* Either old style get_handler or the full handler */
+        if(er_coap_call_handlers(request, notification, transaction->packet +
+                                 COAP_MAX_HEADER_SIZE, REST_MAX_CHUNK_SIZE,
+                                 NULL) > 0) {
+          PRINTF("Notification on new handlers\n");
+        } else {
+          if(resource != NULL) {
+            resource->get_handler(request, notification,
+                                  transaction->packet + COAP_MAX_HEADER_SIZE,
+                                  REST_MAX_CHUNK_SIZE, NULL);
+          } else {
+            /* What to do here? */
+            notification->code = BAD_REQUEST_4_00;
+          }
+        }
 
         if(notification->code < BAD_REQUEST_4_00) {
           coap_set_header_observe(notification, (obs->obs_counter)++);
@@ -266,6 +293,8 @@ coap_observe_handler(resource_t *resource, void *request, void *response)
   coap_packet_t *const coap_res = (coap_packet_t *)response;
   const coap_endpoint_t *src_ep;
   coap_observer_t *obs;
+
+  PRINTF("CoAP observer handler rsc: %d\n", resource != NULL);
 
   if(coap_req->code == COAP_GET && coap_res->code < 128) { /* GET request and response without error code */
     if(IS_OPTION(coap_req, COAP_OPTION_OBSERVE)) {

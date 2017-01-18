@@ -38,6 +38,7 @@
  *         Implementation of the Contiki OMA LWM2M JSON writer
  * \author
  *         Joakim Nohlgård <joakim.nohlgard@eistec.se>
+ *         Joakim Eriksson <joakime@sics.se> added JSON reader parts
  */
 
 #include "lwm2m-object.h"
@@ -54,37 +55,159 @@
 #else
 #define PRINTF(...)
 #endif
+/*---------------------------------------------------------------------------*/
 
+/* {"e":[{"n":"111/1","v":123},{"n":"111/2","v":42}]} */
+
+/* Begin String */
+#define T_NONE       0
+#define T_STRING_B   1
+#define T_STRING     2
+#define T_NAME       4
+#define T_VNUM       5
+#define T_OBJ        6
+#define T_VAL        7
+
+/* Simlified JSON style reader for reading in values from a LWM2M JSON
+   string */
+int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
+  int pos = ctx->inpos;
+  uint8_t type = T_NONE;
+  uint8_t vpos_start = 0;
+  uint8_t vpos_end = 0;
+  uint8_t cont;
+  uint8_t wscount = 0;
+
+  json->name_len = 0;
+  json->value_len = 0;
+
+  cont = 1;
+  /* We will be either at start, or at a specific position */
+  while(pos < ctx->insize && cont) {
+    uint8_t c = ctx->inbuf[pos++];
+    switch(c) {
+    case '{': type = T_OBJ; break;
+    case '}':
+    case ',':
+      if(type == T_VAL || type == T_STRING) {
+        json->value = &ctx->inbuf[vpos_start];
+        json->value_len = vpos_end - vpos_start - wscount;
+        type = T_NONE;
+        cont = 0;
+      }
+      wscount = 0;
+      break;
+    case '\\':
+      /* stuffing */
+      if(pos < ctx->insize) {
+        pos++;
+        vpos_end = pos;
+      }
+      break;
+    case '"':
+      if(type == T_STRING_B) {
+        int i;
+        type = T_STRING;
+        vpos_end = pos - 1;
+        wscount = 0;
+      } else {
+        type = T_STRING_B;
+        vpos_start = pos;
+      }
+      break;
+    case ':':
+      if(type == T_STRING) {
+        json->name = &ctx->inbuf[vpos_start];
+        json->name_len = vpos_end - vpos_start;
+        vpos_start = vpos_end = pos;
+        type = T_VAL;
+      } else {
+        /* Could be in string or at illegal pos */
+        if(type != T_STRING_B) {
+          PRINTF("ERROR - illegal ':'\n");
+        }
+      }
+      break;
+      /* ignore whitespace */
+    case ' ':
+    case '\n':
+    case '\t':
+      if(type != T_STRING_B) {
+        if(vpos_start == pos - 1) {
+          vpos_start = pos;
+        } else {
+          wscount++;
+        }
+      }
+    default:
+      vpos_end = pos;
+    }
+  }
+
+  if(cont == 0 && pos < ctx->insize) {
+    ctx->inpos = pos;
+  }
+  /* OK if cont == 0 othewise we failed */
+  return cont == 0 && pos < ctx->insize;
+}
 /*---------------------------------------------------------------------------*/
 static size_t
-write_boolean(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+init_write(lwm2m_context_t *ctx)
+{
+  int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
+                     ctx->outsize - ctx->outlen, "{\"e\":[");
+  ctx->writer_flags = 0; /* set flags to zero */
+  if((len < 0) || (len >= ctx->outsize)) {
+    return 0;
+  }
+  return len;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+end_write(lwm2m_context_t *ctx)
+{
+  int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
+                     ctx->outsize - ctx->outlen, "]}");
+  if((len < 0) || (len >= ctx->outsize - ctx->outlen)) {
+    return 0;
+  }
+  return len;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+write_boolean(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int value)
 {
-  int len = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"bv\":%s}]}\n", ctx->resource_id, value ? "true" : "false");
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
+  int len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"bv\":%s}", sep, ctx->resource_id, value ? "true" : "false");
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_int(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_int(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
           int32_t value)
 {
-  int len = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"v\":%" PRId32 "}]}\n", ctx->resource_id, value);
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
+  int len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":%" PRId32 "}", sep, ctx->resource_id, value);
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_float32fix(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
                  int32_t value, int bits)
 {
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
   size_t len = 0;
   int res;
-  res = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"v\":", ctx->resource_id);
+  res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":", sep, ctx->resource_id);
   if(res <= 0 || res >= outlen) {
     return 0;
   }
@@ -96,23 +219,26 @@ write_float32fix(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   }
   len += res;
   outlen -= res;
-  res = snprintf((char *)&outbuf[len], outlen, "}]}\n");
+  res = snprintf((char *)&outbuf[len], outlen, "}");
   if((res <= 0) || (res >= outlen)) {
     return 0;
   }
   len += res;
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
+write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
              const char *value, size_t stringlen)
 {
+  char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
   size_t i;
   size_t len = 0;
   int res;
-  PRINTF("{\"e\":[{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
-  res = snprintf((char *)outbuf, outlen, "{\"e\":[{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
+  PRINTF("{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
+  res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"sv\":\"", sep,
+                 ctx->resource_id);
   if(res < 0 || res >= outlen) {
     return 0;
   }
@@ -143,20 +269,25 @@ write_string(const lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
       return 0;
     }
   }
-  PRINTF("\"}]}\n");
-  res = snprintf((char *)&outbuf[len], outlen - len, "\"}]}\n");
+  PRINTF("\"}\n");
+  res = snprintf((char *)&outbuf[len], outlen - len, "\"}");
   if((res < 0) || (res >= (outlen - len))) {
     return 0;
   }
   len += res;
+  ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 const lwm2m_writer_t lwm2m_json_writer = {
+  init_write,
+  end_write,
   write_int,
   write_string,
   write_float32fix,
   write_boolean
 };
+/*---------------------------------------------------------------------------*/
+
 /*---------------------------------------------------------------------------*/
 /** @} */

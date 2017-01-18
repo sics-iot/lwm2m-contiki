@@ -45,8 +45,9 @@
 #include <stdint.h>
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-server.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -60,34 +61,83 @@
 #define MAX_COUNT 2
 #endif
 
-static int32_t sid_arr[MAX_COUNT];
-static int32_t lifetime_arr[MAX_COUNT];
-static lwm2m_instance_t server_instances[MAX_COUNT];
+static int lwm2m_callback(lwm2m_object_instance_t *object,
+                          lwm2m_context_t *ctx);
 
-LWM2M_RESOURCES(server_resources,
-		LWM2M_RESOURCE_INTEGER_VAR_ARR(0, MAX_COUNT, sid_arr),
-		LWM2M_RESOURCE_INTEGER_VAR_ARR(1, MAX_COUNT, lifetime_arr),
-                );
-LWM2M_OBJECT(server, 1, server_instances);
+static const uint16_t resources[] = {LWM2M_SERVER_SHORT_SERVER_ID,
+                                     LWM2M_SERVER_LIFETIME_ID};
+
+lwm2m_object_instance_t server_object;
+
+static server_value_t server_instances[MAX_COUNT];
+
+static int
+lwm2m_server_create(int instance_id)
+{
+  int i;
+  for(i = 0; i < MAX_COUNT; i++) {
+    /* Not used if callback is non-existend */
+    if(server_instances[i].reg_object.callback == NULL) {
+      server_instances[i].reg_object.callback = lwm2m_callback;
+      server_instances[i].reg_object.object_id = LWM2M_OBJECT_SERVER_ID;
+      server_instances[i].reg_object.instance_id = instance_id;
+      server_instances[i].reg_object.resource_ids = resources;
+      server_instances[i].reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+      lwm2m_engine_add_object((lwm2m_object_instance_t *) &server_instances[i]);
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static int
+lwm2m_callback(lwm2m_object_instance_t *object,
+               lwm2m_context_t *ctx)
+{
+  /* NOTE: the create operation will only create an instance and should
+     avoid reading out data */
+  int32_t value;
+  server_value_t *server;
+  server = (server_value_t *) object;
+
+  if(ctx->operation == LWM2M_OP_CREATE) {
+    PRINTF("Creating new instance: %d\n", ctx->object_instance_id);
+    if(lwm2m_server_create(ctx->object_instance_id)) {
+      return ctx->object_instance_id;
+    }
+    return 0;
+  } else if(ctx->operation == LWM2M_OP_WRITE) {
+    PRINTF("Write to: %d\n", ctx->resource_id);
+    switch(ctx->resource_id) {
+    case LWM2M_SERVER_LIFETIME_ID:
+      lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &value);
+      PRINTF("Got lifetime: %d\n", value);
+      server->lifetime = value;
+    }
+  } else if(ctx->operation == LWM2M_OP_READ) {
+    switch(ctx->resource_id) {
+    case LWM2M_SERVER_LIFETIME_ID:
+      lwm2m_object_write_int(ctx, server->lifetime);
+      break;
+    }
+  }
+
+  return 1;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 lwm2m_server_init(void)
 {
-  lwm2m_instance_t template = LWM2M_INSTANCE_UNUSED(0, server_resources);
-  int i;
-
-  /* Initialize the instances */
-  for(i = 0; i < MAX_COUNT; i++) {
-    server_instances[i] = template;
-    server_instances[i].id = i;
-  }
-
-  /**
-   * Register this device and its handlers - the handlers
-   * automatically sends in the object to handle
-   */
   PRINTF("*** Init lwm2m-server\n");
-  lwm2m_engine_register_object(&server);
+
+  server_object.object_id = LWM2M_OBJECT_SERVER_ID;
+  server_object.instance_id = 0xffff; /* Generic instance */
+  server_object.resource_ids = resources;
+  server_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+  server_object.callback = lwm2m_callback;
+
+  lwm2m_engine_add_object(&server_object);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */
