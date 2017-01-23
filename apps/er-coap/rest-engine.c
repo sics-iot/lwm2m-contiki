@@ -117,7 +117,6 @@ rest_activate_resource(resource_t *resource, const char *path)
            resource->periodic->resource->url);
     list_add(restful_periodic_services, resource->periodic);
     periodic = resource->periodic;
-    PRINTF("Periodic resource: %p (%s)\n", periodic, resource->url);
     ntimer_set_callback(&periodic->periodic_timer, process_callback);
     ntimer_set_user_data(&periodic->periodic_timer, resource);
     ntimer_set(&periodic->periodic_timer, periodic->period);

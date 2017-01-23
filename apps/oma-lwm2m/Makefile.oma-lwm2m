@@ -1,5 +1,4 @@
 oma-lwm2m_src = \
-  lwm2m-object.c \
   lwm2m-rd-client.c \
   lwm2m-engine.c \
   lwm2m-device.c \
