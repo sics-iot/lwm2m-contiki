@@ -59,6 +59,7 @@ static void process_callback(ntimer_t *t);
 
 /*---------------------------------------------------------------------------*/
 LIST(restful_services);
+LIST(restful_periodic_services);
 /*---------------------------------------------------------------------------*/
 static uint8_t is_initialized = 0;
 
@@ -82,6 +83,7 @@ rest_init_engine(void)
   is_initialized = 1;
 
   list_init(restful_services);
+  list_init(restful_periodic_services);
 
   REST.set_service_callback(rest_invoke_restful_service);
 
