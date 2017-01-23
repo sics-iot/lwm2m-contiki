@@ -46,7 +46,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTS(l,s,f) do { int i;					\
@@ -115,7 +115,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         str = LWM2M_DEVICE_TYPE;
         break;
       case LWM2M_DEVICE_TIME_ID:
-        PRINTF("Reading time:%u\n", time_offset + ntimer_seconds());
+        PRINTF("Reading time:%u\n", (unsigned int)
+               (time_offset + ntimer_seconds()));
         lwm2m_object_write_int(ctx, time_offset + ntimer_seconds());
         break;
       default:
@@ -138,10 +139,10 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       if(len == 0) {
         PRINTF("FAIL: could not read time\n");
       } else {
-        PRINTF("Got: time: %u\n", lw_time);
+        PRINTF("Got: time: %u\n", (unsigned int) lw_time);
         time_offset = lw_time - ntimer_seconds();
         PRINTF("Write time...%u => offset = %u\n",
-               lw_time, time_offset);
+               (unsigned int) lw_time, (unsigned int) time_offset);
         time_offset = lw_time - ntimer_seconds();
       }
     }
