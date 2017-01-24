@@ -109,12 +109,17 @@ add_periodic(const ipso_sensor_t *sensor)
 static void
 update_last_value(ipso_sensor_value_t *sval, int32_t value)
 {
+  if(sval->last_value != value) {
+    lwm2m_notify_object_observers(&sval->reg_object, IPSO_SENSOR_VALUE);
+  }
   sval->last_value = value;
   if(sval->min_value > value) {
     sval->min_value = value;
+    lwm2m_notify_object_observers(&sval->reg_object, IPSO_SENSOR_MIN_VALUE);
   }
   if(sval->max_value < value) {
     sval->max_value = value;
+    lwm2m_notify_object_observers(&sval->reg_object, IPSO_SENSOR_MAX_VALUE);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -184,10 +189,12 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 int
 ipso_sensor_add(const ipso_sensor_t *sensor)
 {
-  if(!init && sensor->update_interval > 0) {
-    ntimer_set_callback(&nt, timer_callback);
-    ntimer_set(&nt, 1000);
-    init = 1;
+  if(sensor->update_interval > 0) {
+    if(init == 0) {
+      ntimer_set_callback(&nt, timer_callback);
+      ntimer_set(&nt, 1000);
+      init = 1;
+    }
     add_periodic(sensor);
   }
 
