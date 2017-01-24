@@ -111,7 +111,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     switch(ctx->resource_id) {
     case LWM2M_SERVER_LIFETIME_ID:
       lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &value);
-      PRINTF("Got lifetime: %d\n", value);
+      PRINTF("Got lifetime: %d\n", (int) value);
       server->lifetime = value;
     }
   } else if(ctx->operation == LWM2M_OP_READ) {

@@ -131,7 +131,7 @@
 #define NETSTACK_CONF_RADIO        ieee_mode_driver
 
 #ifndef RF_CORE_CONF_CHANNEL
-#define RF_CORE_CONF_CHANNEL                     25
+#define RF_CORE_CONF_CHANNEL                     26
 #endif
 
 #define NULLRDC_CONF_802154_AUTOACK_HW            1
