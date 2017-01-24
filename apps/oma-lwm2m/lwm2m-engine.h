@@ -88,20 +88,11 @@ struct lwm2m_object_instance {
   lwm2m_object_instance_callback_t callback;
 };
 
-static inline void
-lwm2m_notify_object_observers(lwm2m_object_instance_t *obj, uint16_t resource)
-{
-  char path[20]; /* 60000/60000/60000 */
-  if(obj != NULL) {
-    snprintf(path, 20, "%d/%d/%d", obj->object_id, obj->instance_id, resource);
-    printf("Notify PATH: %s\n", path);
-    coap_notify_observers_sub(NULL, path);
-  }
-}
-
 uint16_t lwm2m_engine_recommend_instance_id(uint16_t object_id);
 void lwm2m_engine_add_object(lwm2m_object_instance_t *object);
 void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
+void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
+                                   uint16_t resource);
 
 #endif /* LWM2M_ENGINE_H */
 /** @} */
