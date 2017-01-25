@@ -55,14 +55,14 @@ void ipso_blockwise_test_init(void);
 static void
 callback(ntimer_t *timer)
 {
-  /* Automatic notifcation on two things... for test!*/
-  lwm2m_notify_observers("3303/0/5700");
+  /* Automatic notifcation on device timer for test!*/
   lwm2m_notify_observers("3/0/13");
   ntimer_reset(timer, 10000);
 }
 /*---------------------------------------------------------------------------*/
 #ifndef LWM2M_DEFAULT_RD_SERVER
-#define LWM2M_DEFAULT_RD_SERVER "172.16.31.179"
+/* Default to leshan.eclipse.org */
+#define LWM2M_DEFAULT_RD_SERVER "5.39.83.206"
 #endif /* LWM2M_DEFAULT_RD_SERVER */
 /*---------------------------------------------------------------------------*/
 void

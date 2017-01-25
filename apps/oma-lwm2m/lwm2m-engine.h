@@ -69,7 +69,6 @@ void lwm2m_engine_register_default_objects(void);
 
 int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
 
-
 typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 
 typedef int
@@ -92,6 +91,8 @@ struct lwm2m_object_instance {
 uint16_t lwm2m_engine_recommend_instance_id(uint16_t object_id);
 void lwm2m_engine_add_object(lwm2m_object_instance_t *object);
 void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
+void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
+                                   uint16_t resource);
 
 #endif /* LWM2M_ENGINE_H */
 /** @} */

@@ -60,7 +60,8 @@ static const uint16_t resources[] =
    IPSO_SENSOR_MIN_RANGE, IPSO_SENSOR_MAX_RANGE};
 
 /*---------------------------------------------------------------------------*/
-static void update_last_value(ipso_sensor_value_t *sval, int32_t value);
+static void update_last_value(ipso_sensor_value_t *sval, int32_t value,
+                              uint8_t notify);
 /*---------------------------------------------------------------------------*/
 static int init = 0;
 static ntimer_t nt;
@@ -86,7 +87,7 @@ timer_callback(ntimer_t *timer)
         int32_t value;
         periodics[i].ticks_left = periodics[i].value->sensor->update_interval;
         if(periodics[i].value->sensor->get_value_in_millis(&value) == LWM2M_STATUS_OK) {
-          update_last_value(periodics[i].value, value);
+          update_last_value(periodics[i].value, value, 1);
         }
       }
     }
@@ -107,14 +108,20 @@ add_periodic(const ipso_sensor_t *sensor)
 }
 /*---------------------------------------------------------------------------*/
 static void
-update_last_value(ipso_sensor_value_t *sval, int32_t value)
+update_last_value(ipso_sensor_value_t *sval, int32_t value, uint8_t notify)
 {
+  /* No notification if this a regular read that cause the update */
+  if(sval->last_value != value && notify) {
+    lwm2m_notify_object_observers(&sval->reg_object, IPSO_SENSOR_VALUE);
+  }
   sval->last_value = value;
   if(sval->min_value > value) {
     sval->min_value = value;
+    lwm2m_notify_object_observers(&sval->reg_object, IPSO_SENSOR_MIN_VALUE);
   }
   if(sval->max_value < value) {
     sval->max_value = value;
+    lwm2m_notify_object_observers(&sval->reg_object, IPSO_SENSOR_MAX_VALUE);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -163,7 +170,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         if(sensor->get_value_in_millis != NULL) {
           int32_t v;
           if(sensor->get_value_in_millis(&v) == LWM2M_STATUS_OK) {
-            update_last_value(value, v);
+            update_last_value(value, v, 0);
             lwm2m_object_write_float32fix(ctx, (value->last_value * 1024) / 1000, 10);
           }
         }
@@ -184,10 +191,12 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 int
 ipso_sensor_add(const ipso_sensor_t *sensor)
 {
-  if(!init && sensor->update_interval > 0) {
-    ntimer_set_callback(&nt, timer_callback);
-    ntimer_set(&nt, 1000);
-    init = 1;
+  if(sensor->update_interval > 0) {
+    if(init == 0) {
+      ntimer_set_callback(&nt, timer_callback);
+      ntimer_set(&nt, 1000);
+      init = 1;
+    }
     add_periodic(sensor);
   }
 

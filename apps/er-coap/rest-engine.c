@@ -59,6 +59,7 @@ static void process_callback(ntimer_t *t);
 
 /*---------------------------------------------------------------------------*/
 LIST(restful_services);
+LIST(restful_periodic_services);
 /*---------------------------------------------------------------------------*/
 static uint8_t is_initialized = 0;
 
@@ -82,6 +83,7 @@ rest_init_engine(void)
   is_initialized = 1;
 
   list_init(restful_services);
+  list_init(restful_periodic_services);
 
   REST.set_service_callback(rest_invoke_restful_service);
 
@@ -111,8 +113,10 @@ rest_activate_resource(resource_t *resource, const char *path)
   if(resource->flags & IS_PERIODIC && resource->periodic
      && resource->periodic->periodic_handler
      && resource->periodic->period) {
+    PRINTF("Periodic resource: %p (%s)\n", resource->periodic,
+           resource->periodic->resource->url);
+    list_add(restful_periodic_services, resource->periodic);
     periodic = resource->periodic;
-    PRINTF("Periodic resource: %p (%s)\n", periodic, resource->url);
     ntimer_set_callback(&periodic->periodic_timer, process_callback);
     ntimer_set_user_data(&periodic->periodic_timer, resource);
     ntimer_set(&periodic->periodic_timer, periodic->period);

@@ -52,15 +52,15 @@ ipso_objects_init(void)
   ipso_temperature_init();
 #endif
 
-#if PLATFORM_HAS_BUTTON
-  ipso_button_init();
-#endif
+/* #if PLATFORM_HAS_BUTTON */
+/*   ipso_button_init(); */
+/* #endif */
 
-#ifdef IPSO_LIGHT_CONTROL
-  ipso_light_control_init();
-#elif PLATFORM_HAS_LEDS
-  ipso_leds_control_init();
-#endif
+/* #ifdef IPSO_LIGHT_CONTROL */
+/*   ipso_light_control_init(); */
+/* #elif PLATFORM_HAS_LEDS */
+/*   ipso_leds_control_init(); */
+/* #endif */
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

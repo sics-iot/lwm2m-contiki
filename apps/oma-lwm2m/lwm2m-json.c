@@ -106,7 +106,6 @@ int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
       break;
     case '"':
       if(type == T_STRING_B) {
-        int i;
         type = T_STRING;
         vpos_end = pos - 1;
         wscount = 0;

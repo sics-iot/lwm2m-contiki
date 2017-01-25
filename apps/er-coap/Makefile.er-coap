@@ -2,4 +2,4 @@ er-coap_src = er-coap.c er-coap-engine.c er-coap-transactions.c      \
   er-coap-observe.c er-coap-separate.c er-coap-res-well-known-core.c \
   er-coap-block1.c er-coap-observe-client.c \
   rest-engine.c \
-  er-coap-uip.c er-coap-blocking-api.c
+  er-coap-uip.c er-coap-blocking-api.c er-coap-callback-api.c

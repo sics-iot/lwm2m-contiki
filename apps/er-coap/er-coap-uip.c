@@ -96,6 +96,8 @@ int
 coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 {
   if(uiplib_ipaddrconv(text, &ep->ipaddr)) {
+    /* For now we assume that leshan is runnign on the correct port */
+    ep->port = SERVER_LISTEN_PORT;
     return 1;
   }
   return 0;

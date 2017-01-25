@@ -61,7 +61,7 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTS(l,s,f) do { int i;					\
@@ -163,11 +163,10 @@ static int
 parse_path(const char *path, int path_len,
            uint16_t *oid, uint16_t *iid, uint16_t *rid)
 {
-  int len;
   int ret;
   int pos;
   uint16_t val;
-  char c;
+  char c = 0;
 
   /* get object id */
   PRINTF("Parse PATH:");
@@ -238,7 +237,7 @@ int
 lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
   lwm2m_object_instance_t *o;
   int pos;
-  int len, i, j;
+  int len;
 
   pos = 0;
 
@@ -448,7 +447,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
             }
 
             success = instance->callback(instance, ctx);
-
+	    
             /* We will need to handle no-success and other things */
             PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
                    ctx->object_id, ctx->object_instance_id,ctx->resource_id,
@@ -557,16 +556,12 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
 {
   /* Only for JSON and TLV formats */
   uint16_t oid = 0, iid = 0, rid = 0;
-  uint16_t ooid = 0, oiid = 0, orid = 0;
   uint8_t olv = 0;
   uint8_t mode = 0;
   uint8_t *inbuf;
   int inpos;
   size_t insize;
 
-  ooid = ctx->object_id;
-  oiid = ctx->object_instance_id;
-  orid = ctx->resource_id;
   olv = ctx->level;
   inbuf = ctx->inbuf;
   inpos = ctx->inpos;
@@ -613,13 +608,15 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
       }
 
       if(mode == MODE_READY) {
-        int success;
-        success = instance->callback(instance, ctx);
+        /* int success; */
+        /* success =  - we should use success in the future */
+        instance->callback(instance, ctx);
         mode = MODE_NONE;
         ctx->inbuf = inbuf;
         ctx->inpos = inpos;
         ctx->insize = insize;
         ctx->level = olv;
+
       }
     }
   } else if(format == LWM2M_TLV) {
@@ -629,7 +626,8 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
     while(tlvpos < insize) {
       len = oma_tlv_read(&tlv, &inbuf[tlvpos], insize - tlvpos);
       PRINTF("Got TLV format First is: type:%d id:%d len:%d (p:%d len:%d/%d)\n",
-             tlv.type, tlv.id, tlv.length, tlvpos, (int) len, (int) insize);
+             tlv.type, tlv.id, (int) tlv.length,
+             (int) tlvpos, (int) len, (int) insize);
       if(tlv.type == OMA_TLV_TYPE_OBJECT_INSTANCE) {
         oma_tlv_t tlv2;
         int len2;
@@ -644,7 +642,8 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
         while(pos < tlv.length && (len2 = oma_tlv_read(&tlv2, &tlv.value[pos],
                                                        tlv.length - pos))) {
           PRINTF("   TLV type:%d id:%d len:%d (len:%d/%d)\n",
-                 tlv2.type, tlv2.id, tlv2.length, (int) len2, (int) insize);
+                 tlv2.type, tlv2.id, (int) tlv2.length,
+                 (int) len2, (int) insize);
           if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
             process_tlv_write(ctx, tlv2.id, (uint8_t *)&tlv.value[pos],
                               len2);
@@ -902,8 +901,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   if(success) {
     /* Handle blockwise 1 */
     if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
-      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", bnum, boffset,
-             (offset != NULL ? *offset : 0));
+      PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", (int) bnum, (int) boffset,
+             (int) (offset != NULL ? *offset : 0));
       coap_set_header_block1(response, bnum, 0, bsize);
     }
 
@@ -927,6 +926,17 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     PRINTF("] resource failed\n");
   }
   return 1;
+}
+/*---------------------------------------------------------------------------*/
+void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
+                                   uint16_t resource)
+{
+  char path[20]; /* 60000/60000/60000 */
+  if(obj != NULL) {
+    snprintf(path, 20, "%d/%d/%d", obj->object_id, obj->instance_id, resource);
+    printf("Notify PATH: %s\n", path);
+    coap_notify_observers_sub(NULL, path);
+  }
 }
 /*---------------------------------------------------------------------------*/
 /** @} */
