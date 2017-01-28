@@ -41,6 +41,7 @@
 #include "lwm2m-rd-client.h"
 #include "ipso-objects.h"
 #include "ipso-sensor-template.h"
+#include "dev/leds.h"
 
 #define DEBUG DEBUG_NONE
 #include "net/ip/uip-debug.h"
@@ -192,20 +193,20 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
 
   while(1) {
     PROCESS_WAIT_EVENT();
+    if(ev == PROCESS_EVENT_TIMER && etimer_expired(&periodic)) {
 #if BOARD_SENSORTAG
+      leds_toggle(LEDS_YELLOW);
+      /* deactive / activate to do a new reading */
+      SENSORS_DEACTIVATE(hdc_1000_sensor);
+      SENSORS_DEACTIVATE(opt_3001_sensor);
+      SENSORS_DEACTIVATE(bmp_280_sensor);
 
-    /* deactive / activate to do a new reading */
-    SENSORS_DEACTIVATE(hdc_1000_sensor);
-    SENSORS_DEACTIVATE(opt_3001_sensor);
-    SENSORS_DEACTIVATE(bmp_280_sensor);
-
-    SENSORS_ACTIVATE(hdc_1000_sensor);
-    SENSORS_ACTIVATE(opt_3001_sensor);
-    SENSORS_ACTIVATE(bmp_280_sensor);
-
+      SENSORS_ACTIVATE(hdc_1000_sensor);
+      SENSORS_ACTIVATE(opt_3001_sensor);
+      SENSORS_ACTIVATE(bmp_280_sensor);
 #endif
-    etimer_reset(&periodic);
+      etimer_reset(&periodic);
+    }
   }
-
   PROCESS_END();
 }
