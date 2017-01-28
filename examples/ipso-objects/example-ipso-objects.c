@@ -61,14 +61,35 @@
 static lwm2m_status_t
 read_temp_value(int32_t *value)
 {
-  int val;
-  val = hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_TEMP);
-  /* convert to milli celcius */
-  *value = 100 * val;
+  *value = 10 * hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_TEMP);
+  return LWM2M_STATUS_OK;
+}
+/* Humitidy reading */
+static lwm2m_status_t
+read_hum_value(int32_t *value)
+{
+  *value = 10 * hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_HUMIDITY);
+  return LWM2M_STATUS_OK;
+}
+/* Lux reading */
+static lwm2m_status_t
+read_lux_value(int32_t *value)
+{
+  *value = 10 * opt_3001_sensor.value(0);
+  return LWM2M_STATUS_OK;
+}
+/* Barometer reading */
+static lwm2m_status_t
+read_bar_value(int32_t *value)
+{
+  *value = 10 * bmp_280_sensor.value(BMP_280_SENSOR_TYPE_PRESS);
   return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 static ipso_sensor_value_t temp_value;
+static ipso_sensor_value_t hum_value;
+static ipso_sensor_value_t lux_value;
+static ipso_sensor_value_t bar_value;
 
 static const ipso_sensor_t temp_sensor = {
   .object_id = 3303,
@@ -77,8 +98,37 @@ static const ipso_sensor_t temp_sensor = {
   .min_range = -10000, /* -10 cel milli celcius */
   .get_value_in_millis = read_temp_value,
   .unit = "Cel",
-  .update_interval = 10
+  .update_interval = 30
 };
+
+static const ipso_sensor_t hum_sensor = {
+  .object_id = 3304,
+  .sensor_value = &hum_value,
+  .max_range = 100000, /* 100 % RH */
+  .min_range = 0,
+  .get_value_in_millis = read_hum_value,
+  .unit = "% RH",
+  .update_interval = 30
+};
+static const ipso_sensor_t lux_sensor = {
+  .object_id = 3301,
+  .sensor_value = &lux_value,
+  .max_range = 100000,
+  .min_range = -10000,
+  .get_value_in_millis = read_lux_value,
+  .unit = "LUX",
+  .update_interval = 30
+};
+static const ipso_sensor_t bar_sensor = {
+  .object_id = 3315,
+  .sensor_value = &bar_value,
+  .max_range = 100000, /* 100 cel milli celcius */
+  .min_range = -10000, /* -10 cel milli celcius */
+  .get_value_in_millis = read_bar_value,
+  .unit = "hPa",
+  .update_interval = 30
+};
+
 #endif
 
 
@@ -121,9 +171,14 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
 
 #if BOARD_SENSORTAG
   ipso_sensor_add(&temp_sensor);
+  ipso_sensor_add(&hum_sensor);
+  ipso_sensor_add(&lux_sensor);
+  ipso_sensor_add(&bar_sensor);
   ipso_button_init();
 
   SENSORS_ACTIVATE(hdc_1000_sensor);
+  SENSORS_ACTIVATE(opt_3001_sensor);
+  SENSORS_ACTIVATE(bmp_280_sensor);
 
 #else
   /* Register default IPSO objects - such as button..*/
