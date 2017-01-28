@@ -157,6 +157,7 @@ setup_lwm2m_servers(void)
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(example_ipso_objects, ev, data)
 {
+  static struct etimer periodic;
   PROCESS_BEGIN();
 
   PROCESS_PAUSE();
@@ -185,11 +186,25 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
   ipso_objects_init();
 #endif
 
-
   setup_lwm2m_servers();
+  /* Tick loop each 5 seconds */
+  etimer_set(&periodic, CLOCK_SECOND * 5);
 
   while(1) {
     PROCESS_WAIT_EVENT();
+#if BOARD_SENSORTAG
+
+    /* deactive / activate to do a new reading */
+    SENSORS_DEACTIVATE(hdc_1000_sensor);
+    SENSORS_DEACTIVATE(opt_3001_sensor);
+    SENSORS_DEACTIVATE(bmp_280_sensor);
+
+    SENSORS_ACTIVATE(hdc_1000_sensor);
+    SENSORS_ACTIVATE(opt_3001_sensor);
+    SENSORS_ACTIVATE(bmp_280_sensor);
+
+#endif
+    etimer_reset(&periodic);
   }
 
   PROCESS_END();
