@@ -96,6 +96,7 @@ static lwm2m_object_instance_t reg_object = {
   .object_id = 3200,
   .instance_id = 0,
   .resource_ids = resources,
+  .resource_count = sizeof(resources) / sizeof(uint16_t),
   .callback = lwm2m_callback,
 };
 

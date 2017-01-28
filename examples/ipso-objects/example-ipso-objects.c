@@ -122,6 +122,9 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
 #if BOARD_SENSORTAG
   ipso_sensor_add(&temp_sensor);
   ipso_button_init();
+
+  SENSORS_ACTIVATE(hdc_1000_sensor);
+
 #else
   /* Register default IPSO objects - such as button..*/
   ipso_objects_init();
