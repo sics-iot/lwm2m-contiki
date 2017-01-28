@@ -447,7 +447,11 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
             }
 
             success = instance->callback(instance, ctx);
-	    
+
+            if(!success) {
+              /* What to do here? */
+              PRINTF("CAllback failed: %d\n", success);
+            }
             /* We will need to handle no-success and other things */
             PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
                    ctx->object_id, ctx->object_instance_id,ctx->resource_id,

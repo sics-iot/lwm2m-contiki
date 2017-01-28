@@ -1,3 +1,2 @@
-ipso-objects_src = ipso-temperature.c ipso-objects.c ipso-sensor-template.c
-#ipso-button.c ipso-leds-control.c ipso-light-control.c
+ipso-objects_src = ipso-temperature.c ipso-objects.c ipso-sensor-template.c ipso-button.c #ipso-leds-control.c ipso-light-control.c
 CFLAGS += -DWITH_IPSO=1

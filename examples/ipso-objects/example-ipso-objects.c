@@ -40,6 +40,7 @@
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
 #include "ipso-objects.h"
+#include "ipso-sensor-template.h"
 
 #define DEBUG DEBUG_NONE
 #include "net/ip/uip-debug.h"
@@ -51,6 +52,35 @@
 #ifndef REGISTER_WITH_LWM2M_SERVER
 #define REGISTER_WITH_LWM2M_SERVER 1
 #endif
+
+#if BOARD_SENSORTAG
+#include "board-peripherals.h"
+
+
+/* Temperature reading */
+static lwm2m_status_t
+read_temp_value(int32_t *value)
+{
+  int val;
+  val = hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_TEMP);
+  /* convert to milli celcius */
+  *value = 100 * val;
+  return LWM2M_STATUS_OK;
+}
+/*---------------------------------------------------------------------------*/
+static ipso_sensor_value_t temp_value;
+
+static const ipso_sensor_t temp_sensor = {
+  .object_id = 3303,
+  .sensor_value = &temp_value,
+  .max_range = 100000, /* 100 cel milli celcius */
+  .min_range = -10000, /* -10 cel milli celcius */
+  .get_value_in_millis = read_temp_value,
+  .unit = "Cel",
+  .update_interval = 10
+};
+#endif
+
 
 #ifndef LWM2M_SERVER_ADDRESS
 #define LWM2M_SERVER_ADDRESS "fd02::1"
@@ -89,8 +119,14 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
   /* Register default LWM2M objects */
   lwm2m_engine_register_default_objects();
 
-  /* Register default IPSO objects */
+#if BOARD_SENSORTAG
+  ipso_sensor_add(&temp_sensor);
+  ipso_button_init();
+#else
+  /* Register default IPSO objects - such as button..*/
   ipso_objects_init();
+#endif
+
 
   setup_lwm2m_servers();
 

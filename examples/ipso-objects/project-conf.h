@@ -40,7 +40,11 @@
 #define PLATFORM_REBOOT watchdog_reboot
 #endif
 
+#if BOARD_SENSORTAG
+/* Real sensor is present... */
+#else
 #define IPSO_TEMPERATURE example_ipso_temperature
+#endif
 
 /**
  * Disabling RDC and CSMA to save memory on constrained devices.

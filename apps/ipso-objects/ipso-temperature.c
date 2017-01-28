@@ -78,10 +78,12 @@ static const ipso_sensor_t temp_sensor = {
 lwm2m_status_t
 get_temp_value(int32_t *value)
 {
+#ifdef IPSO_TEMPERATURE
   if(IPSO_TEMPERATURE.read_value == NULL ||
      IPSO_TEMPERATURE.read_value(value) != 0) {
     return LWM2M_STATUS_OK;
   }
+#endif
   return 0;
 }
 /*---------------------------------------------------------------------------*/
