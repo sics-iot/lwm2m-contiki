@@ -143,6 +143,11 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
       ep->port = SERVER_LISTEN_PORT;
     }
     return 1;
+  } else {
+    if(uiplib_ipaddrconv((const char *)&text, &ep->ipaddr)) {
+      ep->port = SERVER_LISTEN_PORT;
+      return 1;
+    }
   }
   return 0;
 }

@@ -134,7 +134,7 @@ static const ipso_sensor_t bar_sensor = {
 
 
 #ifndef LWM2M_SERVER_ADDRESS
-#define LWM2M_SERVER_ADDRESS "fd02::1"
+#define LWM2M_SERVER_ADDRESS "coap://[fd02::1]"
 #endif
 
 PROCESS(example_ipso_objects, "IPSO object example");
