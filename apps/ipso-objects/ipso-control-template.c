@@ -69,13 +69,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   inlen = REST.get_request_payload(ctx->request, &inbuf);
 
   /* Do the stuff */
-  if(ctx->level == 1) {
-    /* Should not happen 3303 */
-    return 0;
-  }
-  if(ctx->level == 2) {
-    /* This is a get whole object - or write whole object 3303/0 */
-    /* No support right now... need to add support for this later */
+  if(ctx->level < 3) {
     return 0;
   }
   if(ctx->level == 3) {

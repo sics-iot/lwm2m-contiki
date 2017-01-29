@@ -41,6 +41,7 @@
 #include "lwm2m-rd-client.h"
 #include "ipso-objects.h"
 #include "ipso-sensor-template.h"
+#include "ipso-control-template.h"
 #include "dev/leds.h"
 
 #define DEBUG DEBUG_NONE
@@ -86,11 +87,28 @@ read_bar_value(int32_t *value)
   *value = 10 * bmp_280_sensor.value(BMP_280_SENSOR_TYPE_PRESS);
   return LWM2M_STATUS_OK;
 }
+/* LED control */
+static lwm2m_status_t
+leds_set_val(uint8_t value)
+{
+  if(value > 0) {
+    leds_on(LEDS_YELLOW);
+  } else {
+    leds_off(LEDS_YELLOW);
+  }
+  return LWM2M_STATUS_OK;
+}
 /*---------------------------------------------------------------------------*/
 static ipso_sensor_value_t temp_value;
 static ipso_sensor_value_t hum_value;
 static ipso_sensor_value_t lux_value;
 static ipso_sensor_value_t bar_value;
+
+static ipso_control_t led_control = {
+   .reg_object.object_id = 3311,
+   .reg_object.instance_id = 0,
+   .set_value = leds_set_val
+};
 
 static const ipso_sensor_t temp_sensor = {
   .object_id = 3303,
@@ -177,6 +195,7 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
   ipso_sensor_add(&hum_sensor);
   ipso_sensor_add(&lux_sensor);
   ipso_sensor_add(&bar_sensor);
+  ipso_control_add(&led_control);
   ipso_button_init();
 
   SENSORS_ACTIVATE(hdc_1000_sensor);
@@ -196,7 +215,6 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
     PROCESS_WAIT_EVENT();
     if(ev == PROCESS_EVENT_TIMER && etimer_expired(&periodic)) {
 #if BOARD_SENSORTAG
-      leds_toggle(LEDS_YELLOW);
       /* deactive / activate to do a new reading */
       SENSORS_DEACTIVATE(hdc_1000_sensor);
       SENSORS_DEACTIVATE(opt_3001_sensor);
