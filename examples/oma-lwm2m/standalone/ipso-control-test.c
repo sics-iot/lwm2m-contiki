@@ -55,11 +55,13 @@ lwm2m_status_t set_light_value(uint8_t value);
 
 static ipso_control_t test_control = {
   .reg_object.object_id = 3306,
+  .reg_object.instance_id = 1,
   .set_value = set_value,
 };
 
 static ipso_control_t test_control2 = {
   .reg_object.object_id = 3311,
+  .reg_object.instance_id = 1,
   .set_value = set_light_value,
 };
 

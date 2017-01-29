@@ -368,6 +368,7 @@ lwm2m_engine_select_reader(lwm2m_context_t *context, unsigned int content_format
 {
   switch(content_format) {
     case LWM2M_TLV:
+    case LWM2M_OLD_TLV:
       context->reader = &oma_tlv_reader;
       break;
     case LWM2M_TEXT_PLAIN:
@@ -574,7 +575,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
   insize = ctx->insize;
 
   PRINTF("Multi Write \n");
-  if(format == LWM2M_JSON) {
+  if(format == LWM2M_JSON || format == LWM2M_OLD_JSON) {
     struct json_data json;
 
     while(lwm2m_json_next_token(ctx, &json)) {
@@ -625,7 +626,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
 
       }
     }
-  } else if(format == LWM2M_TLV) {
+  } else if(format == LWM2M_TLV || format == LWM2M_OLD_TLV) {
     size_t len;
     oma_tlv_t tlv;
     int tlvpos = 0;

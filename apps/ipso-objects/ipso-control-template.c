@@ -52,6 +52,9 @@
 #define IPSO_DIMMER       5851
 #define IPSO_ON_TIME      5852
 
+static const uint16_t resources[] =
+  {IPSO_ONOFF, IPSO_DIMMER, IPSO_ON_TIME};
+
 /*---------------------------------------------------------------------------*/
 static int
 lwm2m_callback(lwm2m_object_instance_t *object,
@@ -74,17 +77,19 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     if(ctx->operation == LWM2M_OP_READ) {
       switch(ctx->resource_id) {
       case IPSO_ONOFF:
-        lwm2m_object_write_int(ctx, control->value > 0);
+        v = control->value > 0;
         break;
       case IPSO_DIMMER:
-        lwm2m_object_write_int(ctx, control->value);
+        v = control->value;
         break;
       case IPSO_ON_TIME:
-        lwm2m_object_write_int(ctx, control->on_time + (ntimer_uptime() - control->last_on_time) / 1000);
+        v = control->on_time +
+          (ntimer_uptime() - control->last_on_time) / 1000;
         break;
       default:
         return 0;
       }
+      lwm2m_object_write_int(ctx, v);
     } else if(ctx->operation == LWM2M_OP_WRITE) {
       switch(ctx->resource_id) {
       case IPSO_ONOFF:
@@ -136,6 +141,9 @@ ipso_control_add(ipso_control_t *control)
     control->reg_object.instance_id =
       lwm2m_engine_recommend_instance_id(control->reg_object.object_id);
   }
+  control->reg_object.resource_ids = resources;
+  control->reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+
   control->reg_object.callback = lwm2m_callback;
   lwm2m_engine_add_object(&control->reg_object);
   return 1;
