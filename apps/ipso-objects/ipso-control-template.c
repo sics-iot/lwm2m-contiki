@@ -36,7 +36,8 @@
 
 /**
  * \file
- *         Implementation of OMA LWM2M / IPSO sensor template.
+ *         Implementation of OMA LWM2M / IPSO control template.
+ *         Useful for implementing controllable objects
  * \author
  *         Joakim Eriksson <joakime@sics.se>
  *         Niclas Finne <nfi@sics.se>
@@ -58,15 +59,10 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 {
   /* Here we cast to our sensor-template struct */
   ipso_control_t *control;
-  const uint8_t *inbuf;
-  int inlen;
+  size_t len;
   int32_t v;
-  int rs;
 
   control = (ipso_control_t *) object;
-
-  /* setup input buffer - TODO: should be handled in lwm2m-engine */
-  inlen = REST.get_request_payload(ctx->request, &inbuf);
 
   /* Do the stuff */
   if(ctx->level < 3) {
@@ -93,8 +89,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       switch(ctx->resource_id) {
       case IPSO_ONOFF:
       case IPSO_DIMMER:
-        rs = ctx->reader->read_int(ctx, inbuf, inlen, &v);
-        if(rs == 0) {
+        len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v);
+        if(len == 0) {
           return 0;
         }
         if(v > 100) {
@@ -117,8 +113,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         }
         break;
       case IPSO_ON_TIME:
-        rs = ctx->reader->read_int(ctx, inbuf, inlen, &v);
-        if(rs == 0) {
+        len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v);
+        if(len == 0) {
           return 0;
         }
         if(v == 0) {
