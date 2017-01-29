@@ -92,12 +92,56 @@ coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
   return e1->port == e2->port;
 }
 /*---------------------------------------------------------------------------*/
+static int
+index_of(const char *data, int offset, int len, uint8_t c)
+{
+  if(offset < 0) {
+    return offset;
+  }
+  for(; offset < len; offset++) {
+    if(data[offset] == c) {
+      return offset;
+    }
+  }
+  return -1;
+}
+/*---------------------------------------------------------------------------*/
+int get_port(const char *inbuf, size_t len, uint32_t *value)
+{
+  int i;
+  *value = 0;
+  for(i = 0; i < len; i++) {
+    if(inbuf[i] >= '0' && inbuf[i] <= '9') {
+      *value = *value * 10 + (inbuf[i] - '0');
+    } else {
+      break;
+    }
+  }
+  return i;
+}
+
 int
 coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 {
-  if(uiplib_ipaddrconv(text, &ep->ipaddr)) {
-    /* For now we assume that leshan is runnign on the correct port */
-    ep->port = SERVER_LISTEN_PORT;
+  /* Only IPv6 supported */
+  int start = index_of(text, 0, size, '[');
+  int end = index_of(text, start, size, ']');
+  int secure = strncmp((const char *)text, "coaps:", 6) == 0;
+  uint32_t port;
+  if(start > 0 && end > start &&
+     uiplib_ipaddrconv((const char *)&text[start], &ep->ipaddr)) {
+    if(text[end + 1] == ':' &&
+       get_port(text + end + 2, size - end - 2, &port)) {
+      ep->port = UIP_HTONS(port);
+    } else if(secure) {
+      /**
+       * Secure CoAP should use a different port but for now
+       * the same port is used.
+       */
+      ep->port = SERVER_LISTEN_PORT;
+    } else {
+      ep->port = SERVER_LISTEN_PORT;
+    }
     return 1;
   }
   return 0;
