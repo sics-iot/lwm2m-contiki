@@ -49,7 +49,7 @@
 
 /*---------------------------------------------------------------------------*/
 static size_t
-read_int(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_int(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
          int32_t *value)
 {
   oma_tlv_t tlv;
@@ -57,12 +57,13 @@ read_int(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
   size = oma_tlv_read(&tlv, inbuf, len);
   if(size > 0) {
     *value = oma_tlv_get_int32(&tlv);
+    ctx->last_value_len = tlv.length;
   }
   return size;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-read_string(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_string(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
             uint8_t *value, size_t stringlen)
 {
   oma_tlv_t tlv;
@@ -75,12 +76,13 @@ read_string(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
     }
     memcpy(value, tlv.value, tlv.length);
     value[tlv.length] = '\0';
+    ctx->last_value_len = tlv.length;
   }
   return size;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-read_float32fix(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_float32fix(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
                 int32_t *value, int bits)
 {
   oma_tlv_t tlv;
@@ -88,12 +90,13 @@ read_float32fix(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
   size = oma_tlv_read(&tlv, inbuf, len);
   if(size > 0) {
     oma_tlv_float32_to_fix(&tlv, value, bits);
+    ctx->last_value_len = tlv.length;
   }
   return size;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-read_boolean(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_boolean(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
              int *value)
 {
   oma_tlv_t tlv;
@@ -101,6 +104,7 @@ read_boolean(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
   size = oma_tlv_read(&tlv, inbuf, len);
   if(size > 0) {
     *value = oma_tlv_get_int32(&tlv) != 0;
+    ctx->last_value_len = tlv.length;
   }
   return size;
 }

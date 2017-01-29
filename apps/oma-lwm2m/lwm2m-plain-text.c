@@ -130,6 +130,7 @@ lwm2m_plain_text_read_float32fix(const uint8_t *inbuf, size_t len,
   if(neg) {
     *value = -*value;
   }
+ 
   return i;
 }
 /*---------------------------------------------------------------------------*/
@@ -220,14 +221,16 @@ const lwm2m_writer_t lwm2m_plain_text_writer = {
 };
 /*---------------------------------------------------------------------------*/
 static size_t
-read_int(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_int(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
          int32_t *value)
 {
-  return lwm2m_plain_text_read_int(inbuf, len, value);
+  int size = lwm2m_plain_text_read_int(inbuf, len, value);
+  ctx->last_value_len = size;
+  return size;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-read_string(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_string(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
             uint8_t *value, size_t stringlen)
 {
   if(stringlen <= len) {
@@ -236,23 +239,28 @@ read_string(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
   }
   memcpy(value, inbuf, len);
   value[len] = '\0';
+  ctx->last_value_len = len;
   return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-read_float32fix(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_float32fix(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
                 int32_t *value, int bits)
 {
-  return lwm2m_plain_text_read_float32fix(inbuf, len, value, bits);
+  int size;
+  size = lwm2m_plain_text_read_float32fix(inbuf, len, value, bits);
+  ctx->last_value_len = size;
+  return size;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
-read_boolean(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
+read_boolean(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len,
              int *value)
 {
   if(len > 0) {
     if(*inbuf == '1' || *inbuf == '0') {
       *value = *inbuf == '1' ? 1 : 0;
+      ctx->last_value_len = 1;
       return 1;
     }
   }

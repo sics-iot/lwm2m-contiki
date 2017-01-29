@@ -131,7 +131,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     case LWM2M_SECURITY_SERVER_URI_ID:
       PRINTF("Writing security URI value: len: %d\n", (int)ctx->insize);
       value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->server_uri, URI_SIZE);
-      security->server_uri_len = value;
+      /* This is string... */
+      security->server_uri_len = ctx->last_value_len;
       break;
     case LWM2M_SECURITY_BOOTSTRAP_SERVER_ID:
       value = lwm2m_object_read_boolean(ctx, ctx->inbuf, ctx->insize, &iv);
@@ -150,12 +151,12 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     case LWM2M_SECURITY_CLIENT_PKI_ID:
       PRINTF("Writing client PKI: len: %d\n", (int)ctx->insize);
       value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->public_key, KEY_SIZE);
-      security->public_key_len = value;
+      security->public_key_len = ctx->last_value_len;
       break;
     case LWM2M_SECURITY_KEY_ID:
       PRINTF("Writing client secret key: len: %d\n", (int)ctx->insize);
       value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->secret_key, URI_SIZE);
-      security->secret_key_len = value;
+      security->secret_key_len = ctx->last_value_len;
       break;
     }
   } else if(ctx->operation == LWM2M_OP_READ) {

@@ -142,6 +142,8 @@ typedef struct lwm2m_context {
 
   /* Info on last_instance read/write */
   uint16_t last_instance;
+  uint16_t last_value_len;
+
   uint8_t writer_flags; /* flags for reader/writer */
   const lwm2m_reader_t *reader;
   const lwm2m_writer_t *writer;
@@ -158,10 +160,11 @@ struct lwm2m_writer {
 };
 
 struct lwm2m_reader {
-  size_t (* read_int)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value);
-  size_t (* read_string)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen);
-  size_t (* read_float32fix)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits);
-  size_t (* read_boolean)(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value);
+  size_t (* read_int)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value);
+  size_t (* read_string)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen);
+  size_t (* read_float32fix)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits);
+  size_t (* read_boolean)(
+lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value);
 };
 
 #define LWM2M_INSTANCE_FLAG_USED 1
@@ -174,25 +177,25 @@ lwm2m_notify_observers(char *path)
 }
 
 static inline size_t
-lwm2m_object_read_int(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value)
+lwm2m_object_read_int(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value)
 {
   return ctx->reader->read_int(ctx, inbuf, len, value);
 }
 
 static inline size_t
-lwm2m_object_read_string(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen)
+lwm2m_object_read_string(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen)
 {
   return ctx->reader->read_string(ctx, inbuf, len, value, strlen);
 }
 
 static inline size_t
-lwm2m_object_read_float32fix(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits)
+lwm2m_object_read_float32fix(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits)
 {
   return ctx->reader->read_float32fix(ctx, inbuf, len, value, bits);
 }
 
 static inline size_t
-lwm2m_object_read_boolean(const lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value)
+lwm2m_object_read_boolean(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value)
 {
   return ctx->reader->read_boolean(ctx, inbuf, len, value);
 }
