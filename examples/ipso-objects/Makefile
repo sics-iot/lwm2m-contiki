@@ -10,6 +10,10 @@ APPS += er-coap
 APPS += oma-lwm2m
 APPS += ipso-objects
 
+ifdef WITH_BOOTSTRAP
+CFLAGS += -DREGISTER_WITH_LWM2M_BOOTSTRAP_SERVER=1
+endif
+
 CONTIKI=../..
 CONTIKI_WITH_IPV6 = 1
 include $(CONTIKI)/Makefile.include

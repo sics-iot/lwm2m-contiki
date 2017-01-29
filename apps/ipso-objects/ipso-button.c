@@ -143,6 +143,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         lwm2m_object_write_int(ctx, debounce_time);
         break;
       case IPSO_INPUT_EDGE_SEL:
+        lwm2m_object_write_int(ctx, edge_selection);
         break;
       case IPSO_INPUT_SENSOR_TYPE:
         lwm2m_object_write_string(ctx, "button", strlen("button"));

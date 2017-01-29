@@ -66,8 +66,12 @@ lwm2m_object_instance_t security_object;
 static lwm2m_security_value_t security_instances[MAX_COUNT];
 static int lwm2m_callback(lwm2m_object_instance_t *object,
                           lwm2m_context_t *ctx);
-static const uint16_t resources[] = {LWM2M_SECURITY_SERVER_URI_ID,
-                                     LWM2M_SECURITY_BOOTSTRAP_SERVER_ID};
+static const uint16_t resources[] = {
+  LWM2M_SECURITY_SERVER_URI_ID, LWM2M_SECURITY_BOOTSTRAP_SERVER_ID,
+  LWM2M_SECURITY_MODE_ID, LWM2M_SECURITY_CLIENT_PKI_ID,
+  LWM2M_SECURITY_SERVER_PKI_ID, LWM2M_SECURITY_KEY_ID,
+  LWM2M_SECURITY_SHORT_SERVER_ID
+};
 
 /*---------------------------------------------------------------------------*/
 int
@@ -135,6 +139,23 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       if(value > 0) {
         security->bootstrap = (uint8_t) iv;
       }
+    case LWM2M_SECURITY_MODE_ID:
+      {
+        int32_t v2;
+        PRINTF("Writing security MODE value: len: %d\n", (int)ctx->insize);
+        value = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v2);
+        security->security_mode = v2;
+      }
+      break;
+    case LWM2M_SECURITY_CLIENT_PKI_ID:
+      PRINTF("Writing client PKI: len: %d\n", (int)ctx->insize);
+      value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->public_key, KEY_SIZE);
+      security->public_key_len = value;
+      break;
+    case LWM2M_SECURITY_KEY_ID:
+      PRINTF("Writing client secret key: len: %d\n", (int)ctx->insize);
+      value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->secret_key, URI_SIZE);
+      security->secret_key_len = value;
       break;
     }
   } else if(ctx->operation == LWM2M_OP_READ) {
@@ -143,6 +164,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       lwm2m_object_write_string(ctx, (const char *) security->server_uri,
                                 security->server_uri_len);
       break;
+    default:
+      return 0;
     }
   }
   return 1;

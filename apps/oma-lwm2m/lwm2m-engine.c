@@ -143,6 +143,7 @@ append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
   return pos;
 }
 /*---------------------------------------------------------------------------*/
+#if DEBUG
 static inline const char *
 get_method_as_string(rest_resource_flags_t method)
 {
@@ -158,6 +159,7 @@ get_method_as_string(rest_resource_flags_t method)
     return "UNKNOWN";
   }
 }
+#endif
 /*--------------------------------------------------------------------------*/
 static int
 parse_path(const char *path, int path_len,
@@ -314,8 +316,8 @@ lwm2m_engine_init(void)
 void
 lwm2m_engine_register_default_objects(void)
 {
-  //  lwm2m_security_init();
-  //  lwm2m_server_init();
+  lwm2m_security_init();
+  lwm2m_server_init();
   lwm2m_device_init();
 }
 /*---------------------------------------------------------------------------*/
