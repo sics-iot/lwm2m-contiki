@@ -456,6 +456,7 @@ publish(void)
   /* Publish MQTT topic in IBM quickstart format */
   int len;
   int remaining = APP_BUFFER_SIZE;
+  int val;
 
   seq_nr_value++;
 
@@ -491,9 +492,20 @@ publish(void)
   }
   remaining -= len;
   buf_ptr += len;
+  val = hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_TEMP);
+  len = snprintf(buf_ptr, remaining, ",\"Temp (C)\":%d.%d",
+                 val / 100, ABS(val % 100));
 
-  len = snprintf(buf_ptr, remaining, ",\"Temp (C)\":%d",
-                 hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_TEMP));
+  if(len < 0 || len >= remaining) {
+    printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
+    return;
+  }
+  remaining -= len;
+  buf_ptr += len;
+
+  val = hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_HUMIDITY);
+  len = snprintf(buf_ptr, remaining, ",\"Hum (rh)\":%d.%d",
+                 val / 100, ABS(val % 100));
 
   if(len < 0 || len >= remaining) {
     printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -502,8 +514,9 @@ publish(void)
   remaining -= len;
   buf_ptr += len;
 
-  len = snprintf(buf_ptr, remaining, ",\"Hum (rh)\":%d",
-                 hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_HUMIDITY));
+  val = bmp_280_sensor.value(BMP_280_SENSOR_TYPE_PRESS);
+  len = snprintf(buf_ptr, remaining, ",\"Pressure (hPa)\":%d.%d",
+                 val / 100, ABS(val % 100));
 
   if(len < 0 || len >= remaining) {
     printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -511,6 +524,7 @@ publish(void)
   }
   remaining -= len;
   buf_ptr += len;
+
 
   len = snprintf(buf_ptr, remaining, "}}");
 
