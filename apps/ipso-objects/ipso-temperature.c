@@ -60,7 +60,7 @@ extern const struct ipso_objects_sensor IPSO_TEMPERATURE;
 #define IPSO_TEMPERATURE_MAX 80000
 #endif
 
-lwm2m_status_t get_temp_value(int32_t *value);
+lwm2m_status_t get_temp_value(const ipso_sensor_t *sensor, int32_t *value);
 
 static ipso_sensor_value_t temp_value;
 
@@ -76,7 +76,7 @@ static const ipso_sensor_t temp_sensor = {
 
 /*---------------------------------------------------------------------------*/
 lwm2m_status_t
-get_temp_value(int32_t *value)
+get_temp_value(const ipso_sensor_t *s, int32_t *value)
 {
 #ifdef IPSO_TEMPERATURE
   if(IPSO_TEMPERATURE.read_value == NULL ||

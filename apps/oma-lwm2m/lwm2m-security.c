@@ -51,8 +51,14 @@
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTS(l,s,f) do { int i;					\
+    for(i = 0; i < l; i++) printf(f, s[i]); \
+    } while(0)
+#define PRINTPRE(p,l,s) do { PRINTF(p);PRINTS(l,s,"%c"); } while(0);
 #else
 #define PRINTF(...)
+#define PRINTS(l,s,f)
+#define PRINTPRE(p,l,s);
 #endif
 
 #ifdef LWM2M_CONF_SERVER_MAX_COUNT
@@ -143,20 +149,28 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     case LWM2M_SECURITY_MODE_ID:
       {
         int32_t v2;
-        PRINTF("Writing security MODE value: len: %d\n", (int)ctx->insize);
         value = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v2);
+        PRINTF("Writing security MODE value: %d len: %d\n", v2,
+               (int)ctx->insize);
         security->security_mode = v2;
       }
       break;
     case LWM2M_SECURITY_CLIENT_PKI_ID:
-      PRINTF("Writing client PKI: len: %d\n", (int)ctx->insize);
       value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->public_key, KEY_SIZE);
       security->public_key_len = ctx->last_value_len;
+
+      PRINTF("Writing client PKI: len: %d '", (int)ctx->last_value_len);
+      PRINTS(ctx->last_value_len, security->public_key, "%c");
+      PRINTF("'\n");
       break;
     case LWM2M_SECURITY_KEY_ID:
-      PRINTF("Writing client secret key: len: %d\n", (int)ctx->insize);
       value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->secret_key, URI_SIZE);
       security->secret_key_len = ctx->last_value_len;
+
+      PRINTF("Writing secret key: len: %d '", (int)ctx->last_value_len);
+      PRINTS(ctx->last_value_len, security->secret_key, "%c");
+      PRINTF("'\n");
+
       break;
     }
   } else if(ctx->operation == LWM2M_OP_READ) {

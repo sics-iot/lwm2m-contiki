@@ -47,9 +47,9 @@
 
 #include "lwm2m-engine.h"
 
-typedef lwm2m_status_t (*ipso_sensor_get_value_millis_t)(int32_t *v);
-
 typedef struct ipso_sensor ipso_sensor_t;
+
+typedef lwm2m_status_t (*ipso_sensor_get_value_millis_t)(const ipso_sensor_t *sensor, int32_t *v);
 
 /* Values of the IPSO object */
 typedef struct ipso_sensor_value {

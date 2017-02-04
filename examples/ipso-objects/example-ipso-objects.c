@@ -61,28 +61,28 @@
 
 /* Temperature reading */
 static lwm2m_status_t
-read_temp_value(int32_t *value)
+read_temp_value(const ipso_sensor_t *s, int32_t *value)
 {
   *value = 10 * hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_TEMP);
   return LWM2M_STATUS_OK;
 }
 /* Humitidy reading */
 static lwm2m_status_t
-read_hum_value(int32_t *value)
+read_hum_value(const ipso_sensor_t *s, int32_t *value)
 {
   *value = 10 * hdc_1000_sensor.value(HDC_1000_SENSOR_TYPE_HUMIDITY);
   return LWM2M_STATUS_OK;
 }
 /* Lux reading */
 static lwm2m_status_t
-read_lux_value(int32_t *value)
+read_lux_value(const ipso_sensor_t *s, int32_t *value)
 {
   *value = 10 * opt_3001_sensor.value(0);
   return LWM2M_STATUS_OK;
 }
 /* Barometer reading */
 static lwm2m_status_t
-read_bar_value(int32_t *value)
+read_bar_value(const ipso_sensor_t *s, int32_t *value)
 {
   *value = 10 * bmp_280_sensor.value(BMP_280_SENSOR_TYPE_PRESS);
   return LWM2M_STATUS_OK;

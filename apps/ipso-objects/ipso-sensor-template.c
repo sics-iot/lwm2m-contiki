@@ -86,7 +86,7 @@ timer_callback(ntimer_t *timer)
       } else {
         int32_t value;
         periodics[i].ticks_left = periodics[i].value->sensor->update_interval;
-        if(periodics[i].value->sensor->get_value_in_millis(&value) == LWM2M_STATUS_OK) {
+        if(periodics[i].value->sensor->get_value_in_millis(periodics[i].value->sensor, &value) == LWM2M_STATUS_OK) {
           update_last_value(periodics[i].value, value, 1);
         }
       }
@@ -169,7 +169,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       case IPSO_SENSOR_VALUE:
         if(sensor->get_value_in_millis != NULL) {
           int32_t v;
-          if(sensor->get_value_in_millis(&v) == LWM2M_STATUS_OK) {
+          if(sensor->get_value_in_millis(sensor, &v) == LWM2M_STATUS_OK) {
             update_last_value(value, v, 0);
             lwm2m_object_write_float32fix(ctx, (value->last_value * 1024) / 1000, 10);
           }
