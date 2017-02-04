@@ -59,6 +59,9 @@
 #endif
 
 #include <string.h>
+#include <strings.h>
+
+PROCESS_NAME(example_ipso_objects);
 /*---------------------------------------------------------------------------*/
 /*
  * IBM server: messaging.quickstart.internetofthings.ibmcloud.com
@@ -701,6 +704,8 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
   uip_icmp6_echo_reply_callback_add(&echo_reply_notification,
                                     echo_reply_handler);
   etimer_set(&echo_request_timer, conf.def_rt_ping_interval);
+
+  process_start(&example_ipso_objects, NULL);
 
   /* Main loop */
   while(1) {
