@@ -104,6 +104,7 @@ static const char *broker_ip = "0064:ff9b:0000:0000:0000:0000:b8ac:7cbd";
 #define CONNECTION_STABLE_TIME     (CLOCK_SECOND * 5)
 static struct timer connection_life;
 static uint8_t connect_attempt;
+static uint16_t button_count;
 /*---------------------------------------------------------------------------*/
 /* Various states */
 static uint8_t state;
@@ -457,18 +458,24 @@ publish(void)
   int len;
   int remaining = APP_BUFFER_SIZE;
   int val;
+  char board[20];
 
   seq_nr_value++;
 
   buf_ptr = app_buffer;
 
+  memcpy(board, BOARD_STRING, MIN(20, strlen(BOARD_STRING)));
+  board[19] = 0;
+
   len = snprintf(buf_ptr, remaining,
                  "{"
                  "\"d\":{"
-                 "\"myName\":\"%s\","
+                 "\"myName\":\"%s%02x%0x2%0x2\","
                  "\"Seq #\":%d,"
                  "\"Uptime (sec)\":%lu",
-                 BOARD_STRING, seq_nr_value, clock_seconds());
+                 BOARD_STRING, uip_lladdr.addr[5],
+                 uip_lladdr.addr[6], uip_lladdr.addr[7],
+                 seq_nr_value, clock_seconds());
 
   if(len < 0 || len >= remaining) {
     printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -525,6 +532,26 @@ publish(void)
   remaining -= len;
   buf_ptr += len;
 
+  val = opt_3001_sensor.value(0);
+  len = snprintf(buf_ptr, remaining, ",\"Light (LUX)\":%d.%d",
+                 val / 100, ABS(val % 100));
+
+  if(len < 0 || len >= remaining) {
+    printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
+    return;
+  }
+  remaining -= len;
+  buf_ptr += len;
+
+  len = snprintf(buf_ptr, remaining, ",\"button\":%d",
+                 button_count);
+
+  if(len < 0 || len >= remaining) {
+    printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
+    return;
+  }
+  remaining -= len;
+  buf_ptr += len;
 
   len = snprintf(buf_ptr, remaining, "}}");
 
@@ -731,6 +758,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
         connect_attempt = 1;
         state = STATE_REGISTERED;
       }
+      button_count++;
     }
 
     if((ev == PROCESS_EVENT_TIMER && data == &publish_periodic_timer) ||
