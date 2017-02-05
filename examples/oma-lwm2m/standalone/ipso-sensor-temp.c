@@ -55,8 +55,8 @@ ipso_sensor_value_t temp_value;
 ipso_sensor_value_t temp_value2;
 ipso_sensor_value_t hum_value;
 
-lwm2m_status_t get_temp_value(int32_t *value);
-lwm2m_status_t get_hum_value(int32_t *value);
+lwm2m_status_t get_temp_value(const ipso_sensor_t *sensor, int32_t *value);
+lwm2m_status_t get_hum_value(const ipso_sensor_t *sensor, int32_t *value);
 
 static const ipso_sensor_t temp_sensor = {
   .object_id = 3303,
@@ -94,14 +94,14 @@ static const ipso_sensor_t hum_sensor = {
 /*---------------------------------------------------------------------------*/
 
 lwm2m_status_t
-get_temp_value(int32_t *value)
+get_temp_value(const ipso_sensor_t *sensor, int32_t *value)
 {
   *value = temp++;
   return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 lwm2m_status_t
-get_hum_value(int32_t *value)
+get_hum_value(const ipso_sensor_t *sensor, int32_t *value)
 {
   *value = temp++;
   return LWM2M_STATUS_OK;
