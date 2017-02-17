@@ -41,10 +41,6 @@ void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
 
 void lwm2m_rd_client_init(const char *ep);
 
-#ifndef LWM2M_DEFAULT_CLIENT_LIFETIME
-#define LWM2M_DEFAULT_CLIENT_LIFETIME 10 //sec
-#endif
-
 #define LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN    15
 
 /*---------------------------------------------------------------------------*/

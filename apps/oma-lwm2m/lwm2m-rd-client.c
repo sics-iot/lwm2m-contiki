@@ -81,6 +81,10 @@
 #define PRINTLLADDR(addr)
 #endif
 
+#ifndef LWM2M_DEFAULT_CLIENT_LIFETIME
+#define LWM2M_DEFAULT_CLIENT_LIFETIME 10 /* sec */
+#endif
+
 #define REMOTE_PORT        UIP_HTONS(COAP_DEFAULT_PORT)
 #define BS_REMOTE_PORT     UIP_HTONS(5685)
 
@@ -157,7 +161,11 @@ lwm2m_rd_client_get_lifetime(void)
 void
 lwm2m_rd_client_set_lifetime(uint16_t lifetime)
 {
-  session_info.lifetime = (0 <= lifetime) ? lifetime : LWM2M_DEFAULT_CLIENT_LIFETIME;
+  if(lifetime > 0) {
+    session_info.lifetime = lifetime;
+  } else {
+    session_info.lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME;
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -326,6 +334,10 @@ update_callback(struct request_state *state)
     rd_state = DO_REGISTRATION;
   } else if(REGISTRATION_SENT == rd_state) { /* this can handle the current double invocation */
     /*Failure! */
+    PRINTF("Registration failed! Retry?");
+    rd_state = DO_REGISTRATION;
+  } else if(UPDATE_SENT == rd_state) {
+    /* Update failed */
     PRINTF("Update failed! Retry?");
     rd_state = DO_REGISTRATION;
   } else {
@@ -494,7 +506,7 @@ periodic_process(ntimer_t *timer)
     check_periodic_observations(); /* TODO: manage periodic observations */
     current_ms += STATE_MACHINE_UPDATE_INTERVAL;
 
-    if(session_info.lifetime * 500 <= current_ms) { /* time to send an update to the server, at half-time! sec vs ms */
+    if(((uint32_t)session_info.lifetime * 500) <= current_ms) { /* time to send an update to the server, at half-time! sec vs ms */
       current_ms = 0;
       /* prepare request,  */
       coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
@@ -523,7 +535,7 @@ void
 lwm2m_rd_client_init(const char *ep)
 {
   session_info.ep = ep;
-  if(session_info.lifetime <= 0) {
+  if(session_info.lifetime == 0) {
     session_info.lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME;
   }
   rd_state = INIT;
