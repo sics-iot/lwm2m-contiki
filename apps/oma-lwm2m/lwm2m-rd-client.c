@@ -124,6 +124,12 @@ has_network_access(void)
   return 1;
 }
 /*---------------------------------------------------------------------------*/
+int
+lwm2m_rd_client_is_registered(void)
+{
+  return rd_state == REGISTRATION_DONE || rd_state == UPDATE_SENT;
+}
+/*---------------------------------------------------------------------------*/
 void
 lwm2m_rd_client_use_bootstrap_server(int use)
 {

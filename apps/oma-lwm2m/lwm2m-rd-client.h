@@ -31,6 +31,7 @@
 #ifndef LWM2M_RD_CLIENT_H_
 #define LWM2M_RD_CLIENT_H_
 
+int  lwm2m_rd_client_is_registered(void);
 void lwm2m_rd_client_use_bootstrap_server(int use);
 void lwm2m_rd_client_use_registration_server(int use);
 void lwm2m_rd_client_register_with_server(const coap_endpoint_t *server);
