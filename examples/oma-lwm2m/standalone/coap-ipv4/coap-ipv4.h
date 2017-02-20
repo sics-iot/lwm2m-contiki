@@ -45,6 +45,7 @@
 typedef struct {
   struct sockaddr_in addr;
   unsigned int addr_len;
+  int secure;
 } coap_endpoint_t;
 
 #endif /* COAP_IPV4_H_ */

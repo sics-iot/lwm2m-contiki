@@ -58,4 +58,5 @@ void coap_endpoint_print(const coap_endpoint_t *ep);
 
 int coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep);
 
+int coap_endpoint_is_secure(coap_endpoint_t *ep);
 #endif /* ER_COAP_ENDPOINT_H_ */

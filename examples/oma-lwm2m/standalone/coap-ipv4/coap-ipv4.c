@@ -49,6 +49,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if WITH_DTLS
+#include "dtls.h"
+#include "dtls_debug.h"
+
+static dtls_handler_t cb;
+#endif
+
 #define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -70,6 +77,13 @@ static int coap_ipv4_fd = -1;
 static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
+
+#if WITH_DTLS
+static dtls_context_t *dtls_context = NULL;
+static dtls_context_t *orig_dtls_context = NULL;
+
+#endif
+
 /*---------------------------------------------------------------------------*/
 static const coap_endpoint_t *
 coap_src_endpoint(void)
@@ -95,7 +109,8 @@ coap_endpoint_print(const coap_endpoint_t *ep)
   const char *address;
   address = inet_ntoa(ep->addr.sin_addr);
   if(address != NULL) {
-    printf("%s:%u", address, ntohs(ep->addr.sin_port));
+    printf("coap%s://%s:%u",ep->secure ? "s":"",
+           address, ntohs(ep->addr.sin_port));
   } else {
     printf("<#N/A>");
   }
@@ -110,21 +125,20 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
   char host[32];
   uint16_t port;
   int hlen = 0;
-
-  /* int secure; */
+  int secure;
   int offset = 0;
   int i;
   PRINTF("CoAP-IPv4: Parsing endpoint: %.*s\n", (int)size, text);
   if(strncmp("coap://", text, 7) == 0) {
-    /* secure = 0; */
+    secure = 0;
     offset = 7;
     PRINTF("COAP found\n");
   } else if(strncmp("coaps://", text, 8) == 0) {
-    /* secure = 1; */
+    secure = 1;
     offset = 8;
     PRINTF("COAPS found\n");
   } else {
-    /* secure = 0; */
+    secure = 0;
   }
 
   for(i = offset; i < size && text[i] != ':' && text[i] != '/' &&
@@ -144,6 +158,7 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
   ep->addr.sin_family = AF_INET;
   ep->addr.sin_port = htons(port);
   ep->addr_len = sizeof(ep->addr);
+  ep->secure = secure;
   if(inet_aton(host, &ep->addr.sin_addr) == 0) {
     /* Failed to parse the address */
     PRINTF("CoAP-IPv4: Failed to parse endpoint host '%s'\n", host);
@@ -177,6 +192,9 @@ static void
 coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 {
   int len;
+  session_t session;
+  memset(&session, 0, sizeof(session_t));
+  session.size = sizeof(session.addr);
 
   if(coap_ipv4_fd < 0) {
     return;
@@ -211,7 +229,12 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
     PRINTF("\n");
   }
 
+#if WITH_DTLS
+  /* DTLS receive??? */
+  dtls_handle_message(dtls_context, &session, coap_databuf(), coap_datalen());
+#else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
+#endif
 }
 /*---------------------------------------------------------------------------*/
 static const struct select_callback udp_callback = {
@@ -232,9 +255,6 @@ coap_transport_init(void)
 
   memset((void *)&server, 0, sizeof(server));
 
-#undef  COAP_SERVER_PORT
-#define COAP_SERVER_PORT 4711
-
   server.sin_family = AF_INET;
   server.sin_port = htons(COAP_SERVER_PORT);
   server.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -246,6 +266,23 @@ coap_transport_init(void)
 
   printf("CoAP server listening on port %u\n", COAP_SERVER_PORT);
   select_set_callback(coap_ipv4_fd, &udp_callback);
+
+#if WITH_DTLS
+  session_t dst; /* needs to be updated to ipv4 coap endpoint */
+  memset(&dst, 0, sizeof(session_t));
+  dst.size = sizeof(dst.addr);
+  /* setup all address info here... should be done to connect */
+
+  /* create new contet with app-data */
+  dtls_context = dtls_new_context(&coap_ipv4_fd);
+  if (!dtls_context) {
+    PRINTF("DTLS: cannot create context\n");
+    exit(-1);
+  }
+  dtls_set_handler(dtls_context, &cb);
+  dtls_connect(dtls_context, &dst);
+#endif
+
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -273,4 +310,103 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     }
   }
 }
+/* DTLS */
+#if WITH_DTLS
+
+/* This is input coming from the DTLS code - e.g. de-crypted input from
+   the other side - peer */
+static int
+input_from_peer(struct dtls_context_t *ctx,
+	       session_t *session, uint8 *data, size_t len) {
+  size_t i;
+  printf("received data:");
+  for (i = 0; i < len; i++)
+    printf("%c", data[i]);
+  printf("\n");
+
+  /* Send this into coap-input */
+  memcpy(coap_databuf(), data, len);
+  coap_buf_len = len;
+  coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
+
+  return 0;
+}
+
+/* This is output from the DTLS code to be sent to peer (encrypted) */
+static int
+output_to_peer(struct dtls_context_t *ctx,
+               session_t *session, uint8 *data, size_t len) {
+
+  int fd = *(int *)dtls_get_app_data(ctx);
+  return sendto(fd, data, len, MSG_DONTWAIT,
+		&session->addr.sa, session->size);
+}
+
+
+/* The PSK information for DTLS */
+#define PSK_ID_MAXLEN 256
+#define PSK_MAXLEN 256
+static unsigned char psk_id[PSK_ID_MAXLEN];
+static size_t psk_id_length = 0;
+static unsigned char psk_key[PSK_MAXLEN];
+static size_t psk_key_length = 0;
+
+/* This function is the "key store" for tinyDTLS. It is called to
+ * retrieve a key for the given identity within this particular
+ * session. */
+static int
+get_psk_info(struct dtls_context_t *ctx,
+             const session_t *session,
+             dtls_credentials_type_t type,
+             const unsigned char *id, size_t id_len,
+             unsigned char *result, size_t result_length) {
+
+  switch (type) {
+  case DTLS_PSK_IDENTITY:
+    if (id_len) {
+      dtls_debug("got psk_identity_hint: '%.*s'\n", id_len, id);
+    }
+
+    if (result_length < psk_id_length) {
+      dtls_warn("cannot set psk_identity -- buffer too small\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    memcpy(result, psk_id, psk_id_length);
+    return psk_id_length;
+  case DTLS_PSK_KEY:
+    if (id_len != psk_id_length || memcmp(psk_id, id, id_len) != 0) {
+      dtls_warn("PSK for unknown id requested, exiting\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_ILLEGAL_PARAMETER);
+    } else if (result_length < psk_key_length) {
+      dtls_warn("cannot set psk -- buffer too small\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    memcpy(result, psk_key, psk_key_length);
+    return psk_key_length;
+  default:
+    dtls_warn("unsupported request type: %d\n", type);
+  }
+
+  return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+}
+
+
+static dtls_handler_t cb = {
+  .write = output_to_peer,
+  .read  = input_from_peer,
+  .event = NULL,
+#ifdef DTLS_PSK
+  .get_psk_info = get_psk_info,
+#endif /* DTLS_PSK */
+#ifdef DTLS_ECC
+  /* .get_ecdsa_key = get_ecdsa_key, */
+  /* .verify_ecdsa_key = verify_ecdsa_key */
+#endif /* DTLS_ECC */
+};
+
+#endif /* WITH_DTLS */
+
+
 /*---------------------------------------------------------------------------*/
