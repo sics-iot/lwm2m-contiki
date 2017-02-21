@@ -389,7 +389,7 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     memset(&session, 0, sizeof(session));
     memcpy(&session.addr, &ep->addr, ep->addr_len);
     session.size = ep->addr_len;
-    res = dtls_write(dtls_context, &session, data, len);
+    res = dtls_write(dtls_context, &session, (uint8_t *)data, len);
     return;
   }
   if(coap_ipv4_fd >= 0) {
@@ -424,6 +424,8 @@ input_from_peer(struct dtls_context_t *ctx,
                 session_t *session, uint8 *data, size_t len)
 {
   size_t i;
+  dtls_peer_t *peer;
+
   printf("received data:");
   for (i = 0; i < len; i++)
     printf("%c", data[i]);
@@ -435,6 +437,14 @@ input_from_peer(struct dtls_context_t *ctx,
   /* Send this into coap-input */
   memmove(coap_databuf(), data, len);
   coap_buf_len = len;
+
+  peer = dtls_get_peer(ctx, session);
+  /* If we have a peer then ensure that the endpoint is tagged as secure */
+  if(peer) {
+    coap_endpoint_t *ep;
+    ep = (coap_endpoint_t *) coap_src_endpoint();
+    ep->secure = 1;
+  }
 
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 
