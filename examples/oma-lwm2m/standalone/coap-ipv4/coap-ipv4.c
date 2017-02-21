@@ -62,8 +62,6 @@
 #include "tinydtls.h"
 #include "dtls.h"
 #include "dtls_debug.h"
-
-static dtls_handler_t cb;
 #endif /* WITH_DTLS */
 
 #define BUFSIZE 1280
@@ -81,8 +79,7 @@ static uint16_t coap_buf_len;
 
 #if WITH_DTLS
 static dtls_context_t *dtls_context = NULL;
-static dtls_context_t *orig_dtls_context = NULL;
-
+static dtls_handler_t cb;
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -101,9 +98,19 @@ coap_endpoint_is_secure(const coap_endpoint_t *ep)
 int
 coap_endpoint_is_connected(const coap_endpoint_t *ep)
 {
-  /* ... */
   if(ep->secure) {
-    /* only if handshake is done! */
+#if WITH_DTLS
+    session_t session;
+    dtls_peer_t *peer;
+    memset(&session, 0, sizeof(session));
+    memcpy(&session.addr, &ep->addr, ep->addr_len);
+    session.size = ep->addr_len;
+    peer = dtls_get_peer(dtls_context, &session);
+    if(peer != NULL) {
+      /* only if handshake is done! */
+      return dtls_peer_is_connected(peer);
+    }
+#endif /* WITH_DTLS */
     return 0;
   }
   /* Assume that the UDP socket is already up... */
@@ -372,7 +379,8 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
    the other side - peer */
 static int
 input_from_peer(struct dtls_context_t *ctx,
-	       session_t *session, uint8 *data, size_t len) {
+                session_t *session, uint8 *data, size_t len)
+{
   size_t i;
   printf("received data:");
   for (i = 0; i < len; i++)
@@ -380,7 +388,7 @@ input_from_peer(struct dtls_context_t *ctx,
   printf("\n");
 
   /* Send this into coap-input */
-  memcpy(coap_databuf(), data, len);
+  memmove(coap_databuf(), data, len);
   coap_buf_len = len;
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 
@@ -390,7 +398,8 @@ input_from_peer(struct dtls_context_t *ctx,
 /* This is output from the DTLS code to be sent to peer (encrypted) */
 static int
 output_to_peer(struct dtls_context_t *ctx,
-               session_t *session, uint8 *data, size_t len) {
+               session_t *session, uint8 *data, size_t len)
+{
   int fd = *(int *)dtls_get_app_data(ctx);
   printf("output_to_peer len:%d %d (s-size: %d)\n", (int) len, fd,
          session->size);
@@ -415,7 +424,8 @@ get_psk_info(struct dtls_context_t *ctx,
              const session_t *session,
              dtls_credentials_type_t type,
              const unsigned char *id, size_t id_len,
-             unsigned char *result, size_t result_length) {
+             unsigned char *result, size_t result_length)
+{
 
   switch (type) {
   case DTLS_PSK_IDENTITY:
