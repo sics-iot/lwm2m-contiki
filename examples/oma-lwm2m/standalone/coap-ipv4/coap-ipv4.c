@@ -92,6 +92,53 @@ coap_src_endpoint(void)
   return &last_source;
 }
 /*---------------------------------------------------------------------------*/
+int
+coap_endpoint_is_secure(const coap_endpoint_t *ep)
+{
+  return ep->secure;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_is_connected(const coap_endpoint_t *ep)
+{
+  /* ... */
+  if(ep->secure) {
+    /* only if handshake is done! */
+    return 0;
+  }
+  /* Assume that the UDP socket is already up... */
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_connect(coap_endpoint_t *ep)
+{
+  if(ep->secure == 0) {
+    return 1;
+  }
+#if WITH_DTLS
+  session_t dst; /* needs to be updated to ipv4 coap endpoint */
+  memset(&dst, 0, sizeof(session_t));
+
+  memcpy(&dst.addr, &ep->addr, sizeof(ep->addr));
+
+  PRINTF("DTLS EP:");
+  PRINTEP(ep);
+  PRINTF("\n");
+
+  dst.size = ep->addr_len;
+  /* setup all address info here... should be done to connect */
+
+  dtls_connect(dtls_context, &dst);
+#endif
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+void
+coap_endpoint_disconnect(coap_endpoint_t *ep)
+{
+}
+/*---------------------------------------------------------------------------*/
 void
 coap_endpoint_copy(coap_endpoint_t *destination, const coap_endpoint_t *from)
 {
@@ -148,7 +195,7 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
   }
   host[hlen] = 0;
 
-  port = COAP_DEFAULT_PORT;
+  port = secure == 0 ? COAP_DEFAULT_PORT : COAP_DEFAULT_SECURE_PORT;
   if(text[i] == ':') {
     /* Parse IPv4 endpoint port */
     port = atoi(&text[i + 1]);
@@ -249,6 +296,9 @@ coap_transport_init(void)
 {
   static struct sockaddr_in server;
 
+
+  dtls_set_log_level(7);
+
   coap_ipv4_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(coap_ipv4_fd == -1) {
     fprintf(stderr, "Could not create CoAP UDP socket\n");
@@ -271,19 +321,14 @@ coap_transport_init(void)
   select_set_callback(coap_ipv4_fd, &udp_callback);
 
 #if WITH_DTLS
-  session_t dst; /* needs to be updated to ipv4 coap endpoint */
-  memset(&dst, 0, sizeof(session_t));
-  dst.size = sizeof(dst.addr);
-  /* setup all address info here... should be done to connect */
-
   /* create new contet with app-data */
   dtls_context = dtls_new_context(&coap_ipv4_fd);
   if (!dtls_context) {
     PRINTF("DTLS: cannot create context\n");
     exit(-1);
   }
+
   dtls_set_handler(dtls_context, &cb);
-  dtls_connect(dtls_context, &dst);
 #endif
 
 }
@@ -291,6 +336,10 @@ coap_transport_init(void)
 void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
 {
+  if(coap_endpoint_is_connected(ep)) {
+    PRINTF("CoAP endpoint not connected\n");
+    return;
+  }
   if(coap_ipv4_fd >= 0) {
     if(sendto(coap_ipv4_fd, data, len, 0,
               (struct sockaddr *)&ep->addr, ep->addr_len) < 1) {
@@ -339,8 +388,9 @@ input_from_peer(struct dtls_context_t *ctx,
 static int
 output_to_peer(struct dtls_context_t *ctx,
                session_t *session, uint8 *data, size_t len) {
-
   int fd = *(int *)dtls_get_app_data(ctx);
+  printf("output_to_peer len:%d %d (s-size: %d)\n", (int) len, fd,
+         session->size);
   return sendto(fd, data, len, MSG_DONTWAIT,
 		&session->addr.sa, session->size);
 }

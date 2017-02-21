@@ -62,7 +62,7 @@ callback(ntimer_t *timer)
 /*---------------------------------------------------------------------------*/
 #ifndef LWM2M_DEFAULT_RD_SERVER
 /* Default to leshan.eclipse.org */
-#define LWM2M_DEFAULT_RD_SERVER "5.39.83.206"
+#define LWM2M_DEFAULT_RD_SERVER "coaps://5.39.83.206"
 #endif /* LWM2M_DEFAULT_RD_SERVER */
 /*---------------------------------------------------------------------------*/
 void

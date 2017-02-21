@@ -344,7 +344,11 @@ periodic_process(ntimer_t *timer)
   switch(rd_state) {
   case INIT:
     PRINTF("RD Client started with endpoint '%s' and client lifetime %d\n", session_info.ep, session_info.lifetime);
-    rd_state = WAIT_NETWORK;
+    if(coap_endpoint_connect(&session_info.server_ep)) {
+      rd_state = WAIT_NETWORK;
+    } else {
+      PRINTF("Failed to connect... trying again...\n");
+    }
     break;
   case WAIT_NETWORK:
     if(now > wait_until_network_check) {
