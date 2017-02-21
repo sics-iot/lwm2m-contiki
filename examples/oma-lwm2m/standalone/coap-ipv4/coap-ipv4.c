@@ -122,7 +122,7 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
       /* only if handshake is done! */
       PRINTF("peer state for ");
       PRINTEP(ep);
-      PRINTF(" is %d\n", peer->state);
+      PRINTF(" is %d %d\n", peer->state, dtls_peer_is_connected(peer));
       return dtls_peer_is_connected(peer);
     } else {
       PRINTF("Did not find peer ");
@@ -371,8 +371,6 @@ coap_transport_init(void)
   memcpy(psk_key, PSK_DEFAULT_KEY, psk_key_length);
 #endif /* DTLS_PSK */
 
-
-
   dtls_set_handler(dtls_context, &cb);
 #endif
 
@@ -381,8 +379,17 @@ coap_transport_init(void)
 void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
 {
-  if(coap_endpoint_is_connected(ep)) {
+  if(!coap_endpoint_is_connected(ep)) {
     PRINTF("CoAP endpoint not connected\n");
+    return;
+  }
+  if(coap_endpoint_is_secure(ep)) {
+    session_t session;
+    int res;
+    memset(&session, 0, sizeof(session));
+    memcpy(&session.addr, &ep->addr, ep->addr_len);
+    session.size = ep->addr_len;
+    res = dtls_write(dtls_context, &session, data, len);
     return;
   }
   if(coap_ipv4_fd >= 0) {
@@ -420,11 +427,15 @@ input_from_peer(struct dtls_context_t *ctx,
   printf("received data:");
   for (i = 0; i < len; i++)
     printf("%c", data[i]);
+  printf("\nHex:");
+  for (i = 0; i < len; i++)
+    printf("%02x", data[i]);
   printf("\n");
 
   /* Send this into coap-input */
   memmove(coap_databuf(), data, len);
   coap_buf_len = len;
+
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 
   return 0;
