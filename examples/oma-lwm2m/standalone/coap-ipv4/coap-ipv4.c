@@ -112,12 +112,8 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
 {
   if(ep->secure) {
 #if WITH_DTLS
-    session_t session;
     dtls_peer_t *peer;
-    memset(&session, 0, sizeof(session));
-    memcpy(&session.addr, &ep->addr, ep->addr_len);
-    session.size = ep->addr_len;
-    peer = dtls_get_peer(dtls_context, &session);
+    peer = dtls_get_peer(dtls_context, ep);
     if(peer != NULL) {
       /* only if handshake is done! */
       PRINTF("peer state for ");
@@ -143,19 +139,13 @@ coap_endpoint_connect(coap_endpoint_t *ep)
     return 1;
   }
 #if WITH_DTLS
-  session_t dst; /* needs to be updated to ipv4 coap endpoint */
-  memset(&dst, 0, sizeof(session_t));
-
-  memcpy(&dst.addr, &ep->addr, sizeof(ep->addr));
-
   PRINTF("DTLS EP:");
   PRINTEP(ep);
-  PRINTF(" len:%d\n", ep->addr_len);
+  PRINTF(" len:%d\n", ep->size);
 
-  dst.size = ep->addr_len;
   /* setup all address info here... should be done to connect */
 
-  dtls_connect(dtls_context, &dst);
+  dtls_connect(dtls_context, ep);
 #endif
   return 1;
 }
@@ -164,11 +154,7 @@ void
 coap_endpoint_disconnect(coap_endpoint_t *ep)
 {
 #if WITH_DTLS
-  session_t session;
-  memset(&session, 0, sizeof(session));
-  memcpy(&session.addr, &ep->addr, ep->addr_len);
-  session.size = ep->addr_len;
-  dtls_close(dtls_context, &session);
+  dtls_close(dtls_context, ep);
 #endif /* WITH_DTLS */
 }
 /*---------------------------------------------------------------------------*/
@@ -238,7 +224,7 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 
   ep->addr.sin_family = AF_INET;
   ep->addr.sin_port = htons(port);
-  ep->addr_len = sizeof(ep->addr);
+  ep->size = sizeof(ep->addr);
   ep->secure = secure;
   if(inet_aton(host, &ep->addr.sin_addr) == 0) {
     /* Failed to parse the address */
@@ -273,11 +259,6 @@ static void
 coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 {
   int len;
-#if WITH_DTLS
-  session_t session;
-  memset(&session, 0, sizeof(session_t));
-  session.size = sizeof(session.addr);
-#endif /* WITH_DTLS */
 
   if(coap_ipv4_fd < 0) {
     return;
@@ -286,9 +267,10 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
     return;
   }
 
-  last_source.addr_len = sizeof(last_source.addr);
+  memset(&last_source, 0, sizeof(last_source));
+  last_source.size = sizeof(last_source.addr);
   len = recvfrom(coap_ipv4_fd, coap_databuf(), BUFSIZE, 0,
-                 (struct sockaddr *)&last_source.addr, &last_source.addr_len);
+                 (struct sockaddr *)&last_source.addr, &last_source.size);
   if(len == -1) {
     if(errno == EAGAIN) {
       return;
@@ -314,10 +296,8 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 
 #if WITH_DTLS
   /* DTLS receive??? */
-  memcpy(&session.addr, &last_source, last_source.addr_len);
-  session.size = last_source.addr_len;
-  PRINTF("Addr size:%d\n", last_source.addr_len);
-  dtls_handle_message(dtls_context, &session, coap_databuf(), coap_datalen());
+  last_source.secure = 1;
+  dtls_handle_message(dtls_context, &last_source, coap_databuf(), coap_datalen());
 #else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 #endif
@@ -384,17 +364,12 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     return;
   }
   if(coap_endpoint_is_secure(ep)) {
-    session_t session;
-    int res;
-    memset(&session, 0, sizeof(session));
-    memcpy(&session.addr, &ep->addr, ep->addr_len);
-    session.size = ep->addr_len;
-    res = dtls_write(dtls_context, &session, (uint8_t *)data, len);
+    dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, len);
     return;
   }
   if(coap_ipv4_fd >= 0) {
     if(sendto(coap_ipv4_fd, data, len, 0,
-              (struct sockaddr *)&ep->addr, ep->addr_len) < 1) {
+              (struct sockaddr *)&ep->addr, ep->size) < 1) {
       PRINTF("failed to send to ");
       PRINTEP(ep);
       PRINTF(" %u bytes: %s\n", len, strerror(errno));
@@ -441,12 +416,10 @@ input_from_peer(struct dtls_context_t *ctx,
   peer = dtls_get_peer(ctx, session);
   /* If we have a peer then ensure that the endpoint is tagged as secure */
   if(peer) {
-    coap_endpoint_t *ep;
-    ep = (coap_endpoint_t *) coap_src_endpoint();
-    ep->secure = 1;
+    session->secure = 1;
   }
 
-  coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
+  coap_receive(session, coap_databuf(), coap_datalen());
 
   return 0;
 }
@@ -457,12 +430,11 @@ output_to_peer(struct dtls_context_t *ctx,
                session_t *session, uint8 *data, size_t len)
 {
   int fd = *(int *)dtls_get_app_data(ctx);
-  printf("output_to_peer len:%d %d (s-size: %d)\n", (int) len, fd,
+  printf("output_to_peer len:%d %d (s-size: %d)\n", (int)len, fd,
          session->size);
   return sendto(fd, data, len, MSG_DONTWAIT,
-		&session->addr.sa, session->size);
+		(struct sockaddr *)&session->addr, session->size);
 }
-
 
 
 /* This function is the "key store" for tinyDTLS. It is called to

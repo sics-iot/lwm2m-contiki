@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, SICS, Swedish ICT AB.
+ * Copyright (c) 2017, SICS, Swedish ICT AB.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,23 +29,17 @@
 
 /**
  * \file
- *         A native IPv4 transport for CoAP
+ *         tinyDTLS support for LWM2M standalone
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef COAP_IPV4_H_
-#define COAP_IPV4_H_
+#ifndef DTLS_SUPPORT_CONF_H_
+#define DTLS_SUPPORT_CONF_H_
 
-#include <netinet/in.h>
+#include "er-coap-endpoint.h"
 
-#define COAP_ENDPOINT_CUSTOM 1
+typedef coap_endpoint_t session_t;
 
-typedef struct {
-  struct sockaddr_in addr;
-  unsigned int size;
-  int secure;
-} coap_endpoint_t;
-
-#endif /* COAP_IPV4_H_ */
+#endif /* DTLS_SUPPORT_CONF_H_ */

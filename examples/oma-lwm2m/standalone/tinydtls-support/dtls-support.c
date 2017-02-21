@@ -35,14 +35,11 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include <stdlib.h>
-#include "dtls-support.h"
+#include "tinydtls.h"
 #include "dtls_debug.h"
 #include "dtls_config.h"
 #include "dtls_time.h"
-#ifdef HAVE_ASSERT_H
-#include <assert.h>
-#endif
+#include <stdlib.h>
 
 #include <arpa/inet.h>
 #include <stdarg.h>
@@ -95,41 +92,33 @@ dsrv_print_addr(const session_t *addr, char *buf, size_t len) {
   in_port_t port;
   char *p = buf;
 
-  switch (addr->addr.sa.sa_family) {
+  switch(addr->addr.sin_family) {
   case AF_INET:
-    if (len < INET_ADDRSTRLEN)
+    if(len < INET_ADDRSTRLEN) {
       return 0;
+    }
 
-    addrptr = &addr->addr.sin.sin_addr;
-    port = ntohs(addr->addr.sin.sin_port);
-    break;
-  case AF_INET6:
-    if (len < INET6_ADDRSTRLEN + 2)
-      return 0;
-
-    *p++ = '[';
-
-    addrptr = &addr->addr.sin6.sin6_addr;
-    port = ntohs(addr->addr.sin6.sin6_port);
-
+    addrptr = &addr->addr.sin_addr;
+    port = ntohs(addr->addr.sin_port);
     break;
   default:
     memcpy(buf, "(unknown address type)", min(22, len));
     return min(22, len);
   }
 
-  if (inet_ntop(addr->addr.sa.sa_family, addrptr, p, len) == 0) {
+  if(inet_ntop(addr->addr.sin_family, addrptr, p, len) == 0) {
     perror("dsrv_print_addr");
     return 0;
   }
 
   p += strnlen(p, len);
 
-  if (addr->addr.sa.sa_family == AF_INET6) {
-    if (p < buf + len) {
+  if(addr->addr.sin_family == AF_INET6) {
+    if(p < buf + len) {
       *p++ = ']';
-    } else
+    } else {
       return 0;
+    }
   }
 
   p += snprintf(p, buf + len - p + 1, ":%d", port);
@@ -271,45 +260,37 @@ dtls_set_retransmit_timer(dtls_context_t *ctx, unsigned int timeout)
 /*---------------------------------------------------------------------------*/
 /* Implementation of session functions */
 void
-dtls_session_init(session_t *sess)
+dtls_session_init(session_t *session)
 {
-  assert(sess);
-  memset(sess, 0, sizeof(session_t));
-  sess->size = sizeof(sess->addr);
+  memset(session, 0, sizeof(session_t));
+  session->size = sizeof(session->addr);
 }
 /*---------------------------------------------------------------------------*/
 int
 dtls_session_equals(const session_t *a, const session_t *b)
 {
-  assert(a); assert(b);
-  printf("SESSION_EQUALS: A:%d,%d,%d B:%d,%d,%d\n", a->ifindex, a->size, a->addr.sa.sa_family,
-         b->ifindex, b->size, b->addr.sa.sa_family);
+  /* printf("SESSION_EQUALS: A:%d,%d B:%d,%d\n", */
+  /*        a->size, a->addr.sin_family, */
+  /*        b->size, b->addr.sin_family); */
 
-  if (a->ifindex != b->ifindex ||
-      a->size != b->size || a->addr.sa.sa_family != b->addr.sa.sa_family)
+  if(a->size != b->size || a->addr.sin_family != b->addr.sin_family) {
     return 0;
-
-  /* need to compare only relevant parts of sockaddr_in6 */
-  switch (a->addr.sa.sa_family) {
-  case AF_INET:
-    return
-     a->addr.sin.sin_port == b->addr.sin.sin_port &&
-     memcmp(&a->addr.sin.sin_addr, &b->addr.sin.sin_addr,
-	    sizeof(struct in_addr)) == 0;
-  case AF_INET6:
-    return a->addr.sin6.sin6_port == b->addr.sin6.sin6_port &&
-      memcmp(&a->addr.sin6.sin6_addr, &b->addr.sin6.sin6_addr,
-             sizeof(struct in6_addr)) == 0;
-  default: /* fall through and signal error */
-    ;
   }
-  return 0;
+
+  /* need to compare only relevant parts of sockaddr */
+  switch(a->addr.sin_family) {
+  case AF_INET:
+    return a->addr.sin_port == b->addr.sin_port &&
+      memcmp(&a->addr.sin_addr, &b->addr.sin_addr,
+             sizeof(struct in_addr)) == 0;
+  default:
+    return 0;
+  }
 }
 /*---------------------------------------------------------------------------*/
 /* The init */
 void
 dtls_support_init(void)
 {
-  /* setup whatever */
 }
 /*---------------------------------------------------------------------------*/
