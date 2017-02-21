@@ -38,7 +38,10 @@ $(TARGETCDIR)/oma-lwm2m/%: $(CONTIKI)/apps/oma-lwm2m/% | $(TARGETCDIRS)
 $(TARGETCDIR)/ipso-objects/%: $(CONTIKI)/apps/ipso-objects/% | $(TARGETCDIRS)
 	@$(CP) -av $^ $@
 
-$(TARGETCDIR)/tinydtls/%: $(CONTIKI)/lib/tinydtls/% | $(TARGETCDIRS)
+$(TARGETCDIR)/tinydtls/%.c: $(CONTIKI)/lib/tinydtls/%.c | $(TARGETCDIRS)
+	@$(CP) -av $^ $@
+
+$(TARGETCDIR)/tinydtls/%.h: $(CONTIKI)/lib/tinydtls/%.h | $(TARGETCDIRS)
 	@$(CP) -av $^ $@
 
 $(OBJECT_FILES): $(TARGET_FILES)
