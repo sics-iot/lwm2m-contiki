@@ -108,6 +108,9 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
     peer = dtls_get_peer(dtls_context, &session);
     if(peer != NULL) {
       /* only if handshake is done! */
+      PRINTF("peer state for ");
+      PRINTEP(ep);
+      PRINTF(" is %d\n", peer->state);
       return dtls_peer_is_connected(peer);
     }
 #endif /* WITH_DTLS */
@@ -144,6 +147,13 @@ coap_endpoint_connect(coap_endpoint_t *ep)
 void
 coap_endpoint_disconnect(coap_endpoint_t *ep)
 {
+#if WITH_DTLS
+  session_t session;
+  memset(&session, 0, sizeof(session));
+  memcpy(&session.addr, &ep->addr, ep->addr_len);
+  session.size = ep->addr_len;
+  dtls_close(dtls_context, &session);
+#endif /* WITH_DTLS */
 }
 /*---------------------------------------------------------------------------*/
 void
