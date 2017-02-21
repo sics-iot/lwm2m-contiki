@@ -78,8 +78,20 @@ static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
 
 #if WITH_DTLS
-static dtls_context_t *dtls_context = NULL;
+#define PSK_DEFAULT_IDENTITY "Client_identity"
+#define PSK_DEFAULT_KEY      "secretPSK"
+
 static dtls_handler_t cb;
+static dtls_context_t *dtls_context = NULL;
+static dtls_context_t *orig_dtls_context = NULL;
+
+/* The PSK information for DTLS */
+#define PSK_ID_MAXLEN 256
+#define PSK_MAXLEN 256
+static unsigned char psk_id[PSK_ID_MAXLEN];
+static size_t psk_id_length = 0;
+static unsigned char psk_key[PSK_MAXLEN];
+static size_t psk_key_length = 0;
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -112,6 +124,10 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
       PRINTEP(ep);
       PRINTF(" is %d\n", peer->state);
       return dtls_peer_is_connected(peer);
+    } else {
+      PRINTF("Did not find peer ");
+      PRINTEP(ep);
+      PRINTF("\n");
     }
 #endif /* WITH_DTLS */
     return 0;
@@ -134,7 +150,7 @@ coap_endpoint_connect(coap_endpoint_t *ep)
 
   PRINTF("DTLS EP:");
   PRINTEP(ep);
-  PRINTF("\n");
+  PRINTF(" len:%d\n", ep->addr_len);
 
   dst.size = ep->addr_len;
   /* setup all address info here... should be done to connect */
@@ -300,7 +316,7 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
   /* DTLS receive??? */
   memcpy(&session.addr, &last_source, last_source.addr_len);
   session.size = last_source.addr_len;
-
+  PRINTF("Addr size:%d\n", last_source.addr_len);
   dtls_handle_message(dtls_context, &session, coap_databuf(), coap_datalen());
 #else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
@@ -347,6 +363,15 @@ coap_transport_init(void)
     PRINTF("DTLS: cannot create context\n");
     exit(-1);
   }
+
+#ifdef DTLS_PSK
+  psk_id_length = strlen(PSK_DEFAULT_IDENTITY);
+  psk_key_length = strlen(PSK_DEFAULT_KEY);
+  memcpy(psk_id, PSK_DEFAULT_IDENTITY, psk_id_length);
+  memcpy(psk_key, PSK_DEFAULT_KEY, psk_key_length);
+#endif /* DTLS_PSK */
+
+
 
   dtls_set_handler(dtls_context, &cb);
 #endif
@@ -418,13 +443,6 @@ output_to_peer(struct dtls_context_t *ctx,
 }
 
 
-/* The PSK information for DTLS */
-#define PSK_ID_MAXLEN 256
-#define PSK_MAXLEN 256
-static unsigned char psk_id[PSK_ID_MAXLEN];
-static size_t psk_id_length = 0;
-static unsigned char psk_key[PSK_MAXLEN];
-static size_t psk_key_length = 0;
 
 /* This function is the "key store" for tinyDTLS. It is called to
  * retrieve a key for the given identity within this particular

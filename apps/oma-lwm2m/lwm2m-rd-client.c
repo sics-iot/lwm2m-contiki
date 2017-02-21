@@ -449,6 +449,11 @@ periodic_process(ntimer_t *timer)
     }
     break;
   case DO_REGISTRATION:
+    if(!coap_endpoint_is_connected(&session_info.server_ep)) {
+      /* Not connected... wait a bit... */
+      printf("Wait until connected... \n");
+      return;
+    }
     if(session_info.use_registration && !session_info.registered &&
        update_registration_server()) {
 

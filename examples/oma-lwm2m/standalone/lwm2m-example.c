@@ -118,7 +118,7 @@ start_application(int argc, char *argv[])
     lwm2m_rd_client_register_with_server(&server_ep);
 #endif
     lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("abcde");
+    lwm2m_rd_client_init("abcd");
   } else {
     fprintf(stderr, "No registration server specified.\n");
   }

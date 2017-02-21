@@ -282,6 +282,8 @@ int
 dtls_session_equals(const session_t *a, const session_t *b)
 {
   assert(a); assert(b);
+  printf("SESSION_EQUALS: A:%d,%d,%d B:%d,%d,%d\n", a->ifindex, a->size, a->addr.sa.sa_family,
+         b->ifindex, b->size, b->addr.sa.sa_family);
 
   if (a->ifindex != b->ifindex ||
       a->size != b->size || a->addr.sa.sa_family != b->addr.sa.sa_family)
