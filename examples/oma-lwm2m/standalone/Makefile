@@ -2,12 +2,22 @@ PROJECT = lwm2m-example
 
 all:	$(PROJECT)
 
-COREDIRS = sys lib
-APPSDIRS = er-coap oma-lwm2m ipso-objects
-TARGETCDIR = oma-lwm2m-src
-TARGETCDIRS = ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}
-SOURCEDIRS = . ${addprefix $(TARGETCDIR)/,. $(APPSDIRS)}
+TARGETCDIR   = oma-lwm2m-src
+COREDIRS     = sys lib
+SOURCEDIRS   = .
 SOURCE_FILES = posix-main.c posix-ntimer.c ipso-sensor-temp.c ipso-control-test.c
+APPSDIRS     = er-coap oma-lwm2m ipso-objects
+
+ifneq ($(MAKE_WITH_DTLS),)
+  CFLAGS += -DWITH_DTLS=1
+  TINYDTLS_DIRS = aes ecc sha2
+  APPSDIRS += tinydtls ${addprefix tinydtls/,$(TINYDTLS_DIRS)}
+  SOURCEDIRS += tinydtls-support
+  SOURCE_FILES += dtls-support.c
+endif
+
+TARGETCDIRS  += ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}
+SOURCEDIRS   += ${addprefix $(TARGETCDIR)/,. $(APPSDIRS)}
 
 CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
 

@@ -49,13 +49,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#if WITH_DTLS
-#include "dtls.h"
-#include "dtls_debug.h"
-
-static dtls_handler_t cb;
-#endif
-
 #define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -64,6 +57,14 @@ static dtls_handler_t cb;
 #define PRINTF(...)
 #define PRINTEP(ep)
 #endif
+
+#if WITH_DTLS
+#include "tinydtls.h"
+#include "dtls.h"
+#include "dtls_debug.h"
+
+static dtls_handler_t cb;
+#endif /* WITH_DTLS */
 
 #define BUFSIZE 1280
 
@@ -192,9 +193,11 @@ static void
 coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 {
   int len;
+#if WITH_DTLS
   session_t session;
   memset(&session, 0, sizeof(session_t));
   session.size = sizeof(session.addr);
+#endif /* WITH_DTLS */
 
   if(coap_ipv4_fd < 0) {
     return;
