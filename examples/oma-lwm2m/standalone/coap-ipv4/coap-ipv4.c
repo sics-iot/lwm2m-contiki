@@ -281,6 +281,9 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 
 #if WITH_DTLS
   /* DTLS receive??? */
+  memcpy(&session.addr, &last_source, last_source.addr_len);
+  session.size = last_source.addr_len;
+
   dtls_handle_message(dtls_context, &session, coap_databuf(), coap_datalen());
 #else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
@@ -297,7 +300,7 @@ coap_transport_init(void)
   static struct sockaddr_in server;
 
 
-  dtls_set_log_level(7);
+  dtls_set_log_level(8);
 
   coap_ipv4_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(coap_ipv4_fd == -1) {
