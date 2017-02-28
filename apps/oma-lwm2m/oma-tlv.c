@@ -156,7 +156,9 @@ oma_tlv_write(const oma_tlv_t *tlv, uint8_t *buffer, size_t len)
   }
 
   /* finally add the value */
-  memcpy(&buffer[pos], tlv->value, tlv->length);
+  if(tlv->value != NULL && tlv->length > 0) {
+    memcpy(&buffer[pos], tlv->value, tlv->length);
+  }
 
   if(DEBUG) {
     int i;
@@ -183,7 +185,7 @@ oma_tlv_get_int32(const oma_tlv_t *tlv)
 }
 /*---------------------------------------------------------------------------*/
 size_t
-oma_tlv_write_int32(int16_t id, int32_t value, uint8_t *buffer, size_t len)
+oma_tlv_write_int32(uint8_t type, int16_t id, int32_t value, uint8_t *buffer, size_t len)
 {
   oma_tlv_t tlv;
   size_t tlvlen = 0;
@@ -201,7 +203,7 @@ oma_tlv_write_int32(int16_t id, int32_t value, uint8_t *buffer, size_t len)
 
   /* export INT as TLV */
   PRINTF("len: %zu\n", tlvlen);
-  tlv.type = OMA_TLV_TYPE_RESOURCE;
+  tlv.type = type;
   tlv.length = tlvlen;
   tlv.value = &buf[3 - (tlvlen - 1)];
   tlv.id = id;
@@ -210,7 +212,7 @@ oma_tlv_write_int32(int16_t id, int32_t value, uint8_t *buffer, size_t len)
 /*---------------------------------------------------------------------------*/
 /* convert fixpoint 32-bit to a IEEE Float in the byte array*/
 size_t
-oma_tlv_write_float32(int16_t id, int32_t value, int bits,
+oma_tlv_write_float32(uint8_t type, int16_t id, int32_t value, int bits,
                       uint8_t *buffer, size_t len)
 {
   int i;
@@ -255,7 +257,7 @@ oma_tlv_write_float32(int16_t id, int32_t value, int bits,
 
   PRINTF("B=%02x%02x%02x%02x\n", b[0], b[1], b[2], b[3]);
   /* construct the TLV */
-  tlv.type = OMA_TLV_TYPE_RESOURCE;
+  tlv.type = type;
   tlv.length = 4;
   tlv.value = b;
   tlv.id = id;

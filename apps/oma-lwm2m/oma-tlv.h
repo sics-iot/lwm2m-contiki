@@ -79,10 +79,10 @@ size_t oma_tlv_write(const oma_tlv_t *tlv, uint8_t *buffer, size_t len);
 int32_t oma_tlv_get_int32(const oma_tlv_t *tlv);
 
 /* write a int as a TLV to the buffer */
-size_t oma_tlv_write_int32(int16_t id, int32_t value, uint8_t *buffer, size_t len);
+size_t oma_tlv_write_int32(uint8_t type, int16_t id, int32_t value, uint8_t *buffer, size_t len);
 
 /* write a float converted from fixpoint as a TLV to the buffer */
-size_t oma_tlv_write_float32(int16_t id, int32_t value, int bits, uint8_t *buffer, size_t len);
+size_t oma_tlv_write_float32(uint8_t type, int16_t id, int32_t value, int bits, uint8_t *buffer, size_t len);
 
 /* convert TLV with float32 to fixpoint */
 size_t oma_tlv_float32_to_fix(const oma_tlv_t *tlv, int32_t *value, int bits);

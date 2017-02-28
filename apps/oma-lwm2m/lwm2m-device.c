@@ -106,6 +106,7 @@ output_multi_i16(lwm2m_context_t *ctx, uint16_t *data, int count) {
   int i;
   size_t len;
   len = lwm2m_object_write_enter_ri(ctx);
+  PRINTF("LEN:%d\n");
   for(i = 0; i < count; i++) {
     len += lwm2m_object_write_int_ri(ctx, i, data[i]);
   }

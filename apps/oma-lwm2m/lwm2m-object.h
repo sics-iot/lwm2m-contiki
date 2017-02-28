@@ -142,6 +142,8 @@ typedef struct lwm2m_context {
   uint8_t *outbuf;
   size_t   outsize;
   unsigned outlen;
+  uint8_t  out_mark_pos_oi; /* mark pos for last object instance   */
+  uint8_t  out_mark_pos_ri; /* mark pos for last resource instance */
 
   uint8_t *inbuf;
   size_t  insize;
@@ -258,7 +260,10 @@ static inline size_t
 lwm2m_object_write_enter_ri(lwm2m_context_t *ctx)
 {
   if(ctx->writer->enter_resource_instance != NULL) {
-    return ctx->writer->enter_resource_instance(ctx);
+    size_t s;
+    s = ctx->writer->enter_resource_instance(ctx);
+    ctx->outlen += s;
+    return s;
   }
   return 0;
 }
@@ -267,7 +272,10 @@ static inline size_t
 lwm2m_object_write_exit_ri(lwm2m_context_t *ctx)
 {
   if(ctx->writer->exit_resource_instance != NULL) {
-    return ctx->writer->exit_resource_instance(ctx);
+    size_t s;
+    s = ctx->writer->exit_resource_instance(ctx);
+    ctx->outlen += s;
+    return s;
   }
   return 0;
 }
