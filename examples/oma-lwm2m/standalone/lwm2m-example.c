@@ -62,7 +62,11 @@ callback(ntimer_t *timer)
 /*---------------------------------------------------------------------------*/
 #ifndef LWM2M_DEFAULT_RD_SERVER
 /* Default to leshan.eclipse.org */
+#if WITH_DTLS
 #define LWM2M_DEFAULT_RD_SERVER "coaps://5.39.83.206"
+#else
+#define LWM2M_DEFAULT_RD_SERVER "coap://5.39.83.206"
+#endif
 #endif /* LWM2M_DEFAULT_RD_SERVER */
 /*---------------------------------------------------------------------------*/
 void
@@ -118,7 +122,7 @@ start_application(int argc, char *argv[])
     lwm2m_rd_client_register_with_server(&server_ep);
 #endif
     lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("abcd");
+    lwm2m_rd_client_init("abcde");
   } else {
     fprintf(stderr, "No registration server specified.\n");
   }

@@ -63,6 +63,9 @@
 static const uint16_t resources[] =
   {LWM2M_DEVICE_MANUFACTURER_ID, LWM2M_DEVICE_MODEL_NUMBER_ID,
    LWM2M_DEVICE_SERIAL_NUMBER_ID, LWM2M_DEVICE_FIRMWARE_VERSION_ID,
+   LWM2M_DEVICE_AVAILABLE_POWER_SOURCES, /* Multi-resource-instance */
+   LWM2M_DEVICE_POWER_SOURCE_VOLTAGE, /* Multi-resource-instance */
+   LWM2M_DEVICE_POWER_SOURCE_CURRENT, /* Multi-resource-instance */
    LWM2M_DEVICE_TYPE_ID, LWM2M_DEVICE_REBOOT_ID,
    LWM2M_DEVICE_TIME_ID, LWM2M_DEVICE_FACTORY_DEFAULT_ID,
   };
@@ -83,8 +86,47 @@ static const uint16_t resources[] =
 #define LWM2M_DEVICE_TYPE "Contiki LWM2M"
 #endif
 
+/* All three must be defined */
+#ifndef LWM2M_DEVICE_POWER_AVAILABLE
+#define LWM2M_DEVICE_POWER_AVAILABLE {1,5}
+#define LWM2M_DEVICE_POWER_VOLTAGE {2500,5000}
+#define LWM2M_DEVICE_POWER_CURRENT {500,1000}
+#endif
+
 static int32_t time_offset = 0;
 
+/* Interal battery and USB - just for test...*/
+static uint16_t power_avail[] = LWM2M_DEVICE_POWER_AVAILABLE;
+static uint16_t power_voltage[] = LWM2M_DEVICE_POWER_VOLTAGE;
+static uint16_t power_current[] = LWM2M_DEVICE_POWER_CURRENT;
+/*---------------------------------------------------------------------------*/
+
+static int
+output_multi_i16(lwm2m_context_t *ctx, uint16_t *data, int count) {
+  int i;
+  size_t len;
+  len = lwm2m_object_write_enter_ri(ctx);
+  for(i = 0; i < count; i++) {
+    len += lwm2m_object_write_int_ri(ctx, i, data[i]);
+  }
+  len += lwm2m_object_write_exit_ri(ctx);
+  return len;
+}
+
+/*---------------------------------------------------------------------------*/
+static int
+lwm2m_dim_callback(lwm2m_object_instance_t *object, uint16_t resource_id)
+{
+  switch(resource_id) {
+  case LWM2M_DEVICE_AVAILABLE_POWER_SOURCES:
+  case LWM2M_DEVICE_POWER_SOURCE_VOLTAGE:
+  case LWM2M_DEVICE_POWER_SOURCE_CURRENT:
+    return sizeof(power_avail) / sizeof(uint16_t);
+    break;
+  }
+  /* zero means that it is no dim parameter to send?? */
+  return 0;
+}
 /*---------------------------------------------------------------------------*/
 static int
 lwm2m_callback(lwm2m_object_instance_t *object,
@@ -118,6 +160,19 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         PRINTF("Reading time:%u\n", (unsigned int)
                (time_offset + ntimer_seconds()));
         lwm2m_object_write_int(ctx, time_offset + ntimer_seconds());
+        break;
+        /* Power Multi-resource case - just use array index as ID */
+      case LWM2M_DEVICE_AVAILABLE_POWER_SOURCES:
+        output_multi_i16(ctx, power_avail,
+                         sizeof(power_avail)/sizeof(uint16_t));
+        break;
+      case LWM2M_DEVICE_POWER_SOURCE_VOLTAGE:
+        output_multi_i16(ctx, power_voltage,
+                         sizeof(power_voltage)/sizeof(uint16_t));
+        break;
+      case LWM2M_DEVICE_POWER_SOURCE_CURRENT:
+        output_multi_i16(ctx, power_current,
+                         sizeof(power_current)/sizeof(uint16_t));
         break;
       default:
         PRINTF("Not found:%d\n", ctx->resource_id);
@@ -160,6 +215,7 @@ lwm2m_device_init(void)
   device.instance_id = 0;
   device.resource_ids = resources;
   device.resource_count = sizeof(resources) / sizeof(uint16_t);
+  device.resource_dim_callback = lwm2m_dim_callback;
   device.callback = lwm2m_callback;
 
   lwm2m_engine_add_object(&device);

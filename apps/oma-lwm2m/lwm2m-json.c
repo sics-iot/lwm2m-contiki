@@ -49,7 +49,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #else
@@ -154,7 +154,8 @@ static size_t
 init_write(lwm2m_context_t *ctx)
 {
   int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
-                     ctx->outsize - ctx->outlen, "{\"e\":[");
+                     ctx->outsize - ctx->outlen, "{\"bn\":\"/%u/%u/\",\"e\":[",
+                     ctx->object_id, ctx->object_instance_id);
   ctx->writer_flags = 0; /* set flags to zero */
   if((len < 0) || (len >= ctx->outsize)) {
     return 0;
@@ -174,14 +175,39 @@ end_write(lwm2m_context_t *ctx)
 }
 /*---------------------------------------------------------------------------*/
 static size_t
+enter_sub(lwm2m_context_t *ctx)
+{
+  /* set some flags in state */
+  PRINTF("Enter sub-resource rsc=%d\n", ctx->resource_id);
+  ctx->writer_flags |= WRITER_RESOURCE_INSTANCE;
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+exit_sub(lwm2m_context_t *ctx)
+{
+  /* clear out state info */
+  PRINTF("Exit sub-resource rsc=%d\n", ctx->resource_id);
+  ctx->writer_flags &= ~WRITER_RESOURCE_INSTANCE;
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
 write_boolean(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
               int value)
 {
   char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
-  int len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"bv\":%s}", sep, ctx->resource_id, value ? "true" : "false");
+  int len;
+  if(ctx->writer_flags & WRITER_RESOURCE_INSTANCE) {
+    len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u/%u\",\"bv\":%s}", sep, ctx->resource_id, ctx->resource_instance_id, value ? "true" : "false");
+  } else {
+    len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"bv\":%s}", sep, ctx->resource_id, value ? "true" : "false");
+  }
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
+  PRINTF("JSON: Write bool:%s\n", outbuf);
+
   ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
@@ -191,10 +217,17 @@ write_int(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
           int32_t value)
 {
   char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
-  int len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":%" PRId32 "}", sep, ctx->resource_id, value);
+  int len;
+  if(ctx->writer_flags & WRITER_RESOURCE_INSTANCE) {
+    len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u/%u\",\"v\":%" PRId32 "}", sep, ctx->resource_id, ctx->resource_instance_id, value);
+  } else {
+    len = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":%" PRId32 "}", sep, ctx->resource_id, value);
+  }
   if((len < 0) || (len >= outlen)) {
     return 0;
   }
+  PRINTF("JSON: Write int:%s\n", outbuf);
+
   ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
 }
@@ -206,7 +239,11 @@ write_float32fix(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   char *sep = (ctx->writer_flags & WRITER_OUTPUT_VALUE) ? "," : "";
   size_t len = 0;
   int res;
-  res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":", sep, ctx->resource_id);
+  if(ctx->writer_flags & WRITER_RESOURCE_INSTANCE) {
+    res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u/%u\",\"v\":", sep, ctx->resource_id, ctx->resource_instance_id);
+  } else {
+    res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"v\":", sep, ctx->resource_id);
+  }
   if(res <= 0 || res >= outlen) {
     return 0;
   }
@@ -236,8 +273,13 @@ write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   size_t len = 0;
   int res;
   PRINTF("{\"n\":\"%u\",\"sv\":\"", ctx->resource_id);
-  res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"sv\":\"", sep,
-                 ctx->resource_id);
+  if(ctx->writer_flags & WRITER_RESOURCE_INSTANCE) {
+    res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u/%u\",\"sv\":\"", sep,
+                   ctx->resource_id, ctx->resource_instance_id);
+  } else {
+    res = snprintf((char *)outbuf, outlen, "%s{\"n\":\"%u\",\"sv\":\"", sep,
+                   ctx->resource_id);
+  }
   if(res < 0 || res >= outlen) {
     return 0;
   }
@@ -273,6 +315,9 @@ write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   if((res < 0) || (res >= (outlen - len))) {
     return 0;
   }
+
+  PRINTF("JSON: Write string:%s\n", outbuf);
+
   len += res;
   ctx->writer_flags |= WRITER_OUTPUT_VALUE;
   return len;
@@ -281,6 +326,8 @@ write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 const lwm2m_writer_t lwm2m_json_writer = {
   init_write,
   end_write,
+  enter_sub,
+  exit_sub,
   write_int,
   write_string,
   write_float32fix,

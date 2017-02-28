@@ -214,6 +214,8 @@ write_string(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 const lwm2m_writer_t lwm2m_plain_text_writer = {
   init_write,
   end_write,
+  NULL, /* No support for sub resources here! */
+  NULL,
   write_int,
   write_string,
   write_float32fix,

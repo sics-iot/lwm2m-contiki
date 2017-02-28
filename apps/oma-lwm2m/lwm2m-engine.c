@@ -130,6 +130,7 @@ append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
 {
   int pos = 0;
   rd_data[pos++] = '<';
+  rd_data[pos++] = '/';
   pos += u16toa(&rd_data[pos], oid);
   if(iid > -1 && iid != 0xffff && size > pos) {
     rd_data[pos++] = '/';
@@ -420,9 +421,15 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
       while(last_rsc_pos < instance->resource_count) {
         if(ctx->level < 3 || ctx->resource_id == instance->resource_ids[last_rsc_pos]) {
           if(ctx->operation == LWM2M_OP_DISCOVER) {
+            int dim = 0;
             len = snprintf((char *) &ctx->outbuf[pos], size - pos,
                            pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
                            instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
+            if(instance->resource_dim_callback != NULL &&
+               (dim = instance->resource_dim_callback(instance, instance->resource_ids[last_rsc_pos])) > 0) {
+              len += snprintf((char *) &ctx->outbuf[pos + len],
+                              size - pos - len,  ";dim=%d", dim);
+            }
             if(len < 0 || len + pos >= size) {
               /* ok we trunkated here... */
               ctx->offset += pos;
@@ -941,7 +948,7 @@ void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
   char path[20]; /* 60000/60000/60000 */
   if(obj != NULL) {
     snprintf(path, 20, "%d/%d/%d", obj->object_id, obj->instance_id, resource);
-    printf("Notify PATH: %s\n", path);
+    PRINTF("Notify PATH: %s\n", path);
     coap_notify_observers_sub(NULL, path);
   }
 }

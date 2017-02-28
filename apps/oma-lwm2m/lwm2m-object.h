@@ -80,6 +80,13 @@
 #define LWM2M_DEVICE_FIRMWARE_VERSION_ID        3
 #define LWM2M_DEVICE_REBOOT_ID                  4
 #define LWM2M_DEVICE_FACTORY_DEFAULT_ID         5
+#define LWM2M_DEVICE_AVAILABLE_POWER_SOURCES    6
+/* These do have multiple instances */
+#define LWM2M_DEVICE_POWER_SOURCE_VOLTAGE       7
+#define LWM2M_DEVICE_POWER_SOURCE_CURRENT       8
+#define LWM2M_DEVICE_BATTERY_LEVEL              9
+
+#define LWM2M_DEVICE_ERROR_CODE                11
 #define LWM2M_DEVICE_TIME_ID                   13
 #define LWM2M_DEVICE_TYPE_ID                   17
 
@@ -110,8 +117,9 @@ typedef enum {
   LWM2M_OP_DELETE
 } lwm2m_operation_t;
 
-/* remember that we have already output a value */
-#define WRITER_OUTPUT_VALUE   1
+/* remember that we have already output a value - can be between two block's */
+#define WRITER_OUTPUT_VALUE      1
+#define WRITER_RESOURCE_INSTANCE 2
 
 typedef struct lwm2m_reader lwm2m_reader_t;
 typedef struct lwm2m_writer lwm2m_writer_t;
@@ -120,11 +128,12 @@ typedef struct lwm2m_context {
   uint16_t object_id;
   uint16_t object_instance_id;
   uint16_t resource_id;
-  uint8_t object_instance_index;
+  uint16_t resource_instance_id;
+
   uint8_t resource_index;
-  uint8_t level;
+  uint8_t resource_instance_index; /* for use when stepping to next sub-resource if having multiple */
+  uint8_t level;  /* 0/1/2/3 = 3 = resource */
   lwm2m_operation_t operation;
-  /* TODO - add uint16_t resource_instance_id */
 
   coap_packet_t *request;
   coap_packet_t *response;
@@ -153,6 +162,9 @@ typedef struct lwm2m_context {
 struct lwm2m_writer {
   size_t (* init_write)(lwm2m_context_t *ctx);
   size_t (* end_write)(lwm2m_context_t *ctx);
+  /* For sub-resources */
+  size_t (* enter_resource_instance)(lwm2m_context_t *ctx);
+  size_t (* exit_resource_instance)(lwm2m_context_t *ctx);
   size_t (* write_int)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value);
   size_t (* write_string)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,  const char *value, size_t strlen);
   size_t (* write_float32fix)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits);
@@ -234,6 +246,70 @@ static inline size_t
 lwm2m_object_write_boolean(lwm2m_context_t *ctx, int value)
 {
   size_t s;
+  s = ctx->writer->write_boolean(ctx, &ctx->outbuf[ctx->outlen],
+                                 ctx->outsize - ctx->outlen, value);
+  ctx->outlen += s;
+  return s;
+}
+
+/* Resource instance functions (_ri)*/
+
+static inline size_t
+lwm2m_object_write_enter_ri(lwm2m_context_t *ctx)
+{
+  if(ctx->writer->enter_resource_instance != NULL) {
+    return ctx->writer->enter_resource_instance(ctx);
+  }
+  return 0;
+}
+
+static inline size_t
+lwm2m_object_write_exit_ri(lwm2m_context_t *ctx)
+{
+  if(ctx->writer->exit_resource_instance != NULL) {
+    return ctx->writer->exit_resource_instance(ctx);
+  }
+  return 0;
+}
+
+static inline size_t
+lwm2m_object_write_int_ri(lwm2m_context_t *ctx, uint16_t id, int32_t value)
+{
+  size_t s;
+  ctx->resource_instance_id = id;
+  s = ctx->writer->write_int(ctx, &ctx->outbuf[ctx->outlen],
+                             ctx->outsize - ctx->outlen, value);
+  ctx->outlen += s;
+  return s;
+}
+
+static inline size_t
+lwm2m_object_write_string_ri(lwm2m_context_t *ctx, uint16_t id, const char *value, size_t strlen)
+{
+  size_t s;
+  ctx->resource_instance_id = id;
+  s = ctx->writer->write_string(ctx, &ctx->outbuf[ctx->outlen],
+                                ctx->outsize - ctx->outlen, value, strlen);
+  ctx->outlen += s;
+  return s;
+}
+
+static inline size_t
+lwm2m_object_write_float32fix_ri(lwm2m_context_t *ctx, uint16_t id, int32_t value, int bits)
+{
+  size_t s;
+  ctx->resource_instance_id = id;
+  s = ctx->writer->write_float32fix(ctx, &ctx->outbuf[ctx->outlen],
+                                    ctx->outsize - ctx->outlen, value, bits);
+  ctx->outlen += s;
+  return s;
+}
+
+static inline size_t
+lwm2m_object_write_boolean_ri(lwm2m_context_t *ctx, uint16_t id, int value)
+{
+  size_t s;
+  ctx->resource_instance_id = id;
   s = ctx->writer->write_boolean(ctx, &ctx->outbuf[ctx->outlen],
                                  ctx->outsize - ctx->outlen, value);
   ctx->outlen += s;

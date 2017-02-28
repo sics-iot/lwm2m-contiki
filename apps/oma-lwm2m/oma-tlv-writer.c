@@ -44,6 +44,13 @@
 
 #include "lwm2m-object.h"
 #include "oma-tlv.h"
+#define DEBUG 0
+#if DEBUG
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...)
+#endif
+
 /*---------------------------------------------------------------------------*/
 static size_t
 init_write(lwm2m_context_t *ctx)
@@ -91,9 +98,34 @@ write_string_tlv(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
   return oma_tlv_write(&tlv, outbuf, outlen);
 }
 /*---------------------------------------------------------------------------*/
+static size_t
+enter_sub(lwm2m_context_t *ctx)
+{
+  /* set some flags in state */
+  PRINTF("Enter sub-resource rsc=%d\n", ctx->resource_id);
+  ctx->writer_flags |= WRITER_RESOURCE_INSTANCE;
+  /* tlv.type = OMA_TLV_TYPE_MULTI_RESOURCE; */
+  /* tlv.length = 0; */
+  /* tlv.value = NULL; */
+  /* tlv.id = id; */
+  /* return oma_tlv_write(&tlv, buffer, len); */
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static size_t
+exit_sub(lwm2m_context_t *ctx)
+{
+  /* clear out state info */
+  PRINTF("Exit sub-resource rsc=%d\n", ctx->resource_id);
+  ctx->writer_flags &= ~WRITER_RESOURCE_INSTANCE;
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
 const lwm2m_writer_t oma_tlv_writer = {
   init_write,
   end_write,
+  enter_sub,
+  exit_sub,
   write_int_tlv,
   write_string_tlv,
   write_float32fix_tlv,

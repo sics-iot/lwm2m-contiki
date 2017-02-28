@@ -74,6 +74,9 @@ typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 typedef int
 (* lwm2m_object_instance_callback_t)(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
+typedef int
+(* lwm2m_resource_dim_callback_t)(lwm2m_object_instance_t *object,
+                                  uint16_t resource_id);
 
 #define LWM2M_OBJECT_INSTANCE_NONE 0xffff
 
@@ -86,6 +89,7 @@ struct lwm2m_object_instance {
   uint16_t resource_count;
   /* the callback for requests */
   lwm2m_object_instance_callback_t callback;
+  lwm2m_resource_dim_callback_t resource_dim_callback;
 };
 
 uint16_t lwm2m_engine_recommend_instance_id(uint16_t object_id);

@@ -312,8 +312,9 @@ coap_transport_init(void)
 {
   static struct sockaddr_in server;
 
-
+#if WITH_DTLS
   dtls_set_log_level(8);
+#endif
 
   coap_ipv4_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(coap_ipv4_fd == -1) {
@@ -363,10 +364,13 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     PRINTF("CoAP endpoint not connected\n");
     return;
   }
+
+#if WITH_DTLS
   if(coap_endpoint_is_secure(ep)) {
     dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, len);
     return;
   }
+#endif
   if(coap_ipv4_fd >= 0) {
     if(sendto(coap_ipv4_fd, data, len, 0,
               (struct sockaddr *)&ep->addr, ep->size) < 1) {
