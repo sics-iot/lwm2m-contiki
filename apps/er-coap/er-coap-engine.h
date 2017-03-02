@@ -46,11 +46,16 @@
 #include "er-coap-observe-client.h"
 #include "er-coap-transport.h"
 
-typedef int (*coap_handler_callback_t)(coap_packet_t *request,
-                                       coap_packet_t *response,
-                                       uint8_t *buffer,
-                                       uint16_t buffer_size,
-                                       int32_t *offset);
+typedef enum {
+  COAP_HANDLER_STATUS_CONTINUE,
+  COAP_HANDLER_STATUS_PROCESSED
+} coap_handler_status_t;
+
+typedef coap_handler_status_t
+(* coap_handler_callback_t)(coap_packet_t *request,
+                            coap_packet_t *response,
+                            uint8_t *buffer, uint16_t buffer_size,
+                            int32_t *offset);
 
 typedef struct coap_handler coap_handler_t;
 
@@ -70,9 +75,11 @@ void coap_init_engine(void);
 int coap_receive(const coap_endpoint_t *src,
                  uint8_t *payload, uint16_t payload_length);
 
-int er_coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
-                          uint8_t *buffer, uint16_t buffer_size,
-                          int32_t *offset);
+coap_handler_status_t er_coap_call_handlers(coap_packet_t *request,
+                                            coap_packet_t *response,
+                                            uint8_t *buffer,
+                                            uint16_t buffer_size,
+                                            int32_t *offset);
 
 /*---------------------------------------------------------------------------*/
 

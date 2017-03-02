@@ -98,10 +98,11 @@ void lwm2m_security_init(void);
 void lwm2m_server_init(void);
 static lwm2m_object_instance_t *lwm2m_engine_get_object_instance(const lwm2m_context_t *context);
 
-static int lwm2m_handler_callback(coap_packet_t *request,
-                                  coap_packet_t *response,
-                                  uint8_t *buffer, uint16_t buffer_size,
-                                  int32_t *offset);
+static coap_handler_status_t lwm2m_handler_callback(coap_packet_t *request,
+                                                    coap_packet_t *response,
+                                                    uint8_t *buffer,
+                                                    uint16_t buffer_size,
+                                                    int32_t *offset);
 static lwm2m_object_instance_t *
 lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last);
 
@@ -743,7 +744,7 @@ lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_i
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
-static int
+static coap_handler_status_t
 lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
                        uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
@@ -765,7 +766,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   if(url_len == 2 && strncmp("bs", url, 2) == 0) {
     PRINTF("BOOTSTRAPPED!!!\n");
     REST.set_response_status(response, CHANGED_2_04);
-    return 1;
+    return COAP_HANDLER_STATUS_PROCESSED;
   }
 
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
@@ -800,9 +801,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       PRINTF("This is a delete all - for bootstrap...\n");
       context.operation = LWM2M_OP_DELETE;
       REST.set_response_status(response, DELETED_2_02);
-      return 1;
+      return COAP_HANDLER_STATUS_PROCESSED;
     }
-    return 0;
+    return COAP_HANDLER_STATUS_CONTINUE;
   }
 
   instance = lwm2m_engine_get_object_instance(&context);
@@ -816,7 +817,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
 
   if(instance == NULL || instance->callback == NULL) {
     /* No matching object/instance found - ignore request */
-    return 0;
+    return COAP_HANDLER_STATUS_CONTINUE;
   }
 
   PRINTF("lwm2m Context: %u/%u/%u  found: %d\n",
@@ -865,7 +866,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   if(instance->instance_id == LWM2M_OBJECT_INSTANCE_NONE &&
      context.level == 2 && context.operation == LWM2M_OP_WRITE) {
     if((instance = create_instance(&context, instance)) == NULL) {
-      return 0;
+      return COAP_HANDLER_STATUS_CONTINUE;
     }
   }
 
@@ -939,7 +940,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     PRINTPRE("lwm2m: [", url_len, url);
     PRINTF("] resource failed\n");
   }
-  return 1;
+  return COAP_HANDLER_STATUS_PROCESSED;
 }
 /*---------------------------------------------------------------------------*/
 void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,

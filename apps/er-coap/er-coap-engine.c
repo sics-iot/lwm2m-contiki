@@ -77,42 +77,49 @@ coap_remove_handler(coap_handler_t *handler)
   list_remove(coap_handlers, handler);
 }
 /*---------------------------------------------------------------------------*/
-CC_INLINE int
+coap_handler_status_t
 er_coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
+  coap_handler_status_t status;
   coap_handler_t *r;
   for(r = list_head(coap_handlers); r != NULL; r = r->next) {
-    if(r->handler &&
-       r->handler(request, response, buffer, buffer_size, offset)) {
-      /* Request handled. */
+    if(r->handler) {
+      status = r->handler(request, response, buffer, buffer_size, offset);
+      if(status != COAP_HANDLER_STATUS_CONTINUE) {
+        /* Request handled. */
 
-      /* Check response code before doing observe! */
-      if(request->code == COAP_GET) {
-        coap_observe_handler(NULL, request, response);
+        /* Check response code before doing observe! */
+        if(request->code == COAP_GET) {
+          coap_observe_handler(NULL, request, response);
+        }
+
+        return status;
       }
-
-      return 1;
     }
   }
-  return 0;
+  return COAP_HANDLER_STATUS_CONTINUE;
 }
 /*---------------------------------------------------------------------------*/
-static CC_INLINE int
+static CC_INLINE coap_handler_status_t
 call_service(coap_packet_t *request, coap_packet_t *response,
              uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
-  if(er_coap_call_handlers(request, response, buffer, buffer_size, offset)) {
-    return 1;
+  coap_handler_status_t status;
+  status = er_coap_call_handlers(request, response, buffer, buffer_size, offset);
+  if(status != COAP_HANDLER_STATUS_CONTINUE) {
+    return status;
   }
-  if(service_cbk != NULL &&
-     service_cbk(request, response, buffer, buffer_size, offset)) {
-    return 1;
+  if(service_cbk != NULL) {
+    status = service_cbk(request, response, buffer, buffer_size, offset);
+    if(status != COAP_HANDLER_STATUS_CONTINUE) {
+      return status;
+    }
   }
 
   REST.set_response_status(response, REST.status.NOT_FOUND);
 
-  return 0;
+  return COAP_HANDLER_STATUS_CONTINUE;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -136,6 +143,7 @@ coap_receive(const coap_endpoint_t *src,
   static coap_packet_t message[1]; /* this way the packet can be treated as pointer as usual */
   static coap_packet_t response[1];
   coap_transaction_t *transaction = NULL;
+  coap_handler_status_t status;
 
   erbium_status_code = coap_parse_message(message, payload, payload_length);
   coap_set_src_endpoint(message, src);
@@ -185,10 +193,11 @@ coap_receive(const coap_endpoint_t *src,
           new_offset = block_offset;
         }
 
-          /* call REST framework and check if found and allowed */
-          if(call_service(message, response,
-                          transaction->packet + COAP_MAX_HEADER_SIZE,
-                          block_size, &new_offset)) {
+        /* call REST framework and check if found and allowed */
+        status = call_service(message, response,
+                              transaction->packet + COAP_MAX_HEADER_SIZE,
+                              block_size, &new_offset);
+        if(status != COAP_HANDLER_STATUS_CONTINUE) {
 
             if(erbium_status_code == NO_ERROR) {
 
@@ -258,7 +267,7 @@ coap_receive(const coap_endpoint_t *src,
             } /* no errors/hooks */
             /* successful service callback */
             /* serialize response */
-          }
+        }
           if(erbium_status_code == NO_ERROR) {
             if((transaction->packet_len = coap_serialize_message(response,
                                                                  transaction->
