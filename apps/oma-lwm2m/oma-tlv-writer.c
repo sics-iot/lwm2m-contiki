@@ -131,7 +131,7 @@ static size_t
 exit_sub(lwm2m_context_t *ctx)
 {
   /* clear out state info */
-  int pos = ctx->out_mark_pos_ri + 2; /* this is the lenght pos */
+  int pos = 2; /* this is the lenght pos */
   int len;
   ctx->writer_flags &= ~WRITER_RESOURCE_INSTANCE;
 
