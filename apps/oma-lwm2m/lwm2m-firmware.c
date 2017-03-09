@@ -75,7 +75,7 @@ uint8_t result = RESULT_DEFAULT;
 lwm2m_object_instance_t reg_object;
 
 /*---------------------------------------------------------------------------*/
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
@@ -90,17 +90,17 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 
   if(ctx->level == 1 || ctx->level == 2) {
     /* Should not happen - as it will be taken care of by the lwm2m engine itself. */
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
 
   if(ctx->operation == LWM2M_OP_READ) {
     switch(ctx->resource_id) {
     case UPDATE_STATE:
       lwm2m_object_write_int(ctx, state); /* 1 means idle */
-      return 1;
+      return LWM2M_STATUS_OK;
     case UPDATE_RESULT:
       lwm2m_object_write_int(ctx, result); /* 0 means default */
-      return 1;
+      return LWM2M_STATUS_OK;
     }
   } else if(ctx->operation == LWM2M_OP_WRITE) {
 #if DEBUG
@@ -119,7 +119,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       } else {
         state = STATE_DOWNLOADING;
       }
-      return 1;
+      return LWM2M_STATUS_OK;
     case UPDATE_PACKAGE_URI:
       /* The firmware URI is written */
       PRINTF("Firmware URI received: %d %d fin:%d\n", ctx->offset, (int) ctx->insize,
@@ -132,21 +132,22 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         }
         PRINTF("'\n");
       }
-      return 1;
+      return LWM2M_STATUS_OK;
     }
   } else if(ctx->operation == LWM2M_OP_EXECUTE && ctx->resource_id == UPDATE_UPDATE) {
     /* Perform the update operation */
     if(state == STATE_DOWNLOADED) {
-      return 1;
+      return LWM2M_STATUS_OK;
     }
     /* Failure... */
   }
-  return 0;
+  return LWM2M_STATUS_ERROR;
 }
 
 /*---------------------------------------------------------------------------*/
 void
-lwm2m_firmware_init(void) {
+lwm2m_firmware_init(void)
+{
   reg_object.object_id = 5;
   reg_object.instance_id = 0;
   reg_object.callback = lwm2m_callback;

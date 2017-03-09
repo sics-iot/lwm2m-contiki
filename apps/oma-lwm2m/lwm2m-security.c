@@ -70,8 +70,8 @@
 lwm2m_object_instance_t security_object;
 
 static lwm2m_security_value_t security_instances[MAX_COUNT];
-static int lwm2m_callback(lwm2m_object_instance_t *object,
-                          lwm2m_context_t *ctx);
+static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
+                                     lwm2m_context_t *ctx);
 static const uint16_t resources[] = {
   LWM2M_SECURITY_SERVER_URI_ID, LWM2M_SECURITY_BOOTSTRAP_SERVER_ID,
   LWM2M_SECURITY_MODE_ID, LWM2M_SECURITY_CLIENT_PKI_ID,
@@ -85,8 +85,10 @@ lwm2m_security_instance_count(void)
 {
   return MAX_COUNT;
 }
-
-lwm2m_security_value_t *lwm2m_security_get_instance(int index) {
+/*---------------------------------------------------------------------------*/
+lwm2m_security_value_t *
+lwm2m_security_get_instance(int index)
+{
   if(index < MAX_COUNT &&
      security_instances[index].reg_object.callback != NULL) {
     return &security_instances[index];
@@ -113,8 +115,8 @@ lwm2m_security_create(int instance_id)
   }
   return 0;
 }
-
-static int
+/*---------------------------------------------------------------------------*/
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
@@ -130,7 +132,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     if(lwm2m_security_create(ctx->object_instance_id)) {
       return ctx->object_instance_id;
     }
-    return 0;
+    return LWM2M_STATUS_ERROR;
   } else if(ctx->operation == LWM2M_OP_WRITE) {
     /* Handle the writes */
     switch(ctx->resource_id) {
@@ -180,10 +182,10 @@ lwm2m_callback(lwm2m_object_instance_t *object,
                                 security->server_uri_len);
       break;
     default:
-      return 0;
+      return LWM2M_STATUS_ERROR;
     }
   }
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 
 /*---------------------------------------------------------------------------*/

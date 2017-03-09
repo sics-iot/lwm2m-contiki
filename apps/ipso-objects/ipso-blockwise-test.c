@@ -54,7 +54,7 @@ lwm2m_object_instance_t reg_object;
 static char junk[64];
 
 /*---------------------------------------------------------------------------*/
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
@@ -69,11 +69,11 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 
   if(ctx->level == 1) {
     /* Should not happen */
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
   if(ctx->level == 2) {
     /* This is a get whole object - or write whole object */
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
 
   if(ctx->operation == LWM2M_OP_READ) {
@@ -98,11 +98,12 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 #endif
     coap_set_header_block1(ctx->response, num, 0, size);
   }
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 
 void
-ipso_blockwise_test_init(void) {
+ipso_blockwise_test_init(void)
+{
   int i;
   reg_object.object_id = 4711;
   reg_object.instance_id = 0;

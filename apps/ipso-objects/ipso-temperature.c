@@ -84,7 +84,7 @@ get_temp_value(const ipso_sensor_t *s, int32_t *value)
     return LWM2M_STATUS_OK;
   }
 #endif
-  return 0;
+  return LWM2M_STATUS_ERROR;
 }
 /*---------------------------------------------------------------------------*/
 void

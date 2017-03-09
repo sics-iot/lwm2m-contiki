@@ -56,7 +56,7 @@ static const uint16_t resources[] =
   {IPSO_ONOFF, IPSO_DIMMER, IPSO_ON_TIME};
 
 /*---------------------------------------------------------------------------*/
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
@@ -69,7 +69,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 
   /* Do the stuff */
   if(ctx->level < 3) {
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
   if(ctx->level == 3) {
     /* This is a get request on 3303/0/3700 */
@@ -87,7 +87,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
           (ntimer_uptime() - control->last_on_time) / 1000;
         break;
       default:
-        return 0;
+        return LWM2M_STATUS_ERROR;
       }
       lwm2m_object_write_int(ctx, v);
     } else if(ctx->operation == LWM2M_OP_WRITE) {
@@ -96,7 +96,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       case IPSO_DIMMER:
         len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v);
         if(len == 0) {
-          return 0;
+          return LWM2M_STATUS_ERROR;
         }
         if(v > 100) {
           v = 100;
@@ -120,18 +120,18 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       case IPSO_ON_TIME:
         len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v);
         if(len == 0) {
-          return 0;
+          return LWM2M_STATUS_ERROR;
         }
         if(v == 0) {
           control->on_time = 0;
         }
         break;
       default:
-        return 0;
+        return LWM2M_STATUS_ERROR;
       }
     }
   }
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 int

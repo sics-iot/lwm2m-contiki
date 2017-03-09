@@ -129,12 +129,12 @@ lwm2m_dim_callback(lwm2m_object_instance_t *object, uint16_t resource_id)
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
   if(ctx->level < 3) {
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
 
   if(ctx->level == 3) {
@@ -177,7 +177,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         break;
       default:
         PRINTF("Not found:%d\n", ctx->resource_id);
-        return 0;
+        return LWM2M_STATUS_NOT_FOUND;
       }
       if(str != NULL) {
         lwm2m_object_write_string(ctx, str, strlen(str));
@@ -203,7 +203,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       }
     }
   }
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 

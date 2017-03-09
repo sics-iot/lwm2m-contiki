@@ -125,7 +125,7 @@ u16toa(uint8_t *buf, uint16_t v)
   }
   return pos;
 }
-
+/*---------------------------------------------------------------------------*/
 static int
 append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
 {
@@ -238,7 +238,8 @@ lwm2m_engine_parse_context(const char *path, int path_len,
 }
 /*---------------------------------------------------------------------------*/
 int
-lwm2m_engine_get_rd_data(uint8_t *rd_data, int size) {
+lwm2m_engine_get_rd_data(uint8_t *rd_data, int size)
+{
   lwm2m_object_instance_t *o;
   int pos;
   int len;
@@ -392,7 +393,7 @@ static lwm2m_object_instance_t *last_ins;
 static int last_rsc_pos;
 
 /* Multi read will handle read of JSON / TLV or Discovery (Link Format) */
-static int
+static lwm2m_status_t
 perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
                                lwm2m_context_t *ctx)
 {
@@ -435,12 +436,14 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
               /* ok we trunkated here... */
               ctx->offset += pos;
               ctx->outlen = pos;
-              return 1;
+              /* TODO handle full outbuffer! */
+              return LWM2M_STATUS_OK;
             }
             pos += len;
           } else if(ctx->operation == LWM2M_OP_READ) {
+            lwm2m_status_t success;
             uint8_t lv;
-            uint8_t success;
+
             lv = ctx->level;
             /* Set the resource ID is ctx->level < 3 */
             if(lv < 3) {
@@ -459,9 +462,10 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
 
             success = instance->callback(instance, ctx);
 
-            if(!success) {
+            if(success != LWM2M_STATUS_OK) {
               /* What to do here? */
               PRINTF("CAllback failed: %d\n", success);
+              return success;
             }
             /* We will need to handle no-success and other things */
             PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
@@ -491,7 +495,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
   /* seems like we are done! */
   ctx->offset=-1;
   ctx->outlen = pos;
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
@@ -546,11 +550,10 @@ get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid)
   return instance;
 }
 
-static int
+static lwm2m_status_t
 process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
 {
   lwm2m_object_instance_t *instance;
-  int success = 0;
   ctx->inbuf = data;
   ctx->inpos = 0;
   ctx->insize = len;
@@ -559,13 +562,13 @@ process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
   PRINTF("  Doing callback to %u/%u/%u\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id);
   instance = get_or_create_instance(ctx, ctx->object_instance_id);
-  if(instance != NULL) {
-    success = instance->callback(instance, ctx);
+  if(instance != NULL && instance->callback != NULL) {
+    return instance->callback(instance, ctx);
   }
-  return success;
+  return LWM2M_STATUS_ERROR;
 }
 
-static int
+static lwm2m_status_t
 perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
                                 lwm2m_context_t *ctx, int format)
 {
@@ -607,7 +610,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
             mode |= MODE_INSTANCE;
           } else {
             /* Failure... */
-            return 0;
+            return LWM2M_STATUS_ERROR;
           }
         }
       } else {
@@ -623,9 +626,9 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
       }
 
       if(mode == MODE_READY) {
-        /* int success; */
-        /* success =  - we should use success in the future */
-        instance->callback(instance, ctx);
+        if(instance->callback(instance, ctx) != LWM2M_STATUS_OK) {
+          /* TODO what to do here */
+        }
         mode = MODE_NONE;
         ctx->inbuf = inbuf;
         ctx->inpos = inpos;
@@ -638,6 +641,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
     size_t len;
     oma_tlv_t tlv;
     int tlvpos = 0;
+    lwm2m_status_t status;
     while(tlvpos < insize) {
       len = oma_tlv_read(&tlv, &inbuf[tlvpos], insize - tlvpos);
       PRINTF("Got TLV format First is: type:%d id:%d len:%d (p:%d len:%d/%d)\n",
@@ -651,7 +655,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
         if(tlv.length == 0) {
           /* Create only - no data */
           if((instance = create_instance(ctx, instance)) == NULL) {
-          return 0;
+            return LWM2M_STATUS_ERROR;
           }
         }
         while(pos < tlv.length && (len2 = oma_tlv_read(&tlv2, &tlv.value[pos],
@@ -660,20 +664,26 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
                  tlv2.type, tlv2.id, (int) tlv2.length,
                  (int) len2, (int) insize);
           if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
-            process_tlv_write(ctx, tlv2.id, (uint8_t *)&tlv.value[pos],
-                              len2);
+            status = process_tlv_write(ctx, tlv2.id,
+                                       (uint8_t *)&tlv.value[pos], len2);
+            if(status != LWM2M_STATUS_OK) {
+              return status;
+            }
           }
           pos += len2;
         }
       } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
-        process_tlv_write(ctx, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
+        status = process_tlv_write(ctx, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
+        if(status != LWM2M_STATUS_OK) {
+          return status;
+        }
         REST.set_response_status(ctx->response, CHANGED_2_04);
       }
       tlvpos += len;
     }
   }
   /* Here we have a success! */
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -759,7 +769,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   uint8_t bmore;
   uint16_t bsize;
   uint32_t boffset;
-  uint8_t success = 1; /* the success boolean */
+  lwm2m_status_t success;
 
   url_len = REST.get_url(request, &url);
 
@@ -913,7 +923,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     success = instance->callback(instance, &context);
   }
 
-  if(success) {
+  if(success == LWM2M_STATUS_OK) {
     /* Handle blockwise 1 */
     if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
       PRINTF("Setting BLOCK 1 num:%d o2:%d o:%d\n", (int) bnum, (int) boffset,
@@ -938,7 +948,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     /* Failed to handle the request */
     REST.set_response_status(response, INTERNAL_SERVER_ERROR_5_00);
     PRINTPRE("lwm2m: [", url_len, url);
-    PRINTF("] resource failed\n");
+    PRINTF("] resource failed: %d\n", success);
   }
   return COAP_HANDLER_STATUS_PROCESSED;
 }

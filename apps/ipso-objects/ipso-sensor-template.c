@@ -125,7 +125,7 @@ update_last_value(ipso_sensor_value_t *sval, int32_t value, uint8_t notify)
   }
 }
 /*---------------------------------------------------------------------------*/
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
@@ -138,11 +138,11 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   /* Do the stuff */
   if(ctx->level == 1) {
     /* Should not happen 3303 */
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
   if(ctx->level == 2) {
     /* This is a get whole object - or write whole object 3303/0 */
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
   if(ctx->level == 3) {
     /* This is a get request on 3303/0/3700 */
@@ -176,7 +176,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         }
         break;
       default:
-        return 0;
+        return LWM2M_STATUS_ERROR;
       }
     } else if(ctx->operation == LWM2M_OP_EXECUTE) {
       if(ctx->resource_id == IPSO_SENSOR_RESET_MINMAX) {
@@ -185,7 +185,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       }
     }
   }
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 int

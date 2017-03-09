@@ -77,8 +77,8 @@ PROCESS(ipso_button_process, "ipso-button");
 #endif /* PLATFORM_HAS_BUTTON */
 
 
-static int lwm2m_callback(lwm2m_object_instance_t *object,
-                          lwm2m_context_t *ctx);
+static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
+                                     lwm2m_context_t *ctx);
 
 static int input_state = 0;
 static int polarity = 0;
@@ -116,14 +116,14 @@ read_state()
 }
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
   /* Do the stuff */
   if(ctx->level < 3) {
     /* Should not happen 3303 */
-    return 0;
+    return LWM2M_STATUS_ERROR;
   }
   if(ctx->level == 3) {
     /* This is a get request on 3303/0/3700 */
@@ -149,17 +149,17 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         lwm2m_object_write_string(ctx, "button", strlen("button"));
         break;
       default:
-        return 0;
+        return LWM2M_STATUS_ERROR;
       }
     } else if(ctx->operation == LWM2M_OP_EXECUTE) {
       if(ctx->resource_id == IPSO_INPUT_CTR_RESET) {
         counter = 0;
       } else {
-        return 0;
+        return LWM2M_STATUS_ERROR;
       }
     }
   }
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 void

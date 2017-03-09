@@ -61,13 +61,13 @@
 #define MAX_COUNT 2
 #endif
 
-static int lwm2m_callback(lwm2m_object_instance_t *object,
-                          lwm2m_context_t *ctx);
+static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
+                                     lwm2m_context_t *ctx);
 
 static const uint16_t resources[] = {LWM2M_SERVER_SHORT_SERVER_ID,
                                      LWM2M_SERVER_LIFETIME_ID};
 
-lwm2m_object_instance_t server_object;
+static lwm2m_object_instance_t server_object;
 
 static server_value_t server_instances[MAX_COUNT];
 
@@ -90,7 +90,7 @@ lwm2m_server_create(int instance_id)
   return 0;
 }
 
-static int
+static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
@@ -105,7 +105,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     if(lwm2m_server_create(ctx->object_instance_id)) {
       return ctx->object_instance_id;
     }
-    return 0;
+    return LWM2M_STATUS_ERROR;
   } else if(ctx->operation == LWM2M_OP_WRITE) {
     PRINTF("Write to: %d\n", ctx->resource_id);
     switch(ctx->resource_id) {
@@ -122,7 +122,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     }
   }
 
-  return 1;
+  return LWM2M_STATUS_OK;
 }
 
 /*---------------------------------------------------------------------------*/

@@ -61,7 +61,23 @@ typedef enum {
 
 typedef enum {
   LWM2M_STATUS_OK,
+
+  /* Internal server error */
   LWM2M_STATUS_ERROR,
+  /* Error from writer */
+  LWM2M_STATUS_WRITE_ERROR,
+  /* Error from reader */
+  LWM2M_STATUS_READ_ERROR,
+
+  LWM2M_STATUS_BAD_REQUEST,
+  LWM2M_STATUS_UNAUTHORIZED,
+  LWM2M_STATUS_FORBIDDEN,
+  LWM2M_STATUS_NOT_FOUND,
+  LWM2M_STATUS_OPERATION_NOT_ALLOWED,
+  LWM2M_STATUS_NOT_ACCEPTABLE,
+
+  LWM2M_STATUS_NOT_IMPLEMENTED,
+  LWM2M_STATUS_SERVICE_UNAVAILABLE,
 } lwm2m_status_t;
 
 void lwm2m_engine_init(void);
@@ -71,7 +87,7 @@ int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
 
 typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 
-typedef int
+typedef lwm2m_status_t
 (* lwm2m_object_instance_callback_t)(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
 typedef int
