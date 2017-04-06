@@ -92,7 +92,6 @@
 
 static struct lwm2m_session_info session_info;
 static struct request_state rd_request_state;
-static uint32_t current_ms = 0;
 
 /* The states for the RD client state machine */
 #define INIT               0
@@ -105,8 +104,12 @@ static uint32_t current_ms = 0;
 #define REGISTRATION_DONE  8
 #define UPDATE_SENT        9
 
+#define FLAG_RD_DATA_DIRTY 1
+
 static uint8_t rd_state = 0;
+static uint8_t rd_flags = 0;
 static uint64_t wait_until_network_check = 0;
+static uint64_t last_update;
 
 static char path_data[32]; /* allocate some data for building the path */
 static char query_data[64]; /* allocate some data for queries and updates */
@@ -117,6 +120,23 @@ static ntimer_t rd_timer;
 void check_periodic_observations();
 
 /*---------------------------------------------------------------------------*/
+static void
+prepare_update(coap_packet_t *request) {
+  int len;
+  coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
+  snprintf(path_data, sizeof(path_data) - 1, "/rd/%s/", session_info.assigned_ep);
+  coap_set_header_uri_path(request, path_data);
+
+  snprintf(query_data, sizeof(query_data) - 1, "?lt=%d", session_info.lifetime);
+  coap_set_header_uri_query(request, query_data);
+
+  if(rd_flags & FLAG_RD_DATA_DIRTY) {
+    rd_flags &= ~FLAG_RD_DATA_DIRTY;
+    /* generate the rd data */
+    len = lwm2m_engine_get_rd_data(rd_data, sizeof(rd_data));
+    coap_set_payload(request, rd_data, len);
+  }
+}
 static int
 has_network_access(void)
 {
@@ -166,6 +186,12 @@ lwm2m_rd_client_set_lifetime(uint16_t lifetime)
   } else {
     session_info.lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME;
   }
+}
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_rd_client_set_update_rd(void)
+{
+  rd_flags |= FLAG_RD_DATA_DIRTY;
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -290,8 +316,10 @@ registration_callback(struct request_state *state)
         memcpy(session_info.assigned_ep, state->response->location_path + 3,
                state->response->location_path_len - 3);
         session_info.assigned_ep[state->response->location_path_len - 3] = 0;
-        current_ms = 0; /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
+        /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
         rd_state = REGISTRATION_DONE;
+        /* remember the last reg time */
+        last_update = ntimer_uptime();
         PRINTF("Done (assigned EP='%s')!\n", session_info.assigned_ep);
         return;
       }
@@ -326,6 +354,8 @@ update_callback(struct request_state *state)
   if(state->response) {
     if(CHANGED_2_04 == state->response->code) {
       PRINTF("Done!\n");
+      /* remember the last reg time */
+      last_update = ntimer_uptime();
       rd_state = REGISTRATION_DONE;
       return;
     }
@@ -504,17 +534,11 @@ periodic_process(ntimer_t *timer)
     /* All is done! */
 
     check_periodic_observations(); /* TODO: manage periodic observations */
-    current_ms += STATE_MACHINE_UPDATE_INTERVAL;
 
-    if(((uint32_t)session_info.lifetime * 500) <= current_ms) { /* time to send an update to the server, at half-time! sec vs ms */
-      current_ms = 0;
+    /* check if it is time for the next update */
+    if(((uint32_t)session_info.lifetime * 500) <= now - last_update) { /* time to send an update to the server, at half-time! sec vs ms */
       /* prepare request,  */
-      coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
-      snprintf(path_data, sizeof(path_data) - 1, "/rd/%s/", session_info.assigned_ep);
-      coap_set_header_uri_path(request, path_data);
-
-      snprintf(query_data, sizeof(query_data) - 1, "?lt=%d", session_info.lifetime);
-      coap_set_header_uri_query(request, query_data);
+      prepare_update(request);
       coap_send_request(&rd_request_state, &session_info.server_ep, request,
                         update_callback);
 

@@ -513,6 +513,9 @@ create_instance(lwm2m_context_t *context,
     instance = lwm2m_engine_get_object_instance(context);
     context->operation = LWM2M_OP_WRITE;
     REST.set_response_status(context->response, CREATED_2_01);
+#if USE_RD_CLIENT
+    lwm2m_rd_client_set_update_rd();
+#endif
     return instance;
   } else {
     /* Can not create... */
@@ -811,6 +814,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       PRINTF("This is a delete all - for bootstrap...\n");
       context.operation = LWM2M_OP_DELETE;
       REST.set_response_status(response, DELETED_2_02);
+#if USE_RD_CLIENT
+      lwm2m_rd_client_set_update_rd();
+#endif
       return COAP_HANDLER_STATUS_PROCESSED;
     }
     return COAP_HANDLER_STATUS_CONTINUE;
