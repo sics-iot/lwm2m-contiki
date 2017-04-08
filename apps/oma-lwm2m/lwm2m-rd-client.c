@@ -94,6 +94,9 @@ static struct lwm2m_session_info session_info;
 static struct request_state rd_request_state;
 
 /* The states for the RD client state machine */
+/* When node is unregistered it ends up in UNREGISTERED
+   and this is going to be there until use X or Y kicks it
+   back into INIT again */
 #define INIT               0
 #define WAIT_NETWORK       1
 #define DO_BOOTSTRAP       3
@@ -103,6 +106,10 @@ static struct request_state rd_request_state;
 #define REGISTRATION_SENT  7
 #define REGISTRATION_DONE  8
 #define UPDATE_SENT        9
+#define DEREGISTER        10
+#define DEREGISTER_SENT   11
+#define DEREGISTERED      12
+
 
 #define FLAG_RD_DATA_DIRTY 1
 
@@ -124,10 +131,10 @@ static void
 prepare_update(coap_packet_t *request) {
   int len;
   coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
-  snprintf(path_data, sizeof(path_data) - 1, "/rd/%s/", session_info.assigned_ep);
-  coap_set_header_uri_path(request, path_data);
+  coap_set_header_uri_path(request, session_info.assigned_ep);
 
   snprintf(query_data, sizeof(query_data) - 1, "?lt=%d", session_info.lifetime);
+  printf("UPDATE:%s %s\n", session_info.assigned_ep, query_data);
   coap_set_header_uri_query(request, query_data);
 
   if(rd_flags & FLAG_RD_DATA_DIRTY) {
@@ -137,6 +144,7 @@ prepare_update(coap_packet_t *request) {
     coap_set_payload(request, rd_data, len);
   }
 }
+
 static int
 has_network_access(void)
 {
@@ -242,6 +250,14 @@ lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server)
   }
 }
 /*---------------------------------------------------------------------------*/
+void
+lwm2m_rd_client_deregister(void)
+{
+  if(lwm2m_rd_client_is_registered()) {
+    rd_state = DEREGISTER;
+  }
+}
+/*---------------------------------------------------------------------------*/
 static int
 update_bootstrap_server(void)
 {
@@ -310,12 +326,10 @@ registration_callback(struct request_state *state)
   if(state->response) {
     /* check state and possibly set registration to done */
     if(CREATED_2_01 == state->response->code) {
-      if(strncmp("rd/", state->response->location_path, 3) == 0 &&
-         state->response->location_path_len > 3 &&
-         state->response->location_path_len < 3 + LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN) {
-        memcpy(session_info.assigned_ep, state->response->location_path + 3,
-               state->response->location_path_len - 3);
-        session_info.assigned_ep[state->response->location_path_len - 3] = 0;
+      if(state->response->location_path_len < LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN) {
+        memcpy(session_info.assigned_ep, state->response->location_path,
+               state->response->location_path_len);
+        session_info.assigned_ep[state->response->location_path_len] = 0;
         /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
         rd_state = REGISTRATION_DONE;
         /* remember the last reg time */
@@ -375,6 +389,26 @@ update_callback(struct request_state *state)
   }
 }
 /*---------------------------------------------------------------------------*/
+static void
+deregister_callback(struct request_state *state)
+{
+  PRINTF("Deregister callback. Response Code: %d\n",
+         state->response != NULL ? state->response->code : 0);
+
+  if(state->response) {
+    if(DELETED_2_02 == state->response->code) {
+      PRINTF("Deregistration success\n");
+      rd_state = DEREGISTERED;
+    }
+  } else {
+    /* failed? try again? */
+    PRINTF("Deregistration failed - retry if under deregistering\n");
+    if(rd_state == DEREGISTER_SENT) {
+      rd_state = DEREGISTER;
+    }
+  }
+}
+/*---------------------------------------------------------------------------*/
 /* ntimer callback */
 static void
 periodic_process(ntimer_t *timer)
@@ -387,7 +421,7 @@ periodic_process(ntimer_t *timer)
   now = ntimer_uptime();
 
   PRINTF("RD Client - state: %d, ms: %lu\n", rd_state,
-         (unsigned long)current_ms);
+         (unsigned long) ntimer_uptime());
 
   switch(rd_state) {
   case INIT:
@@ -548,6 +582,18 @@ periodic_process(ntimer_t *timer)
 
   case UPDATE_SENT:
     /* just wait until the callback kicks us to the next state... */
+    break;
+  case DEREGISTER:
+    PRINTF("DEREGISTER %s\n", session_info.assigned_ep);
+    coap_init_message(request, COAP_TYPE_CON, COAP_DELETE, 0);
+    coap_set_header_uri_path(request, session_info.assigned_ep);
+    coap_send_request(&rd_request_state, &session_info.server_ep, request,
+                      deregister_callback);
+    rd_state = DEREGISTER_SENT;
+    break;
+  case DEREGISTER_SENT:
+    break;
+  case DEREGISTERED:
     break;
 
   default:

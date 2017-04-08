@@ -39,6 +39,7 @@ void lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *serve
 uint16_t lwm2m_rd_client_get_lifetime(void);
 void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
 void lwm2m_rd_client_set_update_rd(void);
+void lwm2m_rd_client_deregister(void);
 void lwm2m_rd_client_init(const char *ep);
 
 #define LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN    15
