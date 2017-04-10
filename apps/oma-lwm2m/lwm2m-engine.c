@@ -401,6 +401,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
   int size = ctx->outsize;
   int len = 0;
   uint8_t initialized = 0; /* used for commas, etc */
+  uint8_t num_read = 0;
 
   if(ctx->offset == 0) {
     last_ins = instance;
@@ -432,6 +433,8 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
               len += snprintf((char *) &ctx->outbuf[pos + len],
                               size - pos - len,  ";dim=%d", dim);
             }
+            /* here we have "read" out something */
+            num_read++;
             if(len < 0 || len + pos >= size) {
               /* ok we trunkated here... */
               ctx->offset += pos;
@@ -464,9 +467,11 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
 
             if(success != LWM2M_STATUS_OK) {
               /* What to do here? */
-              PRINTF("CAllback failed: %d\n", success);
+              PRINTF("Callback failed: %d\n", success);
               return success;
             }
+            /* here we have "read" out something */
+            num_read++;
             /* We will need to handle no-success and other things */
             PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
                    ctx->object_id, ctx->object_instance_id,ctx->resource_id,
@@ -492,6 +497,12 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     initialized = 0;
     last_rsc_pos = 0;
   }
+
+  /* did not read anything even if we should have - on single item */
+  if (num_read == 0 && ctx->level == 3) {
+    return LWM2M_STATUS_NOT_FOUND;
+  }
+
   /* seems like we are done! */
   ctx->offset=-1;
   ctx->outlen = pos;
@@ -940,8 +951,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     if(context.outlen > 0) {
       PRINTPRE("lwm2m: [", url_len, url);
       PRINTF("] replying with %u bytes\n", context.outlen);
-      REST.set_response_payload(response, context.outbuf, context.outlen);
-      REST.set_header_content_type(response, context.content_type);
+      coap_set_payload(response, context.outbuf, context.outlen);
+      coap_set_header_content_format(response, context.content_type);
 
       if(offset != NULL) {
         *offset = context.offset;
@@ -951,8 +962,12 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       PRINTF("] no data in reply\n");
     }
   } else {
-    /* Failed to handle the request */
-    REST.set_response_status(response, INTERNAL_SERVER_ERROR_5_00);
+    if(success == LWM2M_STATUS_NOT_FOUND) {
+      coap_set_status_code(response, NOT_FOUND_4_04);
+    } else {
+      /* Failed to handle the request */
+      coap_set_status_code(response, INTERNAL_SERVER_ERROR_5_00);
+    }
     PRINTPRE("lwm2m: [", url_len, url);
     PRINTF("] resource failed: %d\n", success);
   }
