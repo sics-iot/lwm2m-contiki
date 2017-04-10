@@ -171,6 +171,23 @@ lwm2m_rd_client_use_bootstrap_server(int use)
   }
 }
 /*---------------------------------------------------------------------------*/
+/* will take another argument when we support multiple sessions */
+void
+lwm2m_rd_client_set_session_callback(session_callback_t cb)
+{
+  session_info.callback = cb;
+}
+/*---------------------------------------------------------------------------*/
+static void
+perform_session_callback(int state)
+{
+  if(session_info.callback != NULL) {
+    PRINTF("Performing session callback: %d cb:%p\n",
+           state, session_info.callback);
+    session_info.callback(&session_info, state);
+  }
+}
+/*---------------------------------------------------------------------------*/
 void
 lwm2m_rd_client_use_registration_server(int use)
 {
@@ -335,6 +352,7 @@ registration_callback(struct request_state *state)
         /* remember the last reg time */
         last_update = ntimer_uptime();
         PRINTF("Done (assigned EP='%s')!\n", session_info.assigned_ep);
+        perform_session_callback(LWM2M_RD_CLIENT_REGISTERED);
         return;
       }
 
@@ -399,6 +417,7 @@ deregister_callback(struct request_state *state)
     if(DELETED_2_02 == state->response->code) {
       PRINTF("Deregistration success\n");
       rd_state = DEREGISTERED;
+      perform_session_callback(LWM2M_RD_CLIENT_DEREGISTERED);
     }
   } else {
     /* failed? try again? */

@@ -31,6 +31,14 @@
 #ifndef LWM2M_RD_CLIENT_H_
 #define LWM2M_RD_CLIENT_H_
 
+#define LWM2M_RD_CLIENT_BOOTSTRAPPED 1
+#define LWM2M_RD_CLIENT_REGISTERED   2
+#define LWM2M_RD_CLIENT_DEREGISTERED 3
+#define LWM2M_RD_CLIENT_DISCONNECTED 4
+
+struct lwm2m_session_info;
+typedef void (*session_callback_t)(struct lwm2m_session_info *session, int status);
+
 int  lwm2m_rd_client_is_registered(void);
 void lwm2m_rd_client_use_bootstrap_server(int use);
 void lwm2m_rd_client_use_registration_server(int use);
@@ -41,6 +49,8 @@ void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
 void lwm2m_rd_client_set_update_rd(void);
 void lwm2m_rd_client_deregister(void);
 void lwm2m_rd_client_init(const char *ep);
+
+void lwm2m_rd_client_set_session_callback(session_callback_t cb);
 
 #define LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN    15
 
@@ -59,6 +69,7 @@ struct lwm2m_session_info {
   uint8_t has_registration_server_info;
   uint8_t registered;
   uint8_t bootstrapped; /* bootstrap done */
+  session_callback_t callback;
 };
 
 #endif /* LWM2M_RD_CLIENT_H_ */

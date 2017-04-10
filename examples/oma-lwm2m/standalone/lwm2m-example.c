@@ -51,6 +51,9 @@ void ipso_sensor_temp_init(void);
 void ipso_control_test_init(void);
 void ipso_blockwise_test_init(void);
 
+/* set this above zero to get auto deregister */
+int deregister = -1;
+
 /*---------------------------------------------------------------------------*/
 static void
 callback(ntimer_t *timer)
@@ -58,6 +61,19 @@ callback(ntimer_t *timer)
   /* Automatic notifcation on device timer for test!*/
   lwm2m_notify_observers("3/0/13");
   ntimer_reset(timer, 10000);
+  if(deregister > 0) {
+    deregister--;
+    if(deregister == 0) {
+      printf("Deregistering.\n");
+      lwm2m_rd_client_deregister();
+    }
+  }
+}
+/*---------------------------------------------------------------------------*/
+static void
+session_callback(struct lwm2m_session_info *si, int state)
+{
+  printf("Got Session Callback!!! %d\n", state);
 }
 /*---------------------------------------------------------------------------*/
 #ifndef LWM2M_DEFAULT_RD_SERVER
@@ -122,7 +138,11 @@ start_application(int argc, char *argv[])
     lwm2m_rd_client_register_with_server(&server_ep);
 #endif
     lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("abcde");
+    lwm2m_rd_client_init("abcd");
+
+    printf("Callback: %p\n", session_callback);
+    lwm2m_rd_client_set_session_callback(session_callback);
+
   } else {
     fprintf(stderr, "No registration server specified.\n");
   }
