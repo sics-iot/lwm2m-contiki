@@ -516,11 +516,10 @@ create_instance(lwm2m_context_t *context,
   /* If not discovery or create - this is a regular OP - do the callback */
   PRINTF("CREATE OP on object:%d\n", instance->object_id);
   context->operation = LWM2M_OP_CREATE;
-  /* NOTE: this is a special case - create will return -1 if failing */
-  int new_instance_id = instance->callback(instance, context);
-  if(new_instance_id >= 0) {
-    PRINTF("Created instance: %d\n", new_instance_id);
-    context->object_instance_id = new_instance_id;
+  /* NOTE: context->object_instance_id needs to be set before calling */
+  lwm2m_status_t status = instance->callback(instance, context);
+  if(status == LWM2M_STATUS_OK) {
+    PRINTF("Created instance: %d\n", context->object_instance_id);
     instance = lwm2m_engine_get_object_instance(context);
     context->operation = LWM2M_OP_WRITE;
     REST.set_response_status(context->response, CREATED_2_01);

@@ -47,7 +47,7 @@
 #include "lwm2m-engine.h"
 #include "lwm2m-security.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -101,6 +101,13 @@ lwm2m_security_create(int instance_id)
 {
   int i;
   for(i = 0; i < MAX_COUNT; i++) {
+    if(security_instances[i].reg_object.callback != NULL &&
+       security_instances[i].reg_object.instance_id == instance_id) {
+      PRINTF("Can not create instance - already existing: %d\n", instance_id);
+      return 0;
+    }
+  }
+  for(i = 0; i < MAX_COUNT; i++) {
     /* Not used if callback is non-existend */
     if(security_instances[i].reg_object.callback == NULL) {
       security_instances[i].reg_object.callback = lwm2m_callback;
@@ -130,7 +137,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   if(ctx->operation == LWM2M_OP_CREATE) {
     PRINTF("SEC: Creating new instance: %d\n", ctx->object_instance_id);
     if(lwm2m_security_create(ctx->object_instance_id)) {
-      return ctx->object_instance_id;
+      return LWM2M_STATUS_OK;
     }
     return LWM2M_STATUS_ERROR;
   } else if(ctx->operation == LWM2M_OP_WRITE) {
