@@ -468,7 +468,16 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
             if(success != LWM2M_STATUS_OK) {
               /* What to do here? */
               PRINTF("Callback failed: %d\n", success);
-              return success;
+              if(lv < 3) {
+                if(success == LWM2M_STATUS_NOT_FOUND) {
+                  /* ok with a not found during a multi read - what more
+                     is ok? */
+                } else {
+                  return success;
+                }
+              } else {
+                return success;
+              }
             }
             /* here we have "read" out something */
             num_read++;
