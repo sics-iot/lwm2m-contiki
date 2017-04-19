@@ -17,3 +17,7 @@
 [submodule "tools/sensniff"]
 	path = tools/sensniff
 	url = https://github.com/g-oikonomou/sensniff.git
+[submodule "lib/tinydtls"]
+	path = lib/tinydtls
+	url = https://github.com/sics-iot/tinydtls-standalone.git
+	branch = dtls-standalone
