@@ -46,7 +46,10 @@ void lwm2m_rd_client_register_with_server(const coap_endpoint_t *server);
 void lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server);
 uint16_t lwm2m_rd_client_get_lifetime(void);
 void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
+/* Indicate that something in the object list have changed */
 void lwm2m_rd_client_set_update_rd(void);
+/* Control if the object list should be automatically updated at updates of lifetime */
+void lwm2m_rd_client_set_automatic_update(int update);
 void lwm2m_rd_client_deregister(void);
 void lwm2m_rd_client_init(const char *ep);
 

@@ -112,9 +112,10 @@ static struct request_state rd_request_state;
 
 
 #define FLAG_RD_DATA_DIRTY 1
+#define FLAG_RD_DATA_UPDATE_ON_DIRTY 0x10
 
 static uint8_t rd_state = 0;
-static uint8_t rd_flags = 0;
+static uint8_t rd_flags = FLAG_RD_DATA_UPDATE_ON_DIRTY;
 static uint64_t wait_until_network_check = 0;
 static uint64_t last_update;
 
@@ -217,6 +218,13 @@ void
 lwm2m_rd_client_set_update_rd(void)
 {
   rd_flags |= FLAG_RD_DATA_DIRTY;
+}
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_rd_client_set_automatic_update(int update)
+{
+  rd_flags = (rd_flags & ~FLAG_RD_DATA_UPDATE_ON_DIRTY) |
+    (update != 0 ? FLAG_RD_DATA_UPDATE_ON_DIRTY : 0);
 }
 /*---------------------------------------------------------------------------*/
 void
