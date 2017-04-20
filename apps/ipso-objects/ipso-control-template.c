@@ -52,8 +52,12 @@
 #define IPSO_DIMMER       5851
 #define IPSO_ON_TIME      5852
 
-static const uint16_t resources[] =
-  {IPSO_ONOFF, IPSO_DIMMER, IPSO_ON_TIME};
+static const lwm2m_resource_id_t resources[] =
+  {
+    RW(IPSO_ONOFF),
+    RW(IPSO_DIMMER),
+    RW(IPSO_ON_TIME)
+  };
 
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t

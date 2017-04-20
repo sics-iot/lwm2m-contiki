@@ -61,7 +61,7 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTS(l,s,f) do { int i;					\
@@ -92,6 +92,10 @@
 #include "lwm2m-rd-client.h"
 #endif
 
+/* MACRO for getting out resource ID from resource array ID + flags */
+#define RSC_ID(x) (x & 0xffff)
+#define RSC_READABLE(x) ((x & LWM2M_RESOURCE_READ) > 0)
+#define RSC_WRITABLE(x) ((x & LWM2M_RESOURCE_WRITE) > 0)
 
 void lwm2m_device_init(void);
 void lwm2m_security_init(void);
@@ -422,14 +426,17 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     if(instance->resource_ids != NULL && instance->resource_count > 0) {
       /* show all the available resources (or read all) */
       while(last_rsc_pos < instance->resource_count) {
-        if(ctx->level < 3 || ctx->resource_id == instance->resource_ids[last_rsc_pos]) {
+        PRINTF("READ: %x %x %x lv:%d\n", instance->resource_ids[last_rsc_pos], RSC_ID(instance->resource_ids[last_rsc_pos]), ctx->resource_id, ctx->level);
+        if(ctx->level < 3 || ctx->resource_id == RSC_ID(instance->resource_ids[last_rsc_pos])) {
           if(ctx->operation == LWM2M_OP_DISCOVER) {
             int dim = 0;
             len = snprintf((char *) &ctx->outbuf[pos], size - pos,
                            pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
-                           instance->object_id, instance->instance_id, instance->resource_ids[last_rsc_pos]);
+                           instance->object_id, instance->instance_id,
+                           RSC_ID(instance->resource_ids[last_rsc_pos]));
             if(instance->resource_dim_callback != NULL &&
-               (dim = instance->resource_dim_callback(instance, instance->resource_ids[last_rsc_pos])) > 0) {
+               (dim = instance->resource_dim_callback(instance,
+                                                      RSC_ID(instance->resource_ids[last_rsc_pos]))) > 0) {
               len += snprintf((char *) &ctx->outbuf[pos + len],
                               size - pos - len,  ";dim=%d", dim);
             }
@@ -448,47 +455,55 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
             uint8_t lv;
 
             lv = ctx->level;
+
+            /* Do not allow a read on a non-readable */
+            if(lv == 3 && !RSC_READABLE(instance->resource_ids[last_rsc_pos])) {
+              return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+            }
             /* Set the resource ID is ctx->level < 3 */
             if(lv < 3) {
-              ctx->resource_id = instance->resource_ids[last_rsc_pos];
+              ctx->resource_id = RSC_ID(instance->resource_ids[last_rsc_pos]);
             }
             if(lv < 2) {
               ctx->object_instance_id = instance->instance_id;
             }
-            ctx->level = 3;
-            if(!initialized) {
-              len = ctx->writer->init_write(ctx);
-              ctx->outlen += len;
-              PRINTF("INIT WRITE len:%d\n", len);
-              initialized = 1;
-            }
 
-            success = instance->callback(instance, ctx);
+            if(RSC_READABLE(instance->resource_ids[last_rsc_pos])) {
+              ctx->level = 3;
+              if(!initialized) {
+                len = ctx->writer->init_write(ctx);
+                ctx->outlen += len;
+                PRINTF("INIT WRITE len:%d\n", len);
+                initialized = 1;
+              }
 
-            if(success != LWM2M_STATUS_OK) {
-              /* What to do here? */
-              PRINTF("Callback failed: %d\n", success);
-              if(lv < 3) {
-                if(success == LWM2M_STATUS_NOT_FOUND) {
-                  /* ok with a not found during a multi read - what more
-                     is ok? */
+              success = instance->callback(instance, ctx);
+
+              if(success != LWM2M_STATUS_OK) {
+                /* What to do here? */
+                PRINTF("Callback failed: %d\n", success);
+                if(lv < 3) {
+                  if(success == LWM2M_STATUS_NOT_FOUND) {
+                    /* ok with a not found during a multi read - what more
+                       is ok? */
+                  } else {
+                    return success;
+                  }
                 } else {
                   return success;
                 }
-              } else {
-                return success;
               }
-            }
-            /* here we have "read" out something */
-            num_read++;
-            /* We will need to handle no-success and other things */
-            PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
-                   ctx->object_id, ctx->object_instance_id,ctx->resource_id,
-                   ctx->outlen, success);
+              /* here we have "read" out something */
+              num_read++;
+              /* We will need to handle no-success and other things */
+              PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
+                     ctx->object_id, ctx->object_instance_id, ctx->resource_id,
+                     ctx->outlen, success);
 
-            /* we need to handle full buffer, etc here also! */
-            ctx->level = lv;
-            pos = ctx->outlen;
+              /* we need to handle full buffer, etc here also! */
+              ctx->level = lv;
+              pos = ctx->outlen;
+            }
           }
         }
         last_rsc_pos++;
@@ -548,13 +563,15 @@ create_instance(lwm2m_context_t *context,
 #define MODE_READY     3
 
 static lwm2m_object_instance_t *
-get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid)
+get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid, uint8_t *created)
 {
   lwm2m_object_instance_t *instance;
   int lv = ctx->level;
   instance = lwm2m_engine_get_object_instance(ctx);
   PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id, instance);
+  /* by default we assume that the instance is not created... so we set flag to zero */
+  if(created != NULL) *created = 0;
   if(instance == NULL) {
     /* Find a generic instance for create */
     ctx->object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
@@ -566,16 +583,36 @@ get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid)
     ctx->object_instance_id = oid;
     if((instance = create_instance(ctx, instance)) != NULL) {
       PRINTF("Instance %d created\n", instance->instance_id);
+      /* set created flag to one */
+      if(created != NULL) *created = 1;
     }
     ctx->level = lv;
   }
   return instance;
 }
 
+static int
+check_write(lwm2m_object_instance_t *instance, int rid)
+{
+  int i;
+  if(instance->resource_ids != NULL && instance->resource_count > 0) {
+    int count = instance->resource_count;
+    for(i = 0; i < count; i++) {
+      if(RSC_ID(instance->resource_ids[i]) == rid &&
+         RSC_WRITABLE(instance->resource_ids[i])) {
+        /* yes - writable */
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
 static lwm2m_status_t
 process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
 {
   lwm2m_object_instance_t *instance;
+  uint8_t created = 0;
   ctx->inbuf = data;
   ctx->inpos = 0;
   ctx->insize = len;
@@ -583,9 +620,13 @@ process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
   ctx->resource_id = rid;
   PRINTF("  Doing callback to %u/%u/%u\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id);
-  instance = get_or_create_instance(ctx, ctx->object_instance_id);
+  instance = get_or_create_instance(ctx, ctx->object_instance_id, &created);
   if(instance != NULL && instance->callback != NULL) {
-    return instance->callback(instance, ctx);
+    if(created || check_write(instance, rid)) {
+      return instance->callback(instance, ctx);
+    } else {
+      return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+    }
   }
   return LWM2M_STATUS_ERROR;
 }
@@ -613,6 +654,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
 
     while(lwm2m_json_next_token(ctx, &json)) {
       int i;
+      uint8_t created = 0;
       PRINTF("JSON: '");
       for(i = 0; i < json.name_len; i++) PRINTF("%c", json.name[i]);
       PRINTF("':'");
@@ -626,7 +668,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
             ctx->object_instance_id = oid;
             ctx->resource_id = iid;
 
-            instance = get_or_create_instance(ctx, oid);
+            instance = get_or_create_instance(ctx, oid, &created);
           }
           if(instance != NULL && instance->callback != NULL) {
             mode |= MODE_INSTANCE;
@@ -648,6 +690,10 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
       }
 
       if(mode == MODE_READY) {
+        /* allow write if just created - otherwise not */
+        if(!created && !check_write(instance, ctx->resource_id)) {
+          return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+        }
         if(instance->callback(instance, ctx) != LWM2M_STATUS_OK) {
           /* TODO what to do here */
         }
@@ -656,7 +702,6 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
         ctx->inpos = inpos;
         ctx->insize = insize;
         ctx->level = olv;
-
       }
     }
   } else if(format == LWM2M_TLV || format == LWM2M_OLD_TLV) {
@@ -972,6 +1017,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   } else {
     if(success == LWM2M_STATUS_NOT_FOUND) {
       coap_set_status_code(response, NOT_FOUND_4_04);
+    } else if(success == LWM2M_STATUS_OPERATION_NOT_ALLOWED) {
+      coap_set_status_code(response, METHOD_NOT_ALLOWED_4_05);
     } else {
       /* Failed to handle the request */
       coap_set_status_code(response, INTERNAL_SERVER_ERROR_5_00);

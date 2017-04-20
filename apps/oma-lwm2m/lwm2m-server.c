@@ -64,8 +64,10 @@
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
 
-static const uint16_t resources[] = {LWM2M_SERVER_SHORT_SERVER_ID,
-                                     LWM2M_SERVER_LIFETIME_ID};
+static const lwm2m_resource_id_t resources[] = {
+  LWM2M_SERVER_SHORT_SERVER_ID,
+  LWM2M_SERVER_LIFETIME_ID
+};
 
 static lwm2m_object_instance_t server_object;
 
@@ -143,7 +145,7 @@ lwm2m_server_init(void)
   server_object.object_id = LWM2M_OBJECT_SERVER_ID;
   server_object.instance_id = 0xffff; /* Generic instance */
   server_object.resource_ids = resources;
-  server_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+  server_object.resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t);
   server_object.callback = lwm2m_callback;
 
   lwm2m_engine_add_object(&server_object);

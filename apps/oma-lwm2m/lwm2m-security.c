@@ -72,7 +72,7 @@ lwm2m_object_instance_t security_object;
 static lwm2m_security_value_t security_instances[MAX_COUNT];
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
-static const uint16_t resources[] = {
+static const lwm2m_resource_id_t resources[] = {
   LWM2M_SECURITY_SERVER_URI_ID, LWM2M_SECURITY_BOOTSTRAP_SERVER_ID,
   LWM2M_SECURITY_MODE_ID, LWM2M_SECURITY_CLIENT_PKI_ID,
   LWM2M_SECURITY_SERVER_PKI_ID, LWM2M_SECURITY_KEY_ID,
@@ -203,7 +203,7 @@ lwm2m_security_init(void)
   security_object.object_id = LWM2M_OBJECT_SECURITY_ID;
   security_object.instance_id = 0xffff; /* Generic instance */
   security_object.resource_ids = resources;
-  security_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+  security_object.resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t);
   security_object.callback = lwm2m_callback;
 
   PRINTF("*** Init lwm2m-security\n");

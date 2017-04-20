@@ -60,14 +60,18 @@
 #endif
 
 
-static const uint16_t resources[] =
-  {LWM2M_DEVICE_MANUFACTURER_ID, LWM2M_DEVICE_MODEL_NUMBER_ID,
-   LWM2M_DEVICE_SERIAL_NUMBER_ID, LWM2M_DEVICE_FIRMWARE_VERSION_ID,
-   LWM2M_DEVICE_AVAILABLE_POWER_SOURCES, /* Multi-resource-instance */
-   LWM2M_DEVICE_POWER_SOURCE_VOLTAGE, /* Multi-resource-instance */
-   LWM2M_DEVICE_POWER_SOURCE_CURRENT, /* Multi-resource-instance */
-   LWM2M_DEVICE_TYPE_ID, LWM2M_DEVICE_REBOOT_ID,
-   LWM2M_DEVICE_TIME_ID, LWM2M_DEVICE_FACTORY_DEFAULT_ID,
+static const lwm2m_resource_id_t resources[] =
+  { RO(LWM2M_DEVICE_MANUFACTURER_ID),
+    RO(LWM2M_DEVICE_MODEL_NUMBER_ID),
+    RO(LWM2M_DEVICE_SERIAL_NUMBER_ID),
+    RO(LWM2M_DEVICE_FIRMWARE_VERSION_ID),
+    RO(LWM2M_DEVICE_AVAILABLE_POWER_SOURCES), /* Multi-resource-instance */
+    RO(LWM2M_DEVICE_POWER_SOURCE_VOLTAGE), /* Multi-resource-instance */
+    RO(LWM2M_DEVICE_POWER_SOURCE_CURRENT), /* Multi-resource-instance */
+    RO(LWM2M_DEVICE_TYPE_ID),
+    EX(LWM2M_DEVICE_REBOOT_ID),
+    RW(LWM2M_DEVICE_TIME_ID),
+    EX(LWM2M_DEVICE_FACTORY_DEFAULT_ID),
   };
 
 #ifndef LWM2M_DEVICE_MANUFACTURER
@@ -184,7 +188,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       }
     } else if(ctx->operation == LWM2M_OP_EXECUTE) {
       if(ctx->resource_id == LWM2M_DEVICE_REBOOT_ID) {
-        /* DO THE REBOOT */
+        /* Do THE REBOOT */
         PRINTF("REBOOT\n");
       }
     } else if(ctx->operation == LWM2M_OP_WRITE) {
@@ -215,7 +219,7 @@ lwm2m_device_init(void)
   device.object_id = LWM2M_OBJECT_DEVICE_ID;
   device.instance_id = 0;
   device.resource_ids = resources;
-  device.resource_count = sizeof(resources) / sizeof(uint16_t);
+  device.resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t);
   device.resource_dim_callback = lwm2m_dim_callback;
   device.callback = lwm2m_callback;
 

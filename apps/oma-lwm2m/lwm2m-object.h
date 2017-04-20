@@ -54,6 +54,22 @@
 #include "er-coap.h"
 #include "er-coap-observe.h"
 
+/* Operation permissions on the resources - read/write/execute */
+#define LWM2M_RESOURCE_READ    0x10000
+#define LWM2M_RESOURCE_WRITE   0x20000
+#define LWM2M_RESOURCE_EXECUTE 0x40000
+
+/* The resource id type of lwm2m objects - 16 bits for the ID - the rest
+   is flags */
+typedef uint32_t lwm2m_resource_id_t;
+
+/* Defines for the resource definition array */
+#define RO(x) (x | LWM2M_RESOURCE_READ)
+#define WO(x) (x | LWM2M_RESOURCE_WRITE)
+#define RW(x) (x | LWM2M_RESOURCE_READ | LWM2M_RESOURCE_WRITE)
+#define EX(x) (x | LWM2M_RESOURCE_EXECUTE)
+
+
 #define LWM2M_OBJECT_SECURITY_ID                0
 #define LWM2M_OBJECT_SERVER_ID                  1
 #define LWM2M_OBJECT_ACCESS_CONTROL_ID          2

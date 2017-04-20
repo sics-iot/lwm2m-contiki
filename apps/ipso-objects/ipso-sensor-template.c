@@ -55,9 +55,13 @@
 
 #define IPSO_SENSOR_RESET_MINMAX 5605
 
-static const uint16_t resources[] =
-  {IPSO_SENSOR_VALUE, IPSO_SENSOR_UNIT, IPSO_SENSOR_MIN_VALUE, IPSO_SENSOR_MAX_VALUE,
-   IPSO_SENSOR_MIN_RANGE, IPSO_SENSOR_MAX_RANGE};
+static const lwm2m_resource_id_t resources[] =
+  {
+    RO(IPSO_SENSOR_VALUE), RO(IPSO_SENSOR_UNIT),
+    RO(IPSO_SENSOR_MIN_VALUE), RO(IPSO_SENSOR_MAX_VALUE),
+    RO(IPSO_SENSOR_MIN_RANGE), RO(IPSO_SENSOR_MAX_RANGE),
+    EX(IPSO_SENSOR_RESET_MINMAX)
+  };
 
 /*---------------------------------------------------------------------------*/
 static void update_last_value(ipso_sensor_value_t *sval, int32_t value,
@@ -212,7 +216,8 @@ ipso_sensor_add(const ipso_sensor_t *sensor)
   }
   sensor->sensor_value->reg_object.callback = lwm2m_callback;
   sensor->sensor_value->reg_object.resource_ids = resources;
-  sensor->sensor_value->reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+  sensor->sensor_value->reg_object.resource_count =
+    sizeof(resources) / sizeof(lwm2m_resource_id_t);
   lwm2m_engine_add_object(&sensor->sensor_value->reg_object);
   return 1;
 }

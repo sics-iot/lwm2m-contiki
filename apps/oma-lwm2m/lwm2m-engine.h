@@ -101,7 +101,7 @@ struct lwm2m_object_instance {
   uint16_t object_id;
   uint16_t instance_id;
   /* an array of resource IDs for discovery, etc */
-  const uint16_t *resource_ids;
+  const lwm2m_resource_id_t *resource_ids;
   uint16_t resource_count;
   /* the callback for requests */
   lwm2m_object_instance_callback_t callback;
