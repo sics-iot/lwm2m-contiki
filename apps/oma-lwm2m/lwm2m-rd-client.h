@@ -31,10 +31,11 @@
 #ifndef LWM2M_RD_CLIENT_H_
 #define LWM2M_RD_CLIENT_H_
 
-#define LWM2M_RD_CLIENT_BOOTSTRAPPED 1
-#define LWM2M_RD_CLIENT_REGISTERED   2
-#define LWM2M_RD_CLIENT_DEREGISTERED 3
-#define LWM2M_RD_CLIENT_DISCONNECTED 4
+#define LWM2M_RD_CLIENT_BOOTSTRAPPED       1
+#define LWM2M_RD_CLIENT_REGISTERED         2
+#define LWM2M_RD_CLIENT_DEREGISTERED       3
+#define LWM2M_RD_CLIENT_DEREGISTER_FAILED  4
+#define LWM2M_RD_CLIENT_DISCONNECTED       5
 
 struct lwm2m_session_info;
 typedef void (*session_callback_t)(struct lwm2m_session_info *session, int status);

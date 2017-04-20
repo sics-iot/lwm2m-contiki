@@ -108,8 +108,8 @@ static struct request_state rd_request_state;
 #define UPDATE_SENT        9
 #define DEREGISTER        10
 #define DEREGISTER_SENT   11
-#define DEREGISTERED      12
-
+#define DEREGISTER_FAILED 12
+#define DEREGISTERED      13
 
 #define FLAG_RD_DATA_DIRTY            0x01
 #define FLAG_RD_DATA_UPDATE_TRIGGERED 0x02
@@ -428,17 +428,15 @@ deregister_callback(struct request_state *state)
   PRINTF("Deregister callback. Response Code: %d\n",
          state->response != NULL ? state->response->code : 0);
 
-  if(state->response) {
-    if(DELETED_2_02 == state->response->code) {
-      PRINTF("Deregistration success\n");
-      rd_state = DEREGISTERED;
-      perform_session_callback(LWM2M_RD_CLIENT_DEREGISTERED);
-    }
+  if(state->response && (DELETED_2_02 == state->response->code)) {
+    PRINTF("Deregistration success\n");
+    rd_state = DEREGISTERED;
+    perform_session_callback(LWM2M_RD_CLIENT_DEREGISTERED);
   } else {
-    /* failed? try again? */
-    PRINTF("Deregistration failed - retry if under deregistering\n");
+    PRINTF("Deregistration failed\n");
     if(rd_state == DEREGISTER_SENT) {
-      rd_state = DEREGISTER;
+      rd_state = DEREGISTER_FAILED;
+      perform_session_callback(LWM2M_RD_CLIENT_DEREGISTER_FAILED);
     }
   }
 }
@@ -626,6 +624,8 @@ periodic_process(ntimer_t *timer)
     rd_state = DEREGISTER_SENT;
     break;
   case DEREGISTER_SENT:
+    break;
+  case DEREGISTER_FAILED:
     break;
   case DEREGISTERED:
     break;
