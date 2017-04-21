@@ -89,6 +89,8 @@ typedef uint32_t lwm2m_resource_id_t;
 
 #define LWM2M_SERVER_SHORT_SERVER_ID            0
 #define LWM2M_SERVER_LIFETIME_ID                1
+#define LWM2M_SERVER_BINDING_ID                 7
+#define LWM2M_SERVER_REG_UPDATE_TRIGGER_ID      8
 
 #define LWM2M_DEVICE_MANUFACTURER_ID            0
 #define LWM2M_DEVICE_MODEL_NUMBER_ID            1

@@ -46,6 +46,7 @@
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-server.h"
+#include "lwm2m-rd-client.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -65,8 +66,9 @@ static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
 
 static const lwm2m_resource_id_t resources[] = {
-  LWM2M_SERVER_SHORT_SERVER_ID,
-  LWM2M_SERVER_LIFETIME_ID
+  RO(LWM2M_SERVER_SHORT_SERVER_ID),
+  RW(LWM2M_SERVER_LIFETIME_ID),
+  EX(LWM2M_SERVER_REG_UPDATE_TRIGGER_ID)
 };
 
 static lwm2m_object_instance_t server_object;
@@ -129,6 +131,12 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     switch(ctx->resource_id) {
     case LWM2M_SERVER_LIFETIME_ID:
       lwm2m_object_write_int(ctx, server->lifetime);
+      break;
+    }
+  } else if(ctx->operation == LWM2M_OP_EXECUTE) {
+    switch(ctx->resource_id) {
+    case LWM2M_SERVER_REG_UPDATE_TRIGGER_ID:
+      lwm2m_rd_client_update_triggered();
       break;
     }
   }

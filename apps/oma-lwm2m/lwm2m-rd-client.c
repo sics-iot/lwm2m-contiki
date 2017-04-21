@@ -111,8 +111,9 @@ static struct request_state rd_request_state;
 #define DEREGISTERED      12
 
 
-#define FLAG_RD_DATA_DIRTY 1
-#define FLAG_RD_DATA_UPDATE_ON_DIRTY 0x10
+#define FLAG_RD_DATA_DIRTY            0x01
+#define FLAG_RD_DATA_UPDATE_TRIGGERED 0x02
+#define FLAG_RD_DATA_UPDATE_ON_DIRTY  0x10
 
 static uint8_t rd_state = 0;
 static uint8_t rd_flags = FLAG_RD_DATA_UPDATE_ON_DIRTY;
@@ -129,7 +130,7 @@ void check_periodic_observations();
 
 /*---------------------------------------------------------------------------*/
 static void
-prepare_update(coap_packet_t *request) {
+prepare_update(coap_packet_t *request, int triggered) {
   int len;
   coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
   coap_set_header_uri_path(request, session_info.assigned_ep);
@@ -138,7 +139,7 @@ prepare_update(coap_packet_t *request) {
   printf("UPDATE:%s %s\n", session_info.assigned_ep, query_data);
   coap_set_header_uri_query(request, query_data);
 
-  if(rd_flags & FLAG_RD_DATA_DIRTY) {
+  if((triggered || rd_flags & FLAG_RD_DATA_UPDATE_ON_DIRTY) && (rd_flags & FLAG_RD_DATA_DIRTY)) {
     rd_flags &= ~FLAG_RD_DATA_DIRTY;
     /* generate the rd data */
     len = lwm2m_engine_get_rd_data(rd_data, sizeof(rd_data));
@@ -281,6 +282,12 @@ lwm2m_rd_client_deregister(void)
   if(lwm2m_rd_client_is_registered()) {
     rd_state = DEREGISTER;
   }
+}
+void
+lwm2m_rd_client_update_triggered(void)
+{
+  rd_flags |= FLAG_RD_DATA_UPDATE_TRIGGERED;
+  /* Here we need to do an ntimer poll - to get a quick request transmission! */
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -597,12 +604,12 @@ periodic_process(ntimer_t *timer)
     check_periodic_observations(); /* TODO: manage periodic observations */
 
     /* check if it is time for the next update */
-    if(((uint32_t)session_info.lifetime * 500) <= now - last_update) { /* time to send an update to the server, at half-time! sec vs ms */
-      /* prepare request,  */
-      prepare_update(request);
+    if((rd_flags & FLAG_RD_DATA_UPDATE_TRIGGERED) ||
+       ((uint32_t)session_info.lifetime * 500) <= now - last_update) {
+      /* triggered or time to send an update to the server, at half-time! sec vs ms */
+      prepare_update(request, rd_flags & FLAG_RD_DATA_UPDATE_TRIGGERED);
       coap_send_request(&rd_request_state, &session_info.server_ep, request,
                         update_callback);
-
       rd_state = UPDATE_SENT;
     }
     break;

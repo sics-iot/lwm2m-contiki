@@ -50,6 +50,9 @@ void lwm2m_rd_client_set_lifetime(uint16_t lifetime);
 void lwm2m_rd_client_set_update_rd(void);
 /* Control if the object list should be automatically updated at updates of lifetime */
 void lwm2m_rd_client_set_automatic_update(int update);
+/* trigger an immediate update */
+void lwm2m_rd_client_update_triggered(void);
+
 void lwm2m_rd_client_deregister(void);
 void lwm2m_rd_client_init(const char *ep);
 
