@@ -95,7 +95,8 @@ lwm2m_server_create(int instance_id)
       server_instances[i].reg_object.object_id = LWM2M_OBJECT_SERVER_ID;
       server_instances[i].reg_object.instance_id = instance_id;
       server_instances[i].reg_object.resource_ids = resources;
-      server_instances[i].reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+      server_instances[i].reg_object.resource_count =
+        sizeof(resources) / sizeof(lwm2m_resource_id_t);
       lwm2m_engine_add_object((lwm2m_object_instance_t *) &server_instances[i]);
       return 1;
     }
