@@ -114,7 +114,8 @@ write_opaque_header(lwm2m_context_t *ctx, size_t payloadsize)
   tlv.value = (uint8_t *) NULL;
   tlv.length = (uint32_t) payloadsize;
   tlv.id = ctx->resource_id;
-  return oma_tlv_write(&tlv, &ctx->outbuf[ctx->outlen], ctx->outsize - ctx->outlen);
+  return oma_tlv_write(&tlv, &ctx->outbuf->buffer[ctx->outbuf->len],
+                       ctx->outbuf->size - ctx->outbuf->len);
 }
 /*---------------------------------------------------------------------------*/
 static size_t
@@ -123,17 +124,17 @@ enter_sub(lwm2m_context_t *ctx)
   /* set some flags in state */
   oma_tlv_t tlv;
   int len = 0;
-  PRINTF("Enter sub-resource rsc=%d mark:%d\n", ctx->resource_id, ctx->outlen);
+  PRINTF("Enter sub-resource rsc=%d mark:%d\n", ctx->resource_id, ctx->outbuf->len);
   ctx->writer_flags |= WRITER_RESOURCE_INSTANCE;
   tlv.type = OMA_TLV_TYPE_MULTI_RESOURCE;
   tlv.length = 8; /* create an 8-bit TLV */
   tlv.value = NULL;
   tlv.id = ctx->resource_id;
-  len = oma_tlv_write(&tlv, &ctx->outbuf[ctx->outlen],
-                      ctx->outsize - ctx->outlen);
+  len = oma_tlv_write(&tlv, &ctx->outbuf->buffer[ctx->outbuf->len],
+                      ctx->outbuf->size - ctx->outbuf->len);
   /* store position for deciding where to re-write the TLV when we
      know the length - NOTE: either this or memmov of buffer later... */
-  ctx->out_mark_pos_ri = ctx->outlen;
+  ctx->out_mark_pos_ri = ctx->outbuf->len;
   return len;
 }
 /*---------------------------------------------------------------------------*/
@@ -148,13 +149,13 @@ exit_sub(lwm2m_context_t *ctx)
   if(ctx->resource_id > 0xff) {
     pos++;
   }
-  len = ctx->outlen - ctx->out_mark_pos_ri;
+  len = ctx->outbuf->len - ctx->out_mark_pos_ri;
 
   PRINTF("Exit sub-resource rsc=%d mark:%d len=%d\n", ctx->resource_id,
          ctx->out_mark_pos_ri, len);
 
   /* update the lenght byte... Assume TLV header is pos + 1 bytes. */
-  ctx->outbuf[pos + ctx->out_mark_pos_ri] = len - (pos + 1);
+  ctx->outbuf->buffer[pos + ctx->out_mark_pos_ri] = len - (pos + 1);
   return 0;
 }
 /*---------------------------------------------------------------------------*/

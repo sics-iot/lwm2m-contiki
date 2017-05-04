@@ -124,7 +124,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     PRINTF("Write to: %d\n", ctx->resource_id);
     switch(ctx->resource_id) {
     case LWM2M_SERVER_LIFETIME_ID:
-      lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &value);
+      lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &value);
       PRINTF("Got lifetime: %d\n", (int) value);
       server->lifetime = value;
     }

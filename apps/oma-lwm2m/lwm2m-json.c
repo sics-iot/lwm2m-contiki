@@ -71,7 +71,7 @@
 /* Simlified JSON style reader for reading in values from a LWM2M JSON
    string */
 int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
-  int pos = ctx->inpos;
+  int pos = ctx->inbuf->pos;
   uint8_t type = T_NONE;
   uint8_t vpos_start = 0;
   uint8_t vpos_end = 0;
@@ -83,14 +83,14 @@ int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
 
   cont = 1;
   /* We will be either at start, or at a specific position */
-  while(pos < ctx->insize && cont) {
-    uint8_t c = ctx->inbuf[pos++];
+  while(pos < ctx->inbuf->size && cont) {
+    uint8_t c = ctx->inbuf->buffer[pos++];
     switch(c) {
     case '{': type = T_OBJ; break;
     case '}':
     case ',':
       if(type == T_VAL || type == T_STRING) {
-        json->value = &ctx->inbuf[vpos_start];
+        json->value = &ctx->inbuf->buffer[vpos_start];
         json->value_len = vpos_end - vpos_start - wscount;
         type = T_NONE;
         cont = 0;
@@ -99,7 +99,7 @@ int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
       break;
     case '\\':
       /* stuffing */
-      if(pos < ctx->insize) {
+      if(pos < ctx->inbuf->size) {
         pos++;
         vpos_end = pos;
       }
@@ -116,7 +116,7 @@ int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
       break;
     case ':':
       if(type == T_STRING) {
-        json->name = &ctx->inbuf[vpos_start];
+        json->name = &ctx->inbuf->buffer[vpos_start];
         json->name_len = vpos_end - vpos_start;
         vpos_start = vpos_end = pos;
         type = T_VAL;
@@ -143,21 +143,21 @@ int lwm2m_json_next_token(lwm2m_context_t *ctx, struct json_data *json) {
     }
   }
 
-  if(cont == 0 && pos < ctx->insize) {
-    ctx->inpos = pos;
+  if(cont == 0 && pos < ctx->inbuf->size) {
+    ctx->inbuf->pos = pos;
   }
   /* OK if cont == 0 othewise we failed */
-  return cont == 0 && pos < ctx->insize;
+  return cont == 0 && pos < ctx->inbuf->size;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
 init_write(lwm2m_context_t *ctx)
 {
-  int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
-                     ctx->outsize - ctx->outlen, "{\"bn\":\"/%u/%u/\",\"e\":[",
+  int len = snprintf((char *)&ctx->outbuf->buffer[ctx->outbuf->len],
+                     ctx->outbuf->size - ctx->outbuf->len, "{\"bn\":\"/%u/%u/\",\"e\":[",
                      ctx->object_id, ctx->object_instance_id);
   ctx->writer_flags = 0; /* set flags to zero */
-  if((len < 0) || (len >= ctx->outsize)) {
+  if((len < 0) || (len >= ctx->outbuf->size)) {
     return 0;
   }
   return len;
@@ -166,9 +166,9 @@ init_write(lwm2m_context_t *ctx)
 static size_t
 end_write(lwm2m_context_t *ctx)
 {
-  int len = snprintf((char *)&ctx->outbuf[ctx->outlen],
-                     ctx->outsize - ctx->outlen, "]}");
-  if((len < 0) || (len >= ctx->outsize - ctx->outlen)) {
+  int len = snprintf((char *)&ctx->outbuf->buffer[ctx->outbuf->len],
+                     ctx->outbuf->size - ctx->outbuf->len, "]}");
+  if((len < 0) || (len >= ctx->outbuf->size - ctx->outbuf->len)) {
     return 0;
   }
   return len;

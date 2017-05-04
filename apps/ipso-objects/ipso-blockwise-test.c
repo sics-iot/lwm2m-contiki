@@ -41,7 +41,7 @@
 #include "er-coap.h"
 #include <string.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -56,7 +56,7 @@ static const lwm2m_resource_id_t resources[] =
   {
     RO(10000),
     RO(11000),
-    //RW(11001)
+    RW(11001)
   };
 
 #define LEN 900
@@ -65,16 +65,14 @@ static lwm2m_status_t
 opaque_callback(lwm2m_object_instance_t *object,
                 lwm2m_context_t *ctx, int num_to_write)
 {
-  int i, pos;
+  int i;
   PRINTF("opaque-stream callback num_to_write: %d off: %d outlen: %d\n",
-         num_to_write, ctx->offset, ctx->outlen);
-  if(num_to_write > 0) {
-    for(i = 0; i < num_to_write; i++) {
-      ctx->outbuf[i + ctx->outlen] = '0' + (i & 31);
-      if(i + ctx->offset == LEN) break;
-    }
-    ctx->outlen += i;
+         num_to_write, ctx->offset, ctx->outbuf->len);
+  for(i = 0; i < num_to_write; i++) {
+    ctx->outbuf->buffer[i + ctx->outbuf->len] = '0' + (i & 31);
+    if(i + ctx->offset == LEN) break;
   }
+  ctx->outbuf->len += i;
   if(ctx->offset + i < LEN) {
     ctx->writer_flags |= WRITER_HAS_MORE;
   }
@@ -86,12 +84,10 @@ static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
-#if DEBUG
   uint32_t num;
   uint8_t more;
   uint16_t size;
   uint32_t offset;
-#endif
 
   char *str = "just a string";
 
@@ -126,12 +122,10 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       return LWM2M_STATUS_NOT_FOUND;
     }
   } else if(ctx->operation == LWM2M_OP_WRITE) {
-#if DEBUG
     if(coap_get_header_block1(ctx->request, &num, &more, &size, &offset)) {
       PRINTF("CoAP BLOCK1: %d/%d/%d offset:%d\n", num, more, size, offset);
+      coap_set_header_block1(ctx->response, num, 0, size);
     }
-#endif
-    coap_set_header_block1(ctx->response, num, 0, size);
   }
   return LWM2M_STATUS_OK;
 }

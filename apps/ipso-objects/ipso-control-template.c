@@ -98,7 +98,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       switch(ctx->resource_id) {
       case IPSO_ONOFF:
       case IPSO_DIMMER:
-        len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v);
+        len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
         if(len == 0) {
           return LWM2M_STATUS_ERROR;
         }
@@ -122,7 +122,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         }
         break;
       case IPSO_ON_TIME:
-        len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v);
+        len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
         if(len == 0) {
           return LWM2M_STATUS_ERROR;
         }

@@ -144,13 +144,13 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     /* Handle the writes */
     switch(ctx->resource_id) {
     case LWM2M_SECURITY_SERVER_URI_ID:
-      PRINTF("Writing security URI value: len: %d\n", (int)ctx->insize);
-      value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->server_uri, URI_SIZE);
+      PRINTF("Writing security URI value: len: %d\n", (int)ctx->inbuf->size);
+      value = lwm2m_object_read_string(ctx, ctx->inbuf->buffer, ctx->inbuf->size, security->server_uri, URI_SIZE);
       /* This is string... */
       security->server_uri_len = ctx->last_value_len;
       break;
     case LWM2M_SECURITY_BOOTSTRAP_SERVER_ID:
-      value = lwm2m_object_read_boolean(ctx, ctx->inbuf, ctx->insize, &iv);
+      value = lwm2m_object_read_boolean(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &iv);
       PRINTF("Set Bootstrap: %d\n", iv);
       if(value > 0) {
         security->bootstrap = (uint8_t) iv;
@@ -158,14 +158,14 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     case LWM2M_SECURITY_MODE_ID:
       {
         int32_t v2;
-        value = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize, &v2);
+        value = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v2);
         PRINTF("Writing security MODE value: %d len: %d\n", v2,
-               (int)ctx->insize);
+               (int)ctx->inbuf->size);
         security->security_mode = v2;
       }
       break;
     case LWM2M_SECURITY_CLIENT_PKI_ID:
-      value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->public_key, KEY_SIZE);
+      value = lwm2m_object_read_string(ctx, ctx->inbuf->buffer, ctx->inbuf->size, security->public_key, KEY_SIZE);
       security->public_key_len = ctx->last_value_len;
 
       PRINTF("Writing client PKI: len: %d '", (int)ctx->last_value_len);
@@ -173,7 +173,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       PRINTF("'\n");
       break;
     case LWM2M_SECURITY_KEY_ID:
-      value = lwm2m_object_read_string(ctx, ctx->inbuf, ctx->insize, security->secret_key, URI_SIZE);
+      value = lwm2m_object_read_string(ctx, ctx->inbuf->buffer, ctx->inbuf->size, security->secret_key, URI_SIZE);
       security->secret_key_len = ctx->last_value_len;
 
       PRINTF("Writing secret key: len: %d '", (int)ctx->last_value_len);

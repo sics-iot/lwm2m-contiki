@@ -166,6 +166,13 @@ typedef struct lwm2m_writer lwm2m_writer_t;
 
 typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 
+typedef struct {
+  uint16_t len; /* used for current length of the data in the buffer */
+  uint16_t pos; /* position in the buffer - typically write position or similar */
+  uint16_t size;
+  uint8_t *buffer;
+} lwm2m_buffer_t;
+
 /* Data model for OMA LWM2M objects */
 typedef struct lwm2m_context {
   uint16_t object_id;
@@ -182,15 +189,11 @@ typedef struct lwm2m_context {
   coap_packet_t *response;
 
   unsigned int content_type;
-  uint8_t *outbuf;
-  size_t   outsize;
-  unsigned outlen;
+  lwm2m_buffer_t *outbuf;
+  lwm2m_buffer_t *inbuf;
+
   uint8_t  out_mark_pos_oi; /* mark pos for last object instance   */
   uint8_t  out_mark_pos_ri; /* mark pos for last resource instance */
-
-  uint8_t *inbuf;
-  size_t  insize;
-  int     inpos;
 
   uint32_t offset; /* If we do blockwise - this needs to change */
 
@@ -266,9 +269,9 @@ static inline size_t
 lwm2m_object_write_int(lwm2m_context_t *ctx, int32_t value)
 {
   size_t s;
-  s = ctx->writer->write_int(ctx, &ctx->outbuf[ctx->outlen],
-                             ctx->outsize - ctx->outlen, value);
-  ctx->outlen += s;
+  s = ctx->writer->write_int(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                             ctx->outbuf->size - ctx->outbuf->len, value);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -276,9 +279,9 @@ static inline size_t
 lwm2m_object_write_string(lwm2m_context_t *ctx, const char *value, size_t strlen)
 {
   size_t s;
-  s = ctx->writer->write_string(ctx, &ctx->outbuf[ctx->outlen],
-                                ctx->outsize - ctx->outlen, value, strlen);
-  ctx->outlen += s;
+  s = ctx->writer->write_string(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                                ctx->outbuf->size - ctx->outbuf->len, value, strlen);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -286,9 +289,9 @@ static inline size_t
 lwm2m_object_write_float32fix(lwm2m_context_t *ctx, int32_t value, int bits)
 {
   size_t s;
-  s = ctx->writer->write_float32fix(ctx, &ctx->outbuf[ctx->outlen],
-                                    ctx->outsize - ctx->outlen, value, bits);
-  ctx->outlen += s;
+  s = ctx->writer->write_float32fix(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                                    ctx->outbuf->size - ctx->outbuf->len, value, bits);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -296,9 +299,9 @@ static inline size_t
 lwm2m_object_write_boolean(lwm2m_context_t *ctx, int value)
 {
   size_t s;
-  s = ctx->writer->write_boolean(ctx, &ctx->outbuf[ctx->outlen],
-                                 ctx->outsize - ctx->outlen, value);
-  ctx->outlen += s;
+  s = ctx->writer->write_boolean(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                                 ctx->outbuf->size - ctx->outbuf->len, value);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -309,7 +312,7 @@ lwm2m_object_write_opaque_stream(lwm2m_context_t *ctx, int size, lwm2m_write_opa
   size_t s;
   if(ctx->writer->write_opaque_header != NULL) {
     s = ctx->writer->write_opaque_header(ctx, size);
-    ctx->outlen += s;
+    ctx->outbuf->len += s;
   }
   /* 2. - set the callback so that future data will be grabbed from the callback */
   lwm2m_engine_set_opaque_callback(ctx, cb);
@@ -323,7 +326,7 @@ lwm2m_object_write_enter_ri(lwm2m_context_t *ctx)
   if(ctx->writer->enter_resource_instance != NULL) {
     size_t s;
     s = ctx->writer->enter_resource_instance(ctx);
-    ctx->outlen += s;
+    ctx->outbuf->len += s;
     return s;
   }
   return 0;
@@ -335,7 +338,7 @@ lwm2m_object_write_exit_ri(lwm2m_context_t *ctx)
   if(ctx->writer->exit_resource_instance != NULL) {
     size_t s;
     s = ctx->writer->exit_resource_instance(ctx);
-    ctx->outlen += s;
+    ctx->outbuf->len += s;
     return s;
   }
   return 0;
@@ -346,9 +349,9 @@ lwm2m_object_write_int_ri(lwm2m_context_t *ctx, uint16_t id, int32_t value)
 {
   size_t s;
   ctx->resource_instance_id = id;
-  s = ctx->writer->write_int(ctx, &ctx->outbuf[ctx->outlen],
-                             ctx->outsize - ctx->outlen, value);
-  ctx->outlen += s;
+  s = ctx->writer->write_int(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                             ctx->outbuf->size - ctx->outbuf->len, value);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -357,9 +360,9 @@ lwm2m_object_write_string_ri(lwm2m_context_t *ctx, uint16_t id, const char *valu
 {
   size_t s;
   ctx->resource_instance_id = id;
-  s = ctx->writer->write_string(ctx, &ctx->outbuf[ctx->outlen],
-                                ctx->outsize - ctx->outlen, value, strlen);
-  ctx->outlen += s;
+  s = ctx->writer->write_string(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                                ctx->outbuf->size - ctx->outbuf->len, value, strlen);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -368,9 +371,9 @@ lwm2m_object_write_float32fix_ri(lwm2m_context_t *ctx, uint16_t id, int32_t valu
 {
   size_t s;
   ctx->resource_instance_id = id;
-  s = ctx->writer->write_float32fix(ctx, &ctx->outbuf[ctx->outlen],
-                                    ctx->outsize - ctx->outlen, value, bits);
-  ctx->outlen += s;
+  s = ctx->writer->write_float32fix(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                                    ctx->outbuf->size - ctx->outbuf->len, value, bits);
+  ctx->outbuf->len += s;
   return s;
 }
 
@@ -379,9 +382,9 @@ lwm2m_object_write_boolean_ri(lwm2m_context_t *ctx, uint16_t id, int value)
 {
   size_t s;
   ctx->resource_instance_id = id;
-  s = ctx->writer->write_boolean(ctx, &ctx->outbuf[ctx->outlen],
-                                 ctx->outsize - ctx->outlen, value);
-  ctx->outlen += s;
+  s = ctx->writer->write_boolean(ctx, &ctx->outbuf->buffer[ctx->outbuf->len],
+                                 ctx->outbuf->size - ctx->outbuf->len, value);
+  ctx->outbuf->len += s;
   return s;
 }
 

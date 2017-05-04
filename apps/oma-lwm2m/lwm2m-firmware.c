@@ -112,7 +112,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     switch(ctx->resource_id) {
     case UPDATE_PACKAGE:
       /* The firmware is written */
-      PRINTF("Firmware received: %d %d fin:%d\n", ctx->offset, (int) ctx->insize,
+      PRINTF("Firmware received: %d %d fin:%d\n", ctx->offset, (int) ctx->inbuf->size,
              lwm2m_object_is_final_incoming(ctx));
       if(lwm2m_object_is_final_incoming(ctx)) {
         state = STATE_DOWNLOADED;
@@ -122,13 +122,13 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       return LWM2M_STATUS_OK;
     case UPDATE_PACKAGE_URI:
       /* The firmware URI is written */
-      PRINTF("Firmware URI received: %d %d fin:%d\n", ctx->offset, (int) ctx->insize,
+      PRINTF("Firmware URI received: %d %d fin:%d\n", ctx->offset, (int) ctx->inbuf->size,
              lwm2m_object_is_final_incoming(ctx));
       if(DEBUG) {
         int i;
         PRINTF("Data: '");
-        for(i = 0; i < ctx->insize; i++) {
-          PRINTF("%c", ctx->inbuf[i]);
+        for(i = 0; i < ctx->inbuf->size; i++) {
+          PRINTF("%c", ctx->inbuf->buffer[i]);
         }
         PRINTF("'\n");
       }

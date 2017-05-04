@@ -194,7 +194,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     } else if(ctx->operation == LWM2M_OP_WRITE) {
       /* assume that this only read one TLV value */
       int32_t lw_time;
-      size_t len = lwm2m_object_read_int(ctx, ctx->inbuf, ctx->insize,
+      size_t len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size,
                                          &lw_time);
       if(len == 0) {
         PRINTF("FAIL: could not read time\n");
