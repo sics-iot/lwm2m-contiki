@@ -168,6 +168,32 @@ append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
   return pos;
 }
 /*---------------------------------------------------------------------------*/
+/* This is intended to switch out a block2 transfer buffer
+ * It assumes that ctx containts the double buffer and that the outbuf is to
+ * be the new buffer in ctx.
+ */
+static int
+double_buffer_flush(lwm2m_context_t *ctx, lwm2m_buffer_t *outbuf, int size)
+{
+  /* Copy the data from the double buffer in ctx to the outbuf and move data */
+  /* If the buffer is less than size - we will output all and get remaining down
+     to zero */
+  if(ctx->outbuf->len < size) {
+    size = ctx->outbuf->len;
+  }
+  if(ctx->outbuf->len >= size && outbuf->size >= size) {
+    PRINTF("Double buffer - copying out %d bytes remaining: %d\n",
+           size, ctx->outbuf->len - size);
+    memcpy(outbuf->buffer, ctx->outbuf->buffer, size);
+    memcpy(ctx->outbuf->buffer, &ctx->outbuf->buffer[size],
+           ctx->outbuf->len - size);
+    ctx->outbuf->len -= size;
+    outbuf->len = size;
+    return outbuf->len;
+  }
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
 #if DEBUG
 static inline const char *
 get_method_as_string(rest_resource_flags_t method)
@@ -429,7 +455,6 @@ static lwm2m_status_t
 perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
                                lwm2m_context_t *ctx)
 {
-  int pos = 0;
   int size = ctx->outbuf->size;
   int len = 0;
   uint8_t initialized = 0; /* used for commas, etc */
@@ -464,7 +489,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     /* reset any callback */
     current_opaque_callback = NULL;
     /* reset lwm2m_buf_len - so that we can use the double-size buffer */
-        lwm2m_buf_lock[0] = 1; /* lock "flag" */
+    lwm2m_buf_lock[0] = 1; /* lock "flag" */
     lwm2m_buf_lock[1] = ctx->object_id;
     lwm2m_buf_lock[2] = ctx->object_instance_id;
     lwm2m_buf_lock[3] = ctx->resource_id;
@@ -479,7 +504,6 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     if(last_ins == NULL) {
       ctx->offset = -1;
       ctx->outbuf->buffer[0] = ' ';
-      pos = 1;
     }
   }
   lwm2m_buf_lock_timeout = ntimer_uptime() + 1000;
@@ -498,28 +522,30 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
              generted */
           if(ctx->operation == LWM2M_OP_DISCOVER) {
             int dim = 0;
-            len = snprintf((char *) &ctx->outbuf[pos], size - pos,
-                           pos == 0 && ctx->offset == 0 ? "</%d/%d/%d>":",</%d/%d/%d>",
+            len = snprintf((char *) &ctx->outbuf->buffer[ctx->outbuf->len],
+                           size - ctx->outbuf->len,
+                           (ctx->outbuf->len == 0 && ctx->offset == 0) ? "</%d/%d/%d>":",</%d/%d/%d>",
                            instance->object_id, instance->instance_id,
                            RSC_ID(instance->resource_ids[last_rsc_pos]));
             if(instance->resource_dim_callback != NULL &&
                (dim = instance->resource_dim_callback(instance,
                                                       RSC_ID(instance->resource_ids[last_rsc_pos]))) > 0) {
-              len += snprintf((char *) &ctx->outbuf[pos + len],
-                              size - pos - len,  ";dim=%d", dim);
+              len += snprintf((char *) &ctx->outbuf->buffer[ctx->outbuf->len + len],
+                              size - ctx->outbuf->len - len,  ";dim=%d", dim);
             }
             /* here we have "read" out something */
             num_read++;
-            if(len < 0 || len + pos >= size) {
-              /* ok we trunkated here... */
-              ctx->offset += pos;
-              ctx->outbuf->len = pos;
+            ctx->outbuf->len += len;
+            if(len < 0 || ctx->outbuf->len >= size) {
+              double_buffer_flush(ctx, outbuf, size);
+
+              PRINTF("Copied lwm2m buf - remaining: %d\n", lwm2m_buf.len);
+              /* switch buffer */
+              ctx->outbuf = outbuf;
               ctx->writer_flags |= WRITER_HAS_MORE;
-              /* TODO handle full outbuffer! */
-              lwm2m_buf_lock[0] = 0;
+              ctx->offset += size;
               return LWM2M_STATUS_OK;
             }
-            pos += len;
             /* ---------- Read operation ------------- */
           } else if(ctx->operation == LWM2M_OP_READ) {
             lwm2m_status_t success;
@@ -605,7 +631,6 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
 
               /* we need to handle full buffer, etc here also! */
               ctx->level = lv;
-              pos = ctx->outbuf->len;
             } else {
               PRINTF("Resource not readable\n");
             }
@@ -624,17 +649,13 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
              this now */
           if(ctx->outbuf->len < 2 * COAP_MAX_BLOCK_SIZE) {
             /* We assume that size is equal to COAP_MAX_BLOCK_SIZE here */
-            // double_buffer_flush(outbuf, lwm2m_buf, size);
-            /* Note - the lwm2m_buf is the one used in ctx */
-            memcpy(outbuf->buffer, lwm2m_buf.buffer, COAP_MAX_BLOCK_SIZE);
-            memcpy(lwm2m_buf.buffer, &lwm2m_buf.buffer[COAP_MAX_BLOCK_SIZE],
-                   lwm2m_buf.len - COAP_MAX_BLOCK_SIZE);
-            lwm2m_buf.len -= COAP_MAX_BLOCK_SIZE;
+            double_buffer_flush(ctx, outbuf, size);
+
             PRINTF("Copied lwm2m buf - remaining: %d\n", lwm2m_buf.len);
+            /* switch buffer */
             ctx->outbuf = outbuf;
-            ctx->outbuf->len = size;
             ctx->writer_flags |= WRITER_HAS_MORE;
-            ctx->offset += COAP_MAX_BLOCK_SIZE;
+            ctx->offset += size;
             /* OK - everything went well... but we have more. - keep the lock here! */
             return LWM2M_STATUS_OK;
           } else {
@@ -648,11 +669,10 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     instance = lwm2m_engine_next_object_instance(ctx, instance);
     last_ins = instance;
     if(ctx->operation == LWM2M_OP_READ) {
-      PRINTF("END Writer %d ->", pos);
+      PRINTF("END Writer %d ->", ctx->outbuf->len);
       len = ctx->writer->end_write(ctx);
       ctx->outbuf->len += len;
-      pos = ctx->outbuf->len;
-      PRINTF("%d\n", pos);
+      PRINTF("%d\n", ctx->outbuf->len);
     }
 
     initialized = 0;
@@ -665,17 +685,22 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     return LWM2M_STATUS_NOT_FOUND;
   }
 
-  /* seems like we are done! */
-  ctx->offset=-1;
-
-  memcpy(outbuf->buffer, lwm2m_buf.buffer, pos);
-  lwm2m_buf.len = 0;
-  PRINTF("At END: Copied lwm2m buf %d\n", pos);
+  /* seems like we are done! - flush buffer */
+  len = double_buffer_flush(ctx, outbuf, size);
   ctx->outbuf = outbuf;
-  ctx->outbuf->len = pos;
-  /* OK - everything went well, unlock and return */
+  ctx->offset += len;
 
-  lwm2m_buf_lock[0] = 0;
+  /* If there is still data in the double-buffer - indicate that so that we get another
+     callback */
+  if(lwm2m_buf.len > 0) {
+    ctx->writer_flags |= WRITER_HAS_MORE;
+  } else {
+    /* OK - everything went well we are done, unlock and return */
+    lwm2m_buf_lock[0] = 0;
+  }
+
+  PRINTF("At END: Copied lwm2m buf %d\n", len);
+
   return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
