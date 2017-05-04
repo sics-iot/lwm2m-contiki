@@ -135,12 +135,37 @@ typedef enum {
   LWM2M_OP_DELETE
 } lwm2m_operation_t;
 
+typedef enum {
+  LWM2M_STATUS_OK,
+
+  /* Internal server error */
+  LWM2M_STATUS_ERROR,
+  /* Error from writer */
+  LWM2M_STATUS_WRITE_ERROR,
+  /* Error from reader */
+  LWM2M_STATUS_READ_ERROR,
+
+  LWM2M_STATUS_BAD_REQUEST,
+  LWM2M_STATUS_UNAUTHORIZED,
+  LWM2M_STATUS_FORBIDDEN,
+  LWM2M_STATUS_NOT_FOUND,
+  LWM2M_STATUS_OPERATION_NOT_ALLOWED,
+  LWM2M_STATUS_NOT_ACCEPTABLE,
+
+  LWM2M_STATUS_NOT_IMPLEMENTED,
+  LWM2M_STATUS_SERVICE_UNAVAILABLE,
+} lwm2m_status_t;
+
 /* remember that we have already output a value - can be between two block's */
 #define WRITER_OUTPUT_VALUE      1
 #define WRITER_RESOURCE_INSTANCE 2
+#define WRITER_HAS_MORE          4
 
 typedef struct lwm2m_reader lwm2m_reader_t;
 typedef struct lwm2m_writer lwm2m_writer_t;
+
+typedef struct lwm2m_object_instance lwm2m_object_instance_t;
+
 /* Data model for OMA LWM2M objects */
 typedef struct lwm2m_context {
   uint16_t object_id;
@@ -189,18 +214,23 @@ struct lwm2m_writer {
   size_t (* write_string)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,  const char *value, size_t strlen);
   size_t (* write_float32fix)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int32_t value, int bits);
   size_t (* write_boolean)(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen, int value);
+  size_t (* write_opaque_header)(lwm2m_context_t *ctx, size_t total_size);
 };
 
 struct lwm2m_reader {
   size_t (* read_int)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value);
   size_t (* read_string)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, uint8_t *value, size_t strlen);
   size_t (* read_float32fix)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits);
-  size_t (* read_boolean)(
-lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value);
+  size_t (* read_boolean)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value);
 };
 
 #define LWM2M_INSTANCE_FLAG_USED 1
 
+typedef lwm2m_status_t
+(* lwm2m_write_opaque_callback)(lwm2m_object_instance_t *object,
+                                lwm2m_context_t *ctx, int num_to_write);
+
+void lwm2m_engine_set_opaque_callback(lwm2m_context_t *ctx, lwm2m_write_opaque_callback cb);
 
 static inline void
 lwm2m_notify_observers(char *path)
@@ -270,6 +300,19 @@ lwm2m_object_write_boolean(lwm2m_context_t *ctx, int value)
                                  ctx->outsize - ctx->outlen, value);
   ctx->outlen += s;
   return s;
+}
+
+static inline void
+lwm2m_object_write_opaque_stream(lwm2m_context_t *ctx, int size, lwm2m_write_opaque_callback cb)
+{
+  /* 1. - create a header of either OPAQUE (nothing) or TLV if the format is TLV */
+  size_t s;
+  if(ctx->writer->write_opaque_header != NULL) {
+    s = ctx->writer->write_opaque_header(ctx, size);
+    ctx->outlen += s;
+  }
+  /* 2. - set the callback so that future data will be grabbed from the callback */
+  lwm2m_engine_set_opaque_callback(ctx, cb);
 }
 
 /* Resource instance functions (_ri)*/

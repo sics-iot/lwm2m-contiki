@@ -49,9 +49,37 @@
 #define PRINTF(...)
 #endif
 
-lwm2m_object_instance_t reg_object;
-
+static lwm2m_object_instance_t reg_object;
 static char junk[64];
+
+static const lwm2m_resource_id_t resources[] =
+  {
+    RO(10000),
+    RO(11000),
+    //RW(11001)
+  };
+
+#define LEN 900
+
+static lwm2m_status_t
+opaque_callback(lwm2m_object_instance_t *object,
+                lwm2m_context_t *ctx, int num_to_write)
+{
+  int i, pos;
+  PRINTF("opaque-stream callback num_to_write: %d off: %d outlen: %d\n",
+         num_to_write, ctx->offset, ctx->outlen);
+  if(num_to_write > 0) {
+    for(i = 0; i < num_to_write; i++) {
+      ctx->outbuf[i + ctx->outlen] = '0' + (i & 31);
+      if(i + ctx->offset == LEN) break;
+    }
+    ctx->outlen += i;
+  }
+  if(ctx->offset + i < LEN) {
+    ctx->writer_flags |= WRITER_HAS_MORE;
+  }
+  return LWM2M_STATUS_OK;
+}
 
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t
@@ -64,6 +92,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   uint16_t size;
   uint32_t offset;
 #endif
+
+  char *str = "just a string";
 
   PRINTF("Got request at: %d/%d/%d lv:%d\n", ctx->object_id, ctx->object_instance_id, ctx->resource_id, ctx->level);
 
@@ -83,12 +113,17 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     }
 #endif
 
-    lwm2m_object_write_string(ctx, junk, strlen(junk));
-
-    if(ctx->offset < 640) {
-      ctx->offset += 64;
-    } else {
-      ctx->offset = -1;
+    switch(ctx->resource_id) {
+    case 10000:
+      lwm2m_object_write_string(ctx, str, strlen(str));
+      break;
+    case 11000:
+    case 11001:
+      PRINTF("Preparing object write\n");
+      lwm2m_object_write_opaque_stream(ctx, LEN, opaque_callback);
+      break;
+    default:
+      return LWM2M_STATUS_NOT_FOUND;
     }
   } else if(ctx->operation == LWM2M_OP_WRITE) {
 #if DEBUG
@@ -105,8 +140,12 @@ void
 ipso_blockwise_test_init(void)
 {
   int i;
+  PRINTF("Starting blockwise\n");
   reg_object.object_id = 4711;
   reg_object.instance_id = 0;
+  reg_object.resource_ids = resources;
+  reg_object.resource_count =
+    sizeof(resources) / sizeof(lwm2m_resource_id_t);
   reg_object.callback = lwm2m_callback;
 
   for(i = 0; i < sizeof(junk); i++) {

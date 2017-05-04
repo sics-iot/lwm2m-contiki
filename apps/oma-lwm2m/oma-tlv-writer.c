@@ -107,6 +107,17 @@ write_string_tlv(lwm2m_context_t *ctx, uint8_t *outbuf, size_t outlen,
 }
 /*---------------------------------------------------------------------------*/
 static size_t
+write_opaque_header(lwm2m_context_t *ctx, size_t payloadsize)
+{
+  oma_tlv_t tlv;
+  tlv.type = OMA_TLV_TYPE_RESOURCE;
+  tlv.value = (uint8_t *) NULL;
+  tlv.length = (uint32_t) payloadsize;
+  tlv.id = ctx->resource_id;
+  return oma_tlv_write(&tlv, &ctx->outbuf[ctx->outlen], ctx->outsize - ctx->outlen);
+}
+/*---------------------------------------------------------------------------*/
+static size_t
 enter_sub(lwm2m_context_t *ctx)
 {
   /* set some flags in state */
@@ -123,8 +134,7 @@ enter_sub(lwm2m_context_t *ctx)
   /* store position for deciding where to re-write the TLV when we
      know the length - NOTE: either this or memmov of buffer later... */
   ctx->out_mark_pos_ri = ctx->outlen;
-  /* we remove the nonsense payload here (len = 8) */
-  return len - 8;
+  return len;
 }
 /*---------------------------------------------------------------------------*/
 static size_t
@@ -156,7 +166,8 @@ const lwm2m_writer_t oma_tlv_writer = {
   write_int_tlv,
   write_string_tlv,
   write_float32fix_tlv,
-  write_boolean_tlv
+  write_boolean_tlv,
+  write_opaque_header
 };
 /*---------------------------------------------------------------------------*/
 /** @} */

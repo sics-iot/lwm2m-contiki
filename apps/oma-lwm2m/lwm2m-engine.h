@@ -59,33 +59,10 @@ typedef enum {
   LWM2M_OLD_OPAQUE  = 1544
 } lwm2m_content_format_t;
 
-typedef enum {
-  LWM2M_STATUS_OK,
-
-  /* Internal server error */
-  LWM2M_STATUS_ERROR,
-  /* Error from writer */
-  LWM2M_STATUS_WRITE_ERROR,
-  /* Error from reader */
-  LWM2M_STATUS_READ_ERROR,
-
-  LWM2M_STATUS_BAD_REQUEST,
-  LWM2M_STATUS_UNAUTHORIZED,
-  LWM2M_STATUS_FORBIDDEN,
-  LWM2M_STATUS_NOT_FOUND,
-  LWM2M_STATUS_OPERATION_NOT_ALLOWED,
-  LWM2M_STATUS_NOT_ACCEPTABLE,
-
-  LWM2M_STATUS_NOT_IMPLEMENTED,
-  LWM2M_STATUS_SERVICE_UNAVAILABLE,
-} lwm2m_status_t;
-
 void lwm2m_engine_init(void);
 void lwm2m_engine_register_default_objects(void);
 
 int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
-
-typedef struct lwm2m_object_instance lwm2m_object_instance_t;
 
 typedef lwm2m_status_t
 (* lwm2m_object_instance_callback_t)(lwm2m_object_instance_t *object,
@@ -113,6 +90,9 @@ void lwm2m_engine_add_object(lwm2m_object_instance_t *object);
 void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
 void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
                                    uint16_t resource);
+
+void lwm2m_engine_set_opaque_callback(lwm2m_context_t *ctx, lwm2m_write_opaque_callback cb);
+
 
 #endif /* LWM2M_ENGINE_H */
 /** @} */

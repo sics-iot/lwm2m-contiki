@@ -146,7 +146,8 @@ ipso_control_add(ipso_control_t *control)
       lwm2m_engine_recommend_instance_id(control->reg_object.object_id);
   }
   control->reg_object.resource_ids = resources;
-  control->reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
+  control->reg_object.resource_count =
+    sizeof(resources) / sizeof(lwm2m_resource_id_t);
 
   control->reg_object.callback = lwm2m_callback;
   lwm2m_engine_add_object(&control->reg_object);

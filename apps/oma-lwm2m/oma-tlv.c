@@ -46,7 +46,7 @@
 #include <stdint.h>
 #include "oma-tlv.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -117,8 +117,11 @@ oma_tlv_get_size(const oma_tlv_t *tlv)
   return size;
 }
 /*---------------------------------------------------------------------------*/
+/* If the tlv->value is NULL - only the header will be generated - useful for
+ * large strings or opaque streaming (block transfer)
+ */
 size_t
-oma_tlv_write(const oma_tlv_t *tlv, uint8_t *buffer, size_t len)
+oma_tlv_write(const oma_tlv_t *tlv, uint8_t *buffer, size_t buffersize)
 {
   int pos;
   uint8_t len_type;
@@ -127,8 +130,12 @@ oma_tlv_write(const oma_tlv_t *tlv, uint8_t *buffer, size_t len)
   len_type = get_len_type(tlv);
   pos = 1 + len_type;
   /* ensure that we do not write too much */
-  if(len < tlv->length + pos) {
+  if(tlv->value != NULL && buffersize < tlv->length + pos) {
     PRINTF("OMA-TLV: Could not write the TLV - buffer overflow.\n");
+    return 0;
+  }
+
+  if(buffersize < pos + 2) {
     return 0;
   }
 
@@ -163,13 +170,13 @@ oma_tlv_write(const oma_tlv_t *tlv, uint8_t *buffer, size_t len)
   if(DEBUG) {
     int i;
     PRINTF("TLV:");
-    for(i = 0; i < pos + tlv->length; i++) {
+    for(i = 0; i < pos + ((tlv->value != NULL) ? tlv->length : 0); i++) {
       PRINTF("%02x", buffer[i]);
     }
     PRINTF("\n");
   }
 
-  return pos + tlv->length;
+  return pos + ((tlv->value != NULL) ? tlv->length : 0);
 }
 /*---------------------------------------------------------------------------*/
 int32_t
