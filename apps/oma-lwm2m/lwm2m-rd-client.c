@@ -146,7 +146,7 @@ prepare_update(coap_packet_t *request, int triggered) {
     coap_set_payload(request, rd_data, len);
   }
 }
-
+/*---------------------------------------------------------------------------*/
 static int
 has_network_access(void)
 {
@@ -276,13 +276,17 @@ lwm2m_rd_client_register_with_bootstrap_server(const coap_endpoint_t *server)
   }
 }
 /*---------------------------------------------------------------------------*/
-void
+int
 lwm2m_rd_client_deregister(void)
 {
   if(lwm2m_rd_client_is_registered()) {
     rd_state = DEREGISTER;
+    return 1;
   }
+  /* Not registered */
+  return 0;
 }
+/*---------------------------------------------------------------------------*/
 void
 lwm2m_rd_client_update_triggered(void)
 {

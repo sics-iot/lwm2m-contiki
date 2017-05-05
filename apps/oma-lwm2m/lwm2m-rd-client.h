@@ -54,7 +54,7 @@ void lwm2m_rd_client_set_automatic_update(int update);
 /* trigger an immediate update */
 void lwm2m_rd_client_update_triggered(void);
 
-void lwm2m_rd_client_deregister(void);
+int  lwm2m_rd_client_deregister(void);
 void lwm2m_rd_client_init(const char *ep);
 
 void lwm2m_rd_client_set_session_callback(session_callback_t cb);
