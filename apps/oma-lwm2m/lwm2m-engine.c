@@ -262,18 +262,6 @@ lwm2m_engine_parse_context(const char *path, int path_len,
     return 0;
   }
 
-  /* Set CoAP request/response for now */
-  context->request = request;
-  context->response = response;
-
-  /* Set out buffer */
-  context->outbuf->buffer = outbuf;
-  context->outbuf->size = outsize;
-
-  /* Set default reader/writer */
-  context->reader = &lwm2m_plain_text_reader;
-  context->writer = &oma_tlv_writer;
-
   ret = parse_path(path, path_len, &context->object_id,
                    &context->object_instance_id, &context->resource_id);
 
@@ -1011,9 +999,30 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   lwm2m_buffer_t inbuf;
   lwm2m_buffer_t outbuf;
 
+  /* Initialize the context */
+  memset(&context, 0, sizeof(context));
+  memset(&outbuf, 0, sizeof(outbuf));
+  memset(&inbuf, 0, sizeof(inbuf));
+
   context.outbuf = &outbuf;
   context.inbuf = &inbuf;
 
+  /* Set CoAP request/response for now */
+  context.request = request;
+  context.response = response;
+
+  /* Set out buffer */
+  context.outbuf->buffer = buffer;
+  context.outbuf->size = buffer_size;
+
+  /* Set input buffer */
+  context.offset = offset != NULL ? *offset : 0;
+  context.inbuf->size = coap_get_payload(request, (const uint8_t **) &context.inbuf->buffer);
+  context.inbuf->pos = 0;
+
+  /* Set default reader/writer */
+  context.reader = &lwm2m_plain_text_reader;
+  context.writer = &oma_tlv_writer;
 
 
   url_len = REST.get_url(request, &url);
@@ -1148,10 +1157,6 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     }
   }
 #endif /* DEBUG */
-
-  context.offset = offset != NULL ? *offset : 0;
-  context.inbuf->size = coap_get_payload(request, (const uint8_t **) &context.inbuf->buffer);
-  context.inbuf->pos = 0;
 
   /* PUT/POST - e.g. write will not send in offset here - Maybe in the future? */
   if((offset != NULL && *offset == 0) &&
