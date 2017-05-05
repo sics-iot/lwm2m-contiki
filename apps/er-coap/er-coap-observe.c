@@ -203,9 +203,11 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
     if(url_len < COAP_OBSERVER_URL_LEN - 1 && subpath != NULL) {
       strncpy(&url[url_len], subpath, COAP_OBSERVER_URL_LEN - url_len - 1);
     }
-  } else {
-    url_len = strlen(subpath);
+  } else if(subpath != NULL) {
     strncpy(url, subpath, COAP_OBSERVER_URL_LEN - 1);
+  } else {
+    /* No resource, no subpath */
+    return;
   }
 
   /* Ensure url is null terminated because strncpy does not guarantee this */
