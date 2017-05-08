@@ -118,12 +118,6 @@ typedef uint32_t lwm2m_resource_id_t;
 /* NoSec mode */
 #define LWM2M_SECURITY_MODE_NOSEC               3
 
-#define LWM2M_OBJECT_STR_HELPER(x) (uint8_t *) #x
-#define LWM2M_OBJECT_STR(x) LWM2M_OBJECT_STR_HELPER(x)
-
-#define LWM2M_OBJECT_PATH_STR_HELPER(x) #x
-#define LWM2M_OBJECT_PATH_STR(x) LWM2M_OBJECT_PATH_STR_HELPER(x)
-
 typedef enum {
   LWM2M_OP_NONE,
   LWM2M_OP_READ,
@@ -226,8 +220,6 @@ struct lwm2m_reader {
   size_t (* read_float32fix)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int32_t *value, int bits);
   size_t (* read_boolean)(lwm2m_context_t *ctx, const uint8_t *inbuf, size_t len, int *value);
 };
-
-#define LWM2M_INSTANCE_FLAG_USED 1
 
 typedef lwm2m_status_t
 (* lwm2m_write_opaque_callback)(lwm2m_object_instance_t *object,
