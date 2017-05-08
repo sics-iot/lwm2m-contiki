@@ -97,6 +97,9 @@
 #define RSC_READABLE(x) ((x & LWM2M_RESOURCE_READ) > 0)
 #define RSC_WRITABLE(x) ((x & LWM2M_RESOURCE_WRITE) > 0)
 
+/* invalid instance ID - ffff object ID */
+#define NO_INSTANCE 0xffffffff
+
 /* This is a double-buffer for generating BLOCKs in CoAP - the idea
    is that typical LWM2M resources will fit 1 block unless they themselves
    handle BLOCK transfer - having a double sized buffer makes it possible
@@ -120,6 +123,7 @@ void lwm2m_device_init(void);
 void lwm2m_security_init(void);
 void lwm2m_server_init(void);
 static lwm2m_object_instance_t *lwm2m_engine_get_object_instance(const lwm2m_context_t *context);
+static lwm2m_object_instance_t *get_object_instance_key(uint32_t key, int both);
 
 static coap_handler_status_t lwm2m_handler_callback(coap_packet_t *request,
                                                     coap_packet_t *response,
@@ -133,40 +137,6 @@ lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_i
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 LIST(object_list);
 
-/*---------------------------------------------------------------------------*/
-static int
-u16toa(uint8_t *buf, uint16_t v)
-{
-  int pos = 0;
-  int div = 10000;
-  /* Max size = 5 */
-  while(div > 0) {
-    buf[pos] = '0' + (v / div) % 10;
-    /* if first non-zero found or we have found that before */
-    if(buf[pos] > '0' || pos > 0 || div == 1) pos++;
-    div = div / 10;
-  }
-  return pos;
-}
-/*---------------------------------------------------------------------------*/
-static int
-append_reg_tag(uint8_t *rd_data, size_t size, int oid, int iid, int rid)
-{
-  int pos = 0;
-  rd_data[pos++] = '<';
-  rd_data[pos++] = '/';
-  pos += u16toa(&rd_data[pos], oid);
-  if(iid > -1 && iid != 0xffff && size > pos) {
-    rd_data[pos++] = '/';
-    pos += u16toa(&rd_data[pos], iid);
-    if(rid > -1 && size > pos) {
-      rd_data[pos++] = '/';
-      pos += u16toa(&rd_data[pos], rid);
-    }
-  }
-  rd_data[pos++] = '>';
-  return pos;
-}
 /*---------------------------------------------------------------------------*/
 /* This is intended to switch out a block2 transfer buffer
  * It assumes that ctx containts the double buffer and that the outbuf is to
@@ -293,11 +263,13 @@ lwm2m_engine_get_rd_data(uint8_t *rd_data, int size)
   pos = 0;
 
   for(o = list_head(object_list); o != NULL; o = o->next) {
-    if(pos > 0) {
-      rd_data[pos++] = ',';
+    if(o->instance_id != 0xffff) {
+      len = snprintf((char *) &rd_data[pos], size - pos, (pos > 0) ? ",<%d/%d>" : "<%d/%d>",
+                     o->object_id, o->instance_id);
+    } else {
+      len = snprintf((char *) &rd_data[pos], size - pos, (pos > 0) ? ",<%d>" : "<%d>",
+                     o->object_id);
     }
-    len = append_reg_tag(&rd_data[pos], size - pos,
-                         o->object_id, o->instance_id, -1);
     if(len > 0 && len < size - pos) {
       pos += len;
     }
@@ -435,7 +407,7 @@ lwm2m_engine_select_reader(lwm2m_context_t *context, unsigned int content_format
 /*---------------------------------------------------------------------------*/
 /* Lightweight object instances */
 /*---------------------------------------------------------------------------*/
-static lwm2m_object_instance_t *last_ins;
+static uint32_t last_instance_id = NO_INSTANCE;
 static int last_rsc_pos;
 
 /* Multi read will handle read of JSON / TLV or Discovery (Link Format) */
@@ -472,7 +444,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
 
   if(ctx->offset == 0) {
     /* First GET request - need to setup all buffers and reset things here */
-    last_ins = instance;
+    last_instance_id = instance->object_id << 16 | instance->instance_id;
     last_rsc_pos = 0;
     /* reset any callback */
     current_opaque_callback = NULL;
@@ -485,11 +457,12 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     /* Here we should print top node */
   } else {
     /* offset > 0 - assume that we are already in a disco or multi get*/
-    instance = last_ins;
+    instance = get_object_instance_key(last_instance_id, 1);
+
     /* we assume that this was initialized */
     initialized = 1;
     ctx->writer_flags |= WRITER_OUTPUT_VALUE;
-    if(last_ins == NULL) {
+    if(instance == NULL) {
       ctx->offset = -1;
       ctx->outbuf->buffer[0] = ' ';
     }
@@ -655,7 +628,11 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     }
 
     instance = lwm2m_engine_next_object_instance(ctx, instance);
-    last_ins = instance;
+    if(instance != NULL) {
+      last_instance_id = instance->object_id << 16 | instance->instance_id;
+    } else {
+      last_instance_id = NO_INSTANCE;
+    }
     if(ctx->operation == LWM2M_OP_READ) {
       PRINTF("END Writer %d ->", ctx->outbuf->len);
       len = ctx->writer->end_write(ctx);
@@ -955,16 +932,26 @@ lwm2m_engine_remove_object(lwm2m_object_instance_t *object)
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-lwm2m_engine_get_object_instance(const lwm2m_context_t *context)
+get_object_instance_key(uint32_t key, int match_both)
 {
-  lwm2m_object_instance_t *i;
-  for(i = list_head(object_list); i != NULL ; i = i->next) {
-    if(i->object_id == context->object_id &&
-       ((context->level < 2) || i->instance_id == context->object_instance_id)) {
-      return i;
+  lwm2m_object_instance_t *instance;
+  /* the NO_INSTANCE will return NULL */
+  if(key == NO_INSTANCE && match_both) return NULL;
+  for(instance = list_head(object_list); instance != NULL ; instance = instance->next) {
+    if(instance->object_id == (key >> 16) &&
+       (!match_both || (instance->instance_id == (key & 0xffff)))) {
+      return instance;
     }
   }
   return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+lwm2m_engine_get_object_instance(const lwm2m_context_t *context)
+{
+  return get_object_instance_key((context->object_id << 16) |
+                                 (context->object_instance_id),
+                                 context->level >= 2);
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
