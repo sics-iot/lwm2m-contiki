@@ -5,7 +5,7 @@ all:	$(PROJECT)
 TARGETCDIR   = oma-lwm2m-src
 COREDIRS     = sys lib
 SOURCEDIRS   = .
-SOURCE_FILES = posix-main.c posix-ntimer.c ipso-sensor-temp.c ipso-control-test.c
+SOURCE_FILES = posix-main.c posix-ntimer.c ipso-sensor-temp.c ipso-control-test.c generic-object-test.c
 APPSDIRS     = er-coap oma-lwm2m ipso-objects
 
 ifneq ($(MAKE_WITH_DTLS),)
