@@ -60,15 +60,16 @@ static const lwm2m_resource_id_t resources[] =
     RO(11000),
   };
 
+/*---------------------------------------------------------------------------*/
 static int read_data(uint8_t *buffer, int instance_id, int start, int len)
 {
   int i;
   int start_index;
-  start_index = generic_object.impl->object_id;
+  start_index = instance_id;
   /* Write len bytes into the buffer from the start-offset */
   for(i = 0; i < len; i++) {
-    buffer[i] =  (start_index + i) & 0xff;
-    if(i + start >= MAX_SIZE - 1) return i;
+    buffer[i] =  '0' + ((start_index + i) & 0x3f);
+    if(i + start >= MAX_SIZE) return i;
   }
   return i;
 }
@@ -92,7 +93,7 @@ opaque_callback(lwm2m_object_instance_t *object,
   }
   return LWM2M_STATUS_OK;
 }
-/*---------------------------------------------------------------------------*/
+
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
@@ -137,18 +138,17 @@ setup_instance(lwm2m_object_instance_t *instance, uint16_t instance_id)
 static lwm2m_object_instance_t *
 get_by_id(uint16_t instance_id, lwm2m_status_t *status)
 {
-  lwm2m_object_instance_t *instance;
+  lwm2m_object_instance_t *instance = NULL;
   if(status != NULL) {
     *status = LWM2M_STATUS_OK;
   }
-
-  instance = lwm2m_engine_get_instance_buffer();
-  if(instance == NULL) {
-    return NULL;
-  }
-
-  /* We are fine - update instance variable */
   if(instance_id < 1000) {
+    instance = lwm2m_engine_get_instance_buffer();
+    if(instance == NULL) {
+      return NULL;
+    }
+
+    /* We are fine - update instance variable */
     setup_instance(instance, instance_id);
   }
   return instance;

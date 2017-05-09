@@ -297,7 +297,7 @@ lwm2m_object_write_boolean(lwm2m_context_t *ctx, int value)
   return s;
 }
 
-static inline void
+static inline int
 lwm2m_object_write_opaque_stream(lwm2m_context_t *ctx, int size, lwm2m_write_opaque_callback cb)
 {
   /* 1. - create a header of either OPAQUE (nothing) or TLV if the format is TLV */
@@ -305,9 +305,12 @@ lwm2m_object_write_opaque_stream(lwm2m_context_t *ctx, int size, lwm2m_write_opa
   if(ctx->writer->write_opaque_header != NULL) {
     s = ctx->writer->write_opaque_header(ctx, size);
     ctx->outbuf->len += s;
+  } else {
+    return 0;
   }
   /* 2. - set the callback so that future data will be grabbed from the callback */
   lwm2m_engine_set_opaque_callback(ctx, cb);
+  return 1;
 }
 
 /* Resource instance functions (_ri)*/
