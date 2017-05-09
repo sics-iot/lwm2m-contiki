@@ -120,12 +120,6 @@ static uint64_t lwm2m_buf_lock_timeout = 0;
 static lwm2m_write_opaque_callback current_opaque_callback;
 static int current_opaque_offset = 0;
 
-void lwm2m_device_init(void);
-void lwm2m_security_init(void);
-void lwm2m_server_init(void);
-static lwm2m_object_instance_t *lwm2m_engine_get_object_instance(const lwm2m_context_t *context);
-static lwm2m_object_instance_t *get_object_instance_key(uint32_t key, int both);
-
 static coap_handler_status_t lwm2m_handler_callback(coap_packet_t *request,
                                                     coap_packet_t *response,
                                                     uint8_t *buffer,
@@ -155,7 +149,7 @@ get_object(uint16_t object_id)
 }
 /*---------------------------------------------------------------------------*/
 static int
-has_object_id(uint16_t object_id)
+has_non_generic_object(uint16_t object_id)
 {
   lwm2m_object_instance_t *instance;
   for(instance = list_head(object_list);
@@ -166,7 +160,7 @@ has_object_id(uint16_t object_id)
     }
   }
 
-  return get_object(object_id) != NULL;
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
@@ -434,14 +428,6 @@ lwm2m_engine_init(void)
 #endif
 }
 /*---------------------------------------------------------------------------*/
-void
-lwm2m_engine_register_default_objects(void)
-{
-  lwm2m_security_init();
-  lwm2m_server_init();
-  lwm2m_device_init();
-}
-/*---------------------------------------------------------------------------*/
 /**
  * @brief  Set the writer pointer to the proper writer based on the Accept: header
  *
@@ -557,7 +543,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     /* Here we should print top node */
   } else {
     /* offset > 0 - assume that we are already in a disco or multi get*/
-    instance = get_object_instance_key(last_instance_id, 1);
+    instance = get_instance(last_instance_id >> 16, last_instance_id & 0xffff);
 
     /* we assume that this was initialized */
     initialized = 1;
@@ -780,7 +766,7 @@ create_instance(lwm2m_context_t *context,
   lwm2m_status_t status = instance->callback(instance, context);
   if(status == LWM2M_STATUS_OK) {
     PRINTF("Created instance: %d\n", context->object_instance_id);
-    instance = lwm2m_engine_get_object_instance(context);
+    instance = get_instance_by_context(context);
     context->operation = LWM2M_OP_WRITE;
     REST.set_response_status(context->response, CREATED_2_01);
 #if USE_RD_CLIENT
@@ -803,7 +789,7 @@ get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid, uint8_t *created)
 {
   lwm2m_object_instance_t *instance;
   int lv = ctx->level;
-  instance = lwm2m_engine_get_object_instance(ctx);
+  instance = get_instance_by_context(ctx);
   PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id, instance);
   /* by default we assume that the instance is not created... so we set flag to zero */
@@ -813,7 +799,7 @@ get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid, uint8_t *created)
   if(instance == NULL) {
     /* Find a generic instance for create */
     ctx->object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
-    instance = lwm2m_engine_get_object_instance(ctx);
+    instance = get_instance_by_context(ctx);
     if(instance == NULL) {
       return NULL;
     }
@@ -1036,11 +1022,12 @@ lwm2m_engine_add_object(lwm2m_object_instance_t *object)
     return 0;
   }
   if(object->instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
-    PRINTF("lwm2m-engine: failed to register object with no instance id\n");
+    PRINTF("lwm2m-engine: failed to register object %u with no instance id\n",
+           object->object_id);
     return 0;
   }
-  if(has_object_id(object->object_id)) {
-    /* An object with this id has already been registered */
+  if(get_object(object->object_id) != NULL) {
+    /* A generic object with this id has already been registered */
     PRINTF("lwm2m-engine: object with id %u already registered\n",
            object->object_id);
     return 0;
@@ -1065,7 +1052,7 @@ lwm2m_engine_add_generic_object(lwm2m_object_t *object)
     PRINTF("lwm2m-engine: failed to register NULL object\n");
     return 0;
   }
-  if(has_object_id(object->impl->object_id)) {
+  if(has_non_generic_object(object->impl->object_id)) {
     /* An object with this id has already been registered */
     PRINTF("lwm2m-engine: object with id %u already registered\n",
            object->impl->object_id);
@@ -1079,29 +1066,6 @@ void
 lwm2m_engine_remove_generic_object(lwm2m_object_t *object)
 {
   list_remove(generic_object_list, object);
-}
-/*---------------------------------------------------------------------------*/
-static lwm2m_object_instance_t *
-get_object_instance_key(uint32_t key, int match_both)
-{
-  lwm2m_object_instance_t *instance;
-  /* the NO_INSTANCE will return NULL */
-  if(key == NO_INSTANCE && match_both) return NULL;
-  for(instance = list_head(object_list); instance != NULL ; instance = instance->next) {
-    if(instance->object_id == (key >> 16) &&
-       (!match_both || (instance->instance_id == (key & 0xffff)))) {
-      return instance;
-    }
-  }
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
-static lwm2m_object_instance_t *
-lwm2m_engine_get_object_instance(const lwm2m_context_t *context)
-{
-  return get_object_instance_key((context->object_id << 16) |
-                                 (context->object_instance_id),
-                                 context->level >= 2);
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
@@ -1212,12 +1176,12 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return COAP_HANDLER_STATUS_CONTINUE;
   }
 
-  instance = lwm2m_engine_get_object_instance(&context);
+  instance = get_instance_by_context(&context);
   if(instance == NULL && REST.get_method_type(request) == METHOD_PUT) {
     /* ALLOW generic instance if CREATE / WRITE*/
     int iid = context.object_instance_id;
     context.object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
-    instance = lwm2m_engine_get_object_instance(&context);
+    instance = get_instance_by_context(&context);
     context.object_instance_id = iid;
   }
 
