@@ -1204,7 +1204,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
           object != NULL;
           object = object->next) {
         if(object->impl != NULL && object->impl->delete != NULL) {
-          object-impl->delete(LWM2M_OBJECT_INSTANCE_NONE);
+          object->impl->delete(LWM2M_OBJECT_INSTANCE_NONE, NULL);
         }
       }
 #if USE_RD_CLIENT

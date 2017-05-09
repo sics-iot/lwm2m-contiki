@@ -49,7 +49,7 @@
 #include "lwm2m-server.h"
 #include "lwm2m-rd-client.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -213,11 +213,14 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     switch(ctx->resource_id) {
     case LWM2M_SERVER_LIFETIME_ID:
       lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &value);
-      PRINTF("Got lifetime: %d\n", (int) value);
       server->lifetime = value;
+      break;
     }
   } else if(ctx->operation == LWM2M_OP_READ) {
     switch(ctx->resource_id) {
+    case LWM2M_SERVER_SHORT_SERVER_ID:
+      lwm2m_object_write_int(ctx, object->instance_id);
+      break;
     case LWM2M_SERVER_LIFETIME_ID:
       lwm2m_object_write_int(ctx, server->lifetime);
       break;
