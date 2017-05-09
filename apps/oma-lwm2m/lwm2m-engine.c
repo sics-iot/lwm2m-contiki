@@ -1211,14 +1211,17 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
 
   instance = get_instance_by_context(&context, &object);
-  if(instance == NULL && REST.get_method_type(request) == METHOD_PUT) {
+  if(instance == NULL
+     && object != NULL
+     && REST.get_method_type(request) == METHOD_PUT
+     && context.level == 2
+     && object->impl != NULL
+     && object->impl->create != NULL) {
     /* ALLOW generic instance if CREATE / WRITE*/
-    int iid = context.object_instance_id;
-    object = get_object(context.object_id);
-    if(object != NULL && object->impl != NULL && object->impl->create != NULL) {
-      /* Might be possible to create */
-    } else {
-      object = NULL;
+    instance = object->impl->create(context.object_instance_id, NULL);
+    if(instance == NULL) {
+      PRINTF("lwm2m-engine: failed to create instance %u/%u\n",
+             context.object_id, context.object_instance_id);
     }
   }
 
@@ -1230,6 +1233,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   PRINTF("lwm2m Context: %u/%u/%u  found: %d\n",
          context.object_id,
          context.object_instance_id, context.resource_id, depth);
+
   /*
    * Select reader and writer based on provided Content type and
    * Accept headers.
@@ -1270,14 +1274,6 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     break;
   default:
     break;
-  }
-
-  /* Create might be made here - or anywhere at the write ? */
-  if(instance->instance_id == LWM2M_OBJECT_INSTANCE_NONE &&
-     context.level == 2 && context.operation == LWM2M_OP_WRITE) {
-    if((instance = create_instance(&context, instance)) == NULL) {
-      return COAP_HANDLER_STATUS_CONTINUE;
-    }
   }
 
 #if DEBUG
