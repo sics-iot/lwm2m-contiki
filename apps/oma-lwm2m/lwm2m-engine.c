@@ -1275,9 +1275,6 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   case METHOD_DELETE:
     context.operation = LWM2M_OP_DELETE;
     REST.set_response_status(response, DELETED_2_02);
-#if USE_RD_CLIENT
-    lwm2m_rd_client_set_update_rd();
-#endif
     break;
   default:
     break;
@@ -1318,6 +1315,15 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     success = perform_multi_resource_read_op(object, instance, &context);
   } else if(context.operation == LWM2M_OP_WRITE) {
     success = perform_multi_resource_write_op(object, instance, &context, format);
+  } else if(context.operation == LWM2M_OP_DELETE) {
+    if(object != NULL && object->impl != NULL && object->impl->delete != NULL) {
+      object->impl->delete(context.object_instance_id, &success);
+#if USE_RD_CLIENT
+      lwm2m_rd_client_set_update_rd();
+#endif
+    } else {
+      success = LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+    }
   } else if(instance == NULL) {
     /* No instance */
     success = LWM2M_STATUS_NOT_FOUND;
