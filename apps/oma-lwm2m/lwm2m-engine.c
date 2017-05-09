@@ -126,7 +126,7 @@ static coap_handler_status_t lwm2m_handler_callback(coap_packet_t *request,
                                                     uint16_t buffer_size,
                                                     int32_t *offset);
 static lwm2m_object_instance_t *
-lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last);
+next_object_instance(const lwm2m_context_t *context, lwm2m_object_t *object, lwm2m_object_instance_t *last);
 
 
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
@@ -164,10 +164,14 @@ has_non_generic_object(uint16_t object_id)
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-get_instance(uint16_t object_id, uint16_t instance_id)
+get_instance(uint16_t object_id, uint16_t instance_id, lwm2m_object_t **o)
 {
   lwm2m_object_instance_t *instance;
   lwm2m_object_t *object;
+
+  if(o) {
+    *o = NULL;
+  }
 
   for(instance = list_head(object_list);
       instance != NULL;
@@ -182,6 +186,9 @@ get_instance(uint16_t object_id, uint16_t instance_id)
 
   object = get_object(object_id);
   if(object != NULL) {
+    if(o) {
+      *o = object;
+    }
     if(instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
       return object->impl->get_first(NULL);
     }
@@ -192,12 +199,12 @@ get_instance(uint16_t object_id, uint16_t instance_id)
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-get_instance_by_context(const lwm2m_context_t *context)
+get_instance_by_context(const lwm2m_context_t *context, lwm2m_object_t **o)
 {
   if(context->level < 2) {
-    return get_instance(context->object_id, LWM2M_OBJECT_INSTANCE_NONE);
+    return get_instance(context->object_id, LWM2M_OBJECT_INSTANCE_NONE, o);
   }
-  return get_instance(context->object_id, context->object_instance_id);
+  return get_instance(context->object_id, context->object_instance_id, o);
 }
 /*---------------------------------------------------------------------------*/
 /* This is intended to switch out a block2 transfer buffer
@@ -498,7 +505,8 @@ static int last_rsc_pos;
 
 /* Multi read will handle read of JSON / TLV or Discovery (Link Format) */
 static lwm2m_status_t
-perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
+perform_multi_resource_read_op(lwm2m_object_t *object,
+                               lwm2m_object_instance_t *instance,
                                lwm2m_context_t *ctx)
 {
   int size = ctx->outbuf->size;
@@ -530,7 +538,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
 
   if(ctx->offset == 0) {
     /* First GET request - need to setup all buffers and reset things here */
-    last_instance_id = instance->object_id << 16 | instance->instance_id;
+    last_instance_id = (instance->object_id << 16) | instance->instance_id;
     last_rsc_pos = 0;
     /* reset any callback */
     current_opaque_callback = NULL;
@@ -543,7 +551,8 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
     /* Here we should print top node */
   } else {
     /* offset > 0 - assume that we are already in a disco or multi get*/
-    instance = get_instance(last_instance_id >> 16, last_instance_id & 0xffff);
+    instance = get_instance(last_instance_id >> 16, last_instance_id & 0xffff,
+                            &object);
 
     /* we assume that this was initialized */
     initialized = 1;
@@ -712,10 +721,9 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
         }
       }
     }
-
-    instance = lwm2m_engine_next_object_instance(ctx, instance);
+    instance = next_object_instance(ctx, object, instance);
     if(instance != NULL) {
-      last_instance_id = instance->object_id << 16 | instance->instance_id;
+      last_instance_id = (instance->object_id << 16) | instance->instance_id;
     } else {
       last_instance_id = NO_INSTANCE;
     }
@@ -731,7 +739,7 @@ perform_multi_resource_read_op(lwm2m_object_instance_t *instance,
   }
 
   /* did not read anything even if we should have - on single item */
-  if (num_read == 0 && ctx->level == 3) {
+  if(num_read == 0 && ctx->level == 3) {
     lwm2m_buf_lock[0] = 0;
     return LWM2M_STATUS_NOT_FOUND;
   }
@@ -766,7 +774,7 @@ create_instance(lwm2m_context_t *context,
   lwm2m_status_t status = instance->callback(instance, context);
   if(status == LWM2M_STATUS_OK) {
     PRINTF("Created instance: %d\n", context->object_instance_id);
-    instance = get_instance_by_context(context);
+    instance = get_instance_by_context(context, NULL);
     context->operation = LWM2M_OP_WRITE;
     REST.set_response_status(context->response, CREATED_2_01);
 #if USE_RD_CLIENT
@@ -785,36 +793,35 @@ create_instance(lwm2m_context_t *context,
 #define MODE_READY     3
 
 static lwm2m_object_instance_t *
-get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid, uint8_t *created)
+get_or_create_instance(lwm2m_context_t *ctx, lwm2m_object_t *object,
+                       uint8_t *created)
 {
   lwm2m_object_instance_t *instance;
-  int lv = ctx->level;
-  instance = get_instance_by_context(ctx);
+
+  instance = get_instance_by_context(ctx, NULL);
   PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id, instance);
   /* by default we assume that the instance is not created... so we set flag to zero */
   if(created != NULL) {
     *created = 0;
   }
-  if(instance == NULL) {
+  if(instance == NULL
+     && object != NULL
+     && object->impl != NULL
+     && object->impl->create != NULL) {
     /* Find a generic instance for create */
-    ctx->object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
-    instance = get_instance_by_context(ctx);
-    if(instance == NULL) {
-      return NULL;
-    }
-    ctx->level = 2; /* create use 2? */
-    ctx->object_instance_id = oid;
-    if((instance = create_instance(ctx, instance)) != NULL) {
+    instance = object->impl->create(ctx->object_instance_id, NULL);
+    if(instance != NULL) {
       PRINTF("Instance %d created\n", instance->instance_id);
       /* set created flag to one */
-      if(created != NULL) *created = 1;
+      if(created != NULL) {
+        *created = 1;
+      }
     }
-    ctx->level = lv;
   }
   return instance;
 }
-
+/*---------------------------------------------------------------------------*/
 static int
 check_write(lwm2m_object_instance_t *instance, int rid)
 {
@@ -831,9 +838,10 @@ check_write(lwm2m_object_instance_t *instance, int rid)
   }
   return 0;
 }
-
+/*---------------------------------------------------------------------------*/
 static lwm2m_status_t
-process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
+process_tlv_write(lwm2m_context_t *ctx, lwm2m_object_t *object,
+                  int rid, uint8_t *data, int len)
 {
   lwm2m_object_instance_t *instance;
   uint8_t created = 0;
@@ -844,7 +852,7 @@ process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
   ctx->resource_id = rid;
   PRINTF("  Doing callback to %u/%u/%u\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id);
-  instance = get_or_create_instance(ctx, ctx->object_instance_id, &created);
+  instance = get_or_create_instance(ctx, object, &created);
   if(instance != NULL && instance->callback != NULL) {
     if(created || check_write(instance, rid)) {
       return instance->callback(instance, ctx);
@@ -854,9 +862,10 @@ process_tlv_write(lwm2m_context_t *ctx, int rid, uint8_t *data, int len)
   }
   return LWM2M_STATUS_ERROR;
 }
-
+/*---------------------------------------------------------------------------*/
 static lwm2m_status_t
-perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
+perform_multi_resource_write_op(lwm2m_object_t *object,
+                                lwm2m_object_instance_t *instance,
                                 lwm2m_context_t *ctx, int format)
 {
   /* Only for JSON and TLV formats */
@@ -892,7 +901,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
             ctx->object_instance_id = oid;
             ctx->resource_id = iid;
 
-            instance = get_or_create_instance(ctx, oid, &created);
+            instance = get_or_create_instance(ctx, object, &created);
           }
           if(instance != NULL && instance->callback != NULL) {
             mode |= MODE_INSTANCE;
@@ -955,7 +964,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
                  tlv2.type, tlv2.id, (int) tlv2.length,
                  (int) len2, (int) insize);
           if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
-            status = process_tlv_write(ctx, tlv2.id,
+            status = process_tlv_write(ctx, object, tlv2.id,
                                        (uint8_t *)&tlv.value[pos], len2);
             if(status != LWM2M_STATUS_OK) {
               return status;
@@ -964,7 +973,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
           pos += len2;
         }
       } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
-        status = process_tlv_write(ctx, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
+        status = process_tlv_write(ctx, object, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
         if(status != LWM2M_STATUS_OK) {
           return status;
         }
@@ -987,13 +996,13 @@ lwm2m_engine_get_instance_buffer(void)
 uint16_t
 lwm2m_engine_recommend_instance_id(uint16_t object_id)
 {
+  lwm2m_object_t *object;
   lwm2m_object_instance_t *instance;
   uint16_t min_id = 0xffff;
   uint16_t max_id = 0;
   int found = 0;
   for(instance = list_head(object_list); instance != NULL ; instance = instance->next) {
-    if(instance->object_id == object_id
-       && instance->instance_id != LWM2M_OBJECT_INSTANCE_NONE) {
+    if(instance->object_id == object_id) {
       found++;
       if(instance->instance_id > max_id) {
         max_id = instance->instance_id;
@@ -1005,6 +1014,22 @@ lwm2m_engine_recommend_instance_id(uint16_t object_id)
   }
   if(found == 0) {
     /* No existing instances found */
+    object = get_object(object_id);
+    if(object != NULL && object->impl != NULL) {
+      for(instance = object->impl->get_first(NULL);
+          instance != NULL;
+          instance = object->impl->get_next(instance, NULL)) {
+        found++;
+        if(instance->instance_id > max_id) {
+          max_id = instance->instance_id;
+        }
+        if(instance->instance_id < min_id) {
+          min_id = instance->instance_id;
+        }
+      }
+    }
+  }
+  if(found == 0) {
     return 0;
   }
   if(min_id > 0) {
@@ -1069,16 +1094,24 @@ lwm2m_engine_remove_generic_object(lwm2m_object_t *object)
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_instance_t *last)
+next_object_instance(const lwm2m_context_t *context, lwm2m_object_t *object,
+                     lwm2m_object_instance_t *last)
 {
-  while(last != NULL) {
-    last = last->next;
-    if(last != NULL && last->object_id == context->object_id &&
-       ((context->level < 2) || last->instance_id == context->object_instance_id)) {
-      return last;
-    }
+  if(context->level >= 2) {
+    /* Only single instance */
+    return NULL;
   }
-  return NULL;
+
+  if(object == NULL) {
+    for(last = last->next; last != NULL; last = last->next) {
+      if(last->object_id == context->object_id) {
+        return last;
+      }
+    }
+    return NULL;
+  }
+
+  return object->impl->get_next(last, NULL);
 }
 /*---------------------------------------------------------------------------*/
 static coap_handler_status_t
@@ -1091,6 +1124,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   unsigned int accept;
   int depth;
   lwm2m_context_t context;
+  lwm2m_object_t *object;
   lwm2m_object_instance_t *instance;
   uint32_t bnum;
   uint8_t bmore;
@@ -1176,13 +1210,16 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return COAP_HANDLER_STATUS_CONTINUE;
   }
 
-  instance = get_instance_by_context(&context);
+  instance = get_instance_by_context(&context, &object);
   if(instance == NULL && REST.get_method_type(request) == METHOD_PUT) {
     /* ALLOW generic instance if CREATE / WRITE*/
     int iid = context.object_instance_id;
-    context.object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
-    instance = get_instance_by_context(&context);
-    context.object_instance_id = iid;
+    object = get_object(context.object_id);
+    if(object != NULL && object->impl != NULL && object->impl->create != NULL) {
+      /* Might be possible to create */
+    } else {
+      object = NULL;
+    }
   }
 
   if(instance == NULL || instance->callback == NULL) {
@@ -1272,12 +1309,12 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     /* This is a discovery operation */
   if(context.operation == LWM2M_OP_DISCOVER) {
     /* Assume only one disco at a time... */
-    success = perform_multi_resource_read_op(instance, &context);
+    success = perform_multi_resource_read_op(object, instance, &context);
   } else if(context.operation == LWM2M_OP_READ) {
     PRINTF("Multi READ\n");
-    success = perform_multi_resource_read_op(instance, &context);
+    success = perform_multi_resource_read_op(object, instance, &context);
   } else if(context.operation == LWM2M_OP_WRITE) {
-    success = perform_multi_resource_write_op(instance, &context, format);
+    success = perform_multi_resource_write_op(object, instance, &context, format);
   } else {
     /* If not discovery - this is a regular OP - do the callback */
     success = instance->callback(instance, &context);
