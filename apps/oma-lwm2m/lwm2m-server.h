@@ -37,7 +37,7 @@
 #define LWM2M_SERVER_H
 
 typedef struct server_value {
-  lwm2m_object_instance_t reg_object;
+  lwm2m_object_instance_t instance;
   uint16_t server_id;
   uint32_t lifetime;
 } server_value_t;

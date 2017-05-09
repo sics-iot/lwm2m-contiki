@@ -261,9 +261,9 @@ parse_path(const char *path, int path_len,
   char c = 0;
 
   /* get object id */
-  PRINTF("Parse PATH:");
+  PRINTF("lwm2m: parse PATH: \"");
   PRINTS(path_len, path, "%c");
-  PRINTF("\n");
+  PRINTF("\"\n");
 
   ret = 0;
   pos = 0;
@@ -276,7 +276,7 @@ parse_path(const char *path, int path_len,
     }
     /* Slash will mote thing forward - and the end will be when pos == pl */
     if(c == '/' || pos == path_len) {
-      PRINTF("Setting %u = %u\n", ret, val);
+      /* PRINTF("Setting %u = %u\n", ret, val); */
       if(ret == 0) *oid = val;
       if(ret == 1) *iid = val;
       if(ret == 2) *rid = val;
@@ -533,6 +533,11 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
   PRINTF("MultiRead: %d/%d/%d lv:%d offset:%d\n",
          ctx->object_id, ctx->object_instance_id, ctx->resource_id, ctx->level, ctx->offset);
 
+  if(instance == NULL) {
+    /* No existing instance */
+    return LWM2M_STATUS_NOT_FOUND;
+  }
+
   /* Make use of the double buffer */
   ctx->outbuf = &lwm2m_buf;
 
@@ -764,27 +769,23 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-create_instance(lwm2m_context_t *context,
-                lwm2m_object_instance_t *instance)
+create_instance(lwm2m_context_t *context, lwm2m_object_t *object)
 {
-  /* If not discovery or create - this is a regular OP - do the callback */
-  PRINTF("CREATE OP on object:%d\n", instance->object_id);
-  context->operation = LWM2M_OP_CREATE;
+  lwm2m_object_instance_t *instance;
+  if(object == NULL || object->impl == NULL || object->impl->create == NULL) {
+    return NULL;
+  }
+
   /* NOTE: context->object_instance_id needs to be set before calling */
-  lwm2m_status_t status = instance->callback(instance, context);
-  if(status == LWM2M_STATUS_OK) {
-    PRINTF("Created instance: %d\n", context->object_instance_id);
-    instance = get_instance_by_context(context, NULL);
-    context->operation = LWM2M_OP_WRITE;
+  instance = object->impl->create(context->object_instance_id, NULL);
+  if(instance != NULL) {
+    PRINTF("Created instance: %u/%u\n", context->object_id, context->object_instance_id);
     REST.set_response_status(context->response, CREATED_2_01);
 #if USE_RD_CLIENT
     lwm2m_rd_client_set_update_rd();
 #endif
-    return instance;
-  } else {
-    /* Can not create... */
-    return NULL;
   }
+  return instance;
 }
 /*---------------------------------------------------------------------------*/
 #define MODE_NONE      0
@@ -805,14 +806,9 @@ get_or_create_instance(lwm2m_context_t *ctx, lwm2m_object_t *object,
   if(created != NULL) {
     *created = 0;
   }
-  if(instance == NULL
-     && object != NULL
-     && object->impl != NULL
-     && object->impl->create != NULL) {
-    /* Find a generic instance for create */
-    instance = object->impl->create(ctx->object_instance_id, NULL);
+  if(instance == NULL) {
+    instance = create_instance(ctx, object);
     if(instance != NULL) {
-      PRINTF("Instance %d created\n", instance->instance_id);
       /* set created flag to one */
       if(created != NULL) {
         *created = 1;
@@ -954,7 +950,7 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
         ctx->object_instance_id = tlv.id;
         if(tlv.length == 0) {
           /* Create only - no data */
-          if((instance = create_instance(ctx, instance)) == NULL) {
+          if((instance = create_instance(ctx, object)) == NULL) {
             return LWM2M_STATUS_ERROR;
           }
         }
@@ -1173,7 +1169,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
                                      buffer, buffer_size, &context);
 
-  PRINTF("URL:'");
+  PRINTF("%s URL:'", get_method_as_string(REST.get_method_type(request)));
   PRINTS(url_len, url, "%c");
   PRINTF("' CTX:%u/%u/%u dp:%u bs:%d\n", context.object_id, context.object_instance_id,
 	 context.resource_id, depth, buffer_size);
@@ -1202,6 +1198,15 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       PRINTF("This is a delete all - for bootstrap...\n");
       context.operation = LWM2M_OP_DELETE;
       REST.set_response_status(response, DELETED_2_02);
+
+      /* Delete all dynamic objects that can be deleted */
+      for(object = list_head(generic_object_list);
+          object != NULL;
+          object = object->next) {
+        if(object->impl != NULL && object->impl->delete != NULL) {
+          object-impl->delete(LWM2M_OBJECT_INSTANCE_NONE);
+        }
+      }
 #if USE_RD_CLIENT
       lwm2m_rd_client_set_update_rd();
 #endif
@@ -1214,18 +1219,20 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   if(instance == NULL
      && object != NULL
      && REST.get_method_type(request) == METHOD_PUT
-     && context.level == 2
-     && object->impl != NULL
-     && object->impl->create != NULL) {
+     && context.level == 2) {
     /* ALLOW generic instance if CREATE / WRITE*/
-    instance = object->impl->create(context.object_instance_id, NULL);
+    instance = create_instance(&context, object);
     if(instance == NULL) {
       PRINTF("lwm2m-engine: failed to create instance %u/%u\n",
              context.object_id, context.object_instance_id);
     }
   }
 
-  if(instance == NULL || instance->callback == NULL) {
+  /*
+   * Check if we found either instance or object. Instance means we found an
+   * existing instance and generic objects means we might create an instance.
+   */
+  if(instance == NULL && object == NULL) {
     /* No matching object/instance found - ignore request */
     return COAP_HANDLER_STATUS_CONTINUE;
   }
@@ -1311,6 +1318,11 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     success = perform_multi_resource_read_op(object, instance, &context);
   } else if(context.operation == LWM2M_OP_WRITE) {
     success = perform_multi_resource_write_op(object, instance, &context, format);
+  } else if(instance == NULL) {
+    /* No instance */
+    success = LWM2M_STATUS_NOT_FOUND;
+  } else if(instance->callback == NULL) {
+    success = LWM2M_STATUS_ERROR;
   } else {
     /* If not discovery - this is a regular OP - do the callback */
     success = instance->callback(instance, &context);

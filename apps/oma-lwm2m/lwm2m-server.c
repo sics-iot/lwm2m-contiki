@@ -43,6 +43,7 @@
  */
 
 #include <stdint.h>
+#include "lib/list.h"
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-server.h"
@@ -65,62 +66,149 @@
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
 
+static lwm2m_object_instance_t *create(uint16_t instance_id,
+                                       lwm2m_status_t *status);
+static int delete(uint16_t instance_id, lwm2m_status_t *status);
+static lwm2m_object_instance_t *get_first(lwm2m_status_t *status);
+static lwm2m_object_instance_t *get_next(lwm2m_object_instance_t *instance,
+                                         lwm2m_status_t *status);
+static lwm2m_object_instance_t *get_by_id(uint16_t instance_id,
+                                          lwm2m_status_t *status);
+
 static const lwm2m_resource_id_t resources[] = {
   RO(LWM2M_SERVER_SHORT_SERVER_ID),
   RW(LWM2M_SERVER_LIFETIME_ID),
   EX(LWM2M_SERVER_REG_UPDATE_TRIGGER_ID)
 };
 
-static lwm2m_object_instance_t server_object;
+static const lwm2m_object_impl_t impl = {
+  .object_id = LWM2M_OBJECT_SERVER_ID,
+  .get_first = get_first,
+  .get_next = get_next,
+  .get_by_id = get_by_id,
+  .create = create,
+  .delete = delete,
+};
+static lwm2m_object_t server_object = {
+  .impl = &impl,
+};
 
+LIST(server_list);
 static server_value_t server_instances[MAX_COUNT];
-
-static int
-lwm2m_server_create(int instance_id)
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+create(uint16_t instance_id, lwm2m_status_t *status)
 {
+  lwm2m_object_instance_t *instance;
   int i;
-  /* Check that there is no other instance with this ID */
-  for(i = 0; i < MAX_COUNT; i++) {
-    if(server_instances[i].reg_object.callback != NULL &&
-       server_instances[i].reg_object.instance_id == instance_id) {
-      PRINTF("Can not create instance - already existing: %d\n", instance_id);
-      return 0;
+
+  instance = get_by_id(instance_id, NULL);
+  if(instance != NULL) {
+    /* An instance with this id is already registered */
+    if(status) {
+      *status = LWM2M_STATUS_OPERATION_NOT_ALLOWED;
     }
+    return NULL;
   }
 
   for(i = 0; i < MAX_COUNT; i++) {
-    /* Not used if callback is non-existend */
-    if(server_instances[i].reg_object.callback == NULL) {
-      server_instances[i].reg_object.callback = lwm2m_callback;
-      server_instances[i].reg_object.object_id = LWM2M_OBJECT_SERVER_ID;
-      server_instances[i].reg_object.instance_id = instance_id;
-      server_instances[i].reg_object.resource_ids = resources;
-      server_instances[i].reg_object.resource_count =
+    if(server_instances[i].instance.instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+      server_instances[i].instance.callback = lwm2m_callback;
+      server_instances[i].instance.object_id = LWM2M_OBJECT_SERVER_ID;
+      server_instances[i].instance.instance_id = instance_id;
+      server_instances[i].instance.resource_ids = resources;
+      server_instances[i].instance.resource_count =
         sizeof(resources) / sizeof(lwm2m_resource_id_t);
-      lwm2m_engine_add_object((lwm2m_object_instance_t *) &server_instances[i]);
-      return 1;
+      server_instances[i].server_id = 0;
+      server_instances[i].lifetime = 0;
+      list_add(server_list, &server_instances[i].instance);
+
+      if(status) {
+        *status = LWM2M_STATUS_OK;
+      }
+
+      return &server_instances[i].instance;
     }
   }
+
+  if(status) {
+    *status = LWM2M_STATUS_SERVICE_UNAVAILABLE;
+  }
+
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static int
+delete(uint16_t instance_id, lwm2m_status_t *status)
+{
+  lwm2m_object_instance_t *instance;
+  int i;
+  if(status) {
+    *status = LWM2M_STATUS_OK;
+  }
+
+  if(instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+    /* Remove all instances */
+    while((instance = list_pop(server_list)) != NULL) {
+      instance->instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    }
+    return 1;
+  }
+
+  instance = get_by_id(instance_id, NULL);
+  if(instance != NULL) {
+    instance->instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    list_remove(server_list, instance);
+    return 1;
+  }
+
   return 0;
 }
-
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_first(lwm2m_status_t *status)
+{
+  if(status) {
+    *status = LWM2M_STATUS_OK;
+  }
+  return list_head(server_list);
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_next(lwm2m_object_instance_t *instance, lwm2m_status_t *status)
+{
+  if(status) {
+    *status = LWM2M_STATUS_OK;
+  }
+  return instance == NULL ? NULL : instance->next;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_by_id(uint16_t instance_id, lwm2m_status_t *status)
+{
+  lwm2m_object_instance_t *instance;
+  if(status) {
+    *status = LWM2M_STATUS_OK;
+  }
+  for(instance = list_head(server_list);
+      instance != NULL;
+      instance = instance->next) {
+    if(instance->instance_id == instance_id) {
+      return instance;
+    }
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
 static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
-  /* NOTE: the create operation will only create an instance and should
-     avoid reading out data */
   int32_t value;
   server_value_t *server;
   server = (server_value_t *) object;
 
-  if(ctx->operation == LWM2M_OP_CREATE) {
-    PRINTF("Creating new instance: %d\n", ctx->object_instance_id);
-    if(lwm2m_server_create(ctx->object_instance_id)) {
-      return LWM2M_STATUS_OK;
-    }
-    return LWM2M_STATUS_ERROR;
-  } else if(ctx->operation == LWM2M_OP_WRITE) {
+  if(ctx->operation == LWM2M_OP_WRITE) {
     PRINTF("Write to: %d\n", ctx->resource_id);
     switch(ctx->resource_id) {
     case LWM2M_SERVER_LIFETIME_ID:
@@ -140,6 +228,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       lwm2m_rd_client_update_triggered();
       break;
     }
+  } else {
+    return LWM2M_STATUS_NOT_IMPLEMENTED;
   }
 
   return LWM2M_STATUS_OK;
@@ -149,15 +239,16 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 void
 lwm2m_server_init(void)
 {
+  int i;
+
   PRINTF("*** Init lwm2m-server\n");
 
-  server_object.object_id = LWM2M_OBJECT_SERVER_ID;
-  server_object.instance_id = 0xffff; /* Generic instance */
-  server_object.resource_ids = resources;
-  server_object.resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t);
-  server_object.callback = lwm2m_callback;
+  list_init(server_list);
 
-  lwm2m_engine_add_object(&server_object);
+  for(i = 0; i < MAX_COUNT; i++) {
+    server_instances[i].instance.instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+  }
+  lwm2m_engine_add_generic_object(&server_object);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */
