@@ -74,6 +74,14 @@ uint8_t result = RESULT_DEFAULT;
 
 lwm2m_object_instance_t reg_object;
 
+static const lwm2m_resource_id_t resources[] =
+  { WO(UPDATE_PACKAGE),
+    WO(UPDATE_PACKAGE_URI),
+    RO(UPDATE_STATE),
+    RO(UPDATE_RESULT),
+    EX(UPDATE_UPDATE)
+  };
+
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
@@ -151,5 +159,8 @@ lwm2m_firmware_init(void)
   reg_object.object_id = 5;
   reg_object.instance_id = 0;
   reg_object.callback = lwm2m_callback;
+  reg_object.resource_ids = resources;
+  reg_object.resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t);
+
   lwm2m_engine_add_object(&reg_object);
 }
