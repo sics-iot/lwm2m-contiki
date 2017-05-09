@@ -85,9 +85,31 @@ struct lwm2m_object_instance {
   lwm2m_resource_dim_callback_t resource_dim_callback;
 };
 
+typedef struct {
+  uint16_t object_id;
+  lwm2m_object_instance_t *(* create)(uint16_t instance_id,
+                                      lwm2m_status_t *status);
+  int (* delete)(uint16_t instance_id, lwm2m_status_t *status);
+  lwm2m_object_instance_t *(* get_first)(lwm2m_status_t *status);
+  lwm2m_object_instance_t *(* get_next)(lwm2m_object_instance_t *instance,
+                                        lwm2m_status_t *status);
+  lwm2m_object_instance_t *(* get_by_id)(uint16_t instance_id,
+                                         lwm2m_status_t *status);
+} lwm2m_object_impl_t;
+
+typedef struct lwm2m_object lwm2m_object_t;
+struct lwm2m_object {
+  lwm2m_object_t *next;
+  const lwm2m_object_impl_t *impl;
+};
+
+lwm2m_object_instance_t *get_instance_buffer(void);
+
 uint16_t lwm2m_engine_recommend_instance_id(uint16_t object_id);
-void lwm2m_engine_add_object(lwm2m_object_instance_t *object);
+int  lwm2m_engine_add_object(lwm2m_object_instance_t *object);
 void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
+int  lwm2m_engine_add_generic_object(lwm2m_object_t *object);
+void lwm2m_engine_remove_generic_object(lwm2m_object_t *object);
 void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
                                    uint16_t resource);
 

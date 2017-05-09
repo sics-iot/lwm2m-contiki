@@ -99,14 +99,14 @@ static const lwm2m_resource_id_t resources[] =
 
 static int32_t time_offset = 0;
 
-/* Interal battery and USB - just for test...*/
+/* Internal battery and USB - just for test...*/
 static uint16_t power_avail[] = LWM2M_DEVICE_POWER_AVAILABLE;
 static uint16_t power_voltage[] = LWM2M_DEVICE_POWER_VOLTAGE;
 static uint16_t power_current[] = LWM2M_DEVICE_POWER_CURRENT;
 /*---------------------------------------------------------------------------*/
 
 static int
-output_multi_i16(lwm2m_context_t *ctx, uint16_t *data, int count) {
+output_multi_i16(lwm2m_context_t *ctx, const uint16_t *data, int count) {
   int i;
   size_t len;
   len = lwm2m_object_write_enter_ri(ctx);

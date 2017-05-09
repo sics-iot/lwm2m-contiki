@@ -111,6 +111,7 @@ static uint8_t d_buf[COAP_MAX_BLOCK_SIZE * 2];
 static lwm2m_buffer_t lwm2m_buf = {
   .len = 0, .size =  COAP_MAX_BLOCK_SIZE * 2, .buffer = d_buf
 };
+static lwm2m_object_instance_t instance_buffer;
 
 /* obj-id / ... */
 static uint16_t lwm2m_buf_lock[4];
@@ -136,7 +137,74 @@ lwm2m_engine_next_object_instance(const lwm2m_context_t *context, lwm2m_object_i
 
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 LIST(object_list);
+LIST(generic_object_list);
 
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_t *
+get_object(uint16_t object_id)
+{
+  lwm2m_object_t *object;
+  for(object = list_head(generic_object_list);
+      object != NULL;
+      object = object->next) {
+    if(object->impl && object->impl->object_id == object_id) {
+      return object;
+    }
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static int
+has_object_id(uint16_t object_id)
+{
+  lwm2m_object_instance_t *instance;
+  for(instance = list_head(object_list);
+      instance != NULL;
+      instance = instance->next) {
+    if(instance->object_id == object_id) {
+      return 1;
+    }
+  }
+
+  return get_object(object_id) != NULL;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_instance(uint16_t object_id, uint16_t instance_id)
+{
+  lwm2m_object_instance_t *instance;
+  lwm2m_object_t *object;
+
+  for(instance = list_head(object_list);
+      instance != NULL;
+      instance = instance->next) {
+    if(instance->object_id == object_id) {
+      if(instance->instance_id == instance_id ||
+         instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+        return instance;
+      }
+    }
+  }
+
+  object = get_object(object_id);
+  if(object != NULL) {
+    if(instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+      return object->impl->get_first(NULL);
+    }
+    return object->impl->get_by_id(instance_id, NULL);
+  }
+
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_instance_by_context(const lwm2m_context_t *context)
+{
+  if(context->level < 2) {
+    return get_instance(context->object_id, LWM2M_OBJECT_INSTANCE_NONE);
+  }
+  return get_instance(context->object_id, context->object_instance_id);
+}
 /*---------------------------------------------------------------------------*/
 /* This is intended to switch out a block2 transfer buffer
  * It assumes that ctx containts the double buffer and that the outbuf is to
@@ -256,6 +324,7 @@ void lwm2m_engine_set_opaque_callback(lwm2m_context_t *ctx, lwm2m_write_opaque_c
 int
 lwm2m_engine_get_rd_data(uint8_t *rd_data, int size)
 {
+  lwm2m_object_t *object;
   lwm2m_object_instance_t *o;
   int pos;
   int len;
@@ -274,6 +343,36 @@ lwm2m_engine_get_rd_data(uint8_t *rd_data, int size)
       pos += len;
     }
   }
+  for(object = list_head(generic_object_list);
+      object != NULL;
+      object = object->next) {
+    if(object->impl != NULL) {
+      o = object->impl->get_first(NULL);
+      if(o == NULL) {
+        if(pos > 0 && pos < size) {
+          rd_data[pos++] = ',';
+        }
+        len = snprintf((char *)&rd_data[pos], size - pos, "<%d>",
+                       object->impl->object_id);
+        if(len > 0 && len < size - pos) {
+          pos += len;
+        }
+      } else {
+        do {
+          if(pos > 0 && pos < size) {
+            rd_data[pos++] = ',';
+          }
+          len = snprintf((char *)&rd_data[pos], size - pos, "<%d/%d>",
+                         object->impl->object_id, o->instance_id);
+          if(len > 0 && len < size - pos) {
+            pos += len;
+          } else {
+            break;
+          }
+        } while((o = object->impl->get_next(o, NULL)) != NULL);
+      }
+    }
+  }
   rd_data[pos] = 0;
   return pos;
 }
@@ -282,6 +381,7 @@ void
 lwm2m_engine_init(void)
 {
   list_init(object_list);
+  list_init(generic_object_list);
 
 #ifdef LWM2M_ENGINE_CLIENT_ENDPOINT_NAME
   const char *endpoint = LWM2M_ENGINE_CLIENT_ENDPOINT_NAME;
@@ -707,7 +807,9 @@ get_or_create_instance(lwm2m_context_t *ctx, uint16_t oid, uint8_t *created)
   PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id, instance);
   /* by default we assume that the instance is not created... so we set flag to zero */
-  if(created != NULL) *created = 0;
+  if(created != NULL) {
+    *created = 0;
+  }
   if(instance == NULL) {
     /* Find a generic instance for create */
     ctx->object_instance_id = LWM2M_OBJECT_INSTANCE_NONE;
@@ -890,6 +992,12 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
 }
 
 /*---------------------------------------------------------------------------*/
+lwm2m_object_instance_t *
+get_instance_buffer(void)
+{
+  return &instance_buffer;
+}
+/*---------------------------------------------------------------------------*/
 uint16_t
 lwm2m_engine_recommend_instance_id(uint16_t object_id)
 {
@@ -919,16 +1027,58 @@ lwm2m_engine_recommend_instance_id(uint16_t object_id)
   return max_id + 1;
 }
 /*---------------------------------------------------------------------------*/
-void
+int
 lwm2m_engine_add_object(lwm2m_object_instance_t *object)
 {
+  if(object == NULL || object->callback == NULL) {
+    /* Insufficient object configuration */
+    PRINTF("lwm2m-engine: failed to register NULL object\n");
+    return 0;
+  }
+  if(object->instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+    PRINTF("lwm2m-engine: failed to register object with no instance id\n");
+    return 0;
+  }
+  if(has_object_id(object->object_id)) {
+    /* An object with this id has already been registered */
+    PRINTF("lwm2m-engine: object with id %u already registered\n",
+           object->object_id);
+    return 0;
+  }
   list_add(object_list, object);
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 void
 lwm2m_engine_remove_object(lwm2m_object_instance_t *object)
 {
   list_remove(object_list, object);
+}
+/*---------------------------------------------------------------------------*/
+int
+lwm2m_engine_add_generic_object(lwm2m_object_t *object)
+{
+  if(object == NULL || object->impl == NULL
+     || object->impl->get_first == NULL
+     || object->impl->get_next == NULL
+     || object->impl->get_by_id == NULL) {
+    PRINTF("lwm2m-engine: failed to register NULL object\n");
+    return 0;
+  }
+  if(has_object_id(object->impl->object_id)) {
+    /* An object with this id has already been registered */
+    PRINTF("lwm2m-engine: object with id %u already registered\n",
+           object->impl->object_id);
+    return 0;
+  }
+  list_add(generic_object_list, object);
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_engine_remove_generic_object(lwm2m_object_t *object)
+{
+  list_remove(generic_object_list, object);
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
@@ -1003,7 +1153,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   context.outbuf->size = buffer_size;
 
   /* Set input buffer */
-  context.offset = offset != NULL ? *offset : 0;
+  if(offset != NULL) {
+    context.offset = *offset;
+  }
   context.inbuf->size = coap_get_payload(request, (const uint8_t **) &context.inbuf->buffer);
   context.inbuf->pos = 0;
 
@@ -1132,7 +1284,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   PRINTPRE("lwm2m: [", url_len, url);
   PRINTF("] %s Format:%d ID:%d bsize:%u offset:%d\n",
          get_method_as_string(REST.get_method_type(request)),
-         format, context.object_id, buffer_size, (int) *offset);
+         format, context.object_id, buffer_size,
+         offset != NULL ? ((int)*offset) : 0);
   if(format == LWM2M_TEXT_PLAIN) {
     /* a string */
     const uint8_t *data;
