@@ -102,7 +102,7 @@ struct lwm2m_object {
   const lwm2m_object_impl_t *impl;
 };
 
-lwm2m_object_instance_t *get_instance_buffer(void);
+lwm2m_object_instance_t *lwm2m_engine_get_instance_buffer(void);
 
 uint16_t lwm2m_engine_recommend_instance_id(uint16_t object_id);
 int  lwm2m_engine_add_object(lwm2m_object_instance_t *object);

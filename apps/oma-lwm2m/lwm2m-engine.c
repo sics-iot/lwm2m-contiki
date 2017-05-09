@@ -979,7 +979,7 @@ perform_multi_resource_write_op(lwm2m_object_instance_t *instance,
 
 /*---------------------------------------------------------------------------*/
 lwm2m_object_instance_t *
-get_instance_buffer(void)
+lwm2m_engine_get_instance_buffer(void)
 {
   return &instance_buffer;
 }
