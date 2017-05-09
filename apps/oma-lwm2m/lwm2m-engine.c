@@ -579,7 +579,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
           if(ctx->operation == LWM2M_OP_DISCOVER) {
             int dim = 0;
             len = snprintf((char *) &ctx->outbuf->buffer[ctx->outbuf->len],
-                           size - ctx->outbuf->len,
+                           ctx->outbuf->size - ctx->outbuf->len,
                            (ctx->outbuf->len == 0 && ctx->offset == 0) ? "</%d/%d/%d>":",</%d/%d/%d>",
                            instance->object_id, instance->instance_id,
                            RSC_ID(instance->resource_ids[last_rsc_pos]));
@@ -587,7 +587,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
                (dim = instance->resource_dim_callback(instance,
                                                       RSC_ID(instance->resource_ids[last_rsc_pos]))) > 0) {
               len += snprintf((char *) &ctx->outbuf->buffer[ctx->outbuf->len + len],
-                              size - ctx->outbuf->len - len,  ";dim=%d", dim);
+                              ctx->outbuf->size - ctx->outbuf->len - len,  ";dim=%d", dim);
             }
             /* here we have "read" out something */
             num_read++;
