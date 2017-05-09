@@ -511,15 +511,16 @@ periodic_process(ntimer_t *timer)
   case BOOTSTRAP_DONE:
     /* check that we should still use bootstrap */
     if(session_info.use_bootstrap) {
-      const lwm2m_security_value_t *security = NULL;
+      lwm2m_security_value_t *security;
       int i;
       PRINTF("*** Bootstrap - checking for server info...\n");
       /* get the security object - ignore bootstrap servers */
-      for(i = 0; i < lwm2m_security_instance_count(); i++) {
-        security = lwm2m_security_get_instance(i);
-        if(security != NULL && security->bootstrap == 0)
+      for(security = lwm2m_security_get_first();
+          security != NULL;
+          security = lwm2m_security_get_next(security)) {
+        if(security->bootstrap == 0) {
           break;
-        security = NULL;
+        }
       }
 
       if(security != NULL) {

@@ -43,6 +43,7 @@
  */
 
 #include <stdint.h>
+#include <string.h>
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-security.h"
@@ -67,11 +68,12 @@
 #define MAX_COUNT 2
 #endif
 
-lwm2m_object_instance_t security_object;
-
-static lwm2m_security_value_t security_instances[MAX_COUNT];
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
+
+static lwm2m_object_instance_t *get_by_id(uint16_t instance_id,
+                                          lwm2m_status_t *status);
+
 static const lwm2m_resource_id_t resources[] = {
   LWM2M_SECURITY_SERVER_URI_ID, LWM2M_SECURITY_BOOTSTRAP_SERVER_ID,
   LWM2M_SECURITY_MODE_ID, LWM2M_SECURITY_CLIENT_PKI_ID,
@@ -79,48 +81,95 @@ static const lwm2m_resource_id_t resources[] = {
   LWM2M_SECURITY_SHORT_SERVER_ID
 };
 
+LIST(instances_list);
+static lwm2m_security_value_t instances[MAX_COUNT];
 /*---------------------------------------------------------------------------*/
-int
-lwm2m_security_instance_count(void)
+static lwm2m_object_instance_t *
+create(uint16_t instance_id, lwm2m_status_t *status)
 {
-  return MAX_COUNT;
-}
-/*---------------------------------------------------------------------------*/
-lwm2m_security_value_t *
-lwm2m_security_get_instance(int index)
-{
-  if(index < MAX_COUNT &&
-     security_instances[index].reg_object.callback != NULL) {
-    return &security_instances[index];
+  lwm2m_object_instance_t *instance;
+  int i;
+
+  instance = get_by_id(instance_id, NULL);
+  if(instance != NULL) {
+    /* An instance with this id is already registered */
+    if(status) {
+      *status = LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+    }
+    return NULL;
   }
+
+  for(i = 0; i < MAX_COUNT; i++) {
+    if(instances[i].instance.instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+      memset(&instances[i], 0, sizeof(instances[i]));
+      instances[i].instance.callback = lwm2m_callback;
+      instances[i].instance.object_id = LWM2M_OBJECT_SECURITY_ID;
+      instances[i].instance.instance_id = instance_id;
+      instances[i].instance.resource_ids = resources;
+      instances[i].instance.resource_count =
+        sizeof(resources) / sizeof(lwm2m_resource_id_t);
+      list_add(instances_list, &instances[i].instance);
+
+      PRINTF("SEC: Create new security instance\n");
+      return &instances[i].instance;
+    }
+  }
+
+  if(status) {
+    *status = LWM2M_STATUS_SERVICE_UNAVAILABLE;
+  }
+
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
 static int
-lwm2m_security_create(int instance_id)
+delete(uint16_t instance_id, lwm2m_status_t *status)
 {
+  lwm2m_object_instance_t *instance;
   int i;
-  for(i = 0; i < MAX_COUNT; i++) {
-    if(security_instances[i].reg_object.callback != NULL &&
-       security_instances[i].reg_object.instance_id == instance_id) {
-      PRINTF("Can not create instance - already existing: %d\n", instance_id);
-      return 0;
+
+  if(instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+    /* Remove all instances */
+    while((instance = list_pop(instances_list)) != NULL) {
+      instance->instance_id = LWM2M_OBJECT_INSTANCE_NONE;
     }
+    return 1;
   }
-  for(i = 0; i < MAX_COUNT; i++) {
-    /* Not used if callback is non-existend */
-    if(security_instances[i].reg_object.callback == NULL) {
-      security_instances[i].reg_object.callback = lwm2m_callback;
-      security_instances[i].reg_object.object_id = LWM2M_OBJECT_SECURITY_ID;
-      security_instances[i].reg_object.instance_id = instance_id;
-      security_instances[i].reg_object.resource_ids = resources;
-      security_instances[i].reg_object.resource_count = sizeof(resources) / sizeof(uint16_t);
-      lwm2m_engine_add_object((lwm2m_object_instance_t *) &security_instances[i]);
-      PRINTF("SEC: Create new security instance\n");
-      return 1;
-    }
+
+  instance = get_by_id(instance_id, NULL);
+  if(instance != NULL) {
+    instance->instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+    list_remove(instances_list, instance);
+    return 1;
   }
+
   return 0;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_first(lwm2m_status_t *status)
+{
+  return list_head(instances_list);
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_next(lwm2m_object_instance_t *instance, lwm2m_status_t *status)
+{
+  return instance == NULL ? NULL : instance->next;
+}
+/*---------------------------------------------------------------------------*/
+static lwm2m_object_instance_t *
+get_by_id(uint16_t instance_id, lwm2m_status_t *status)
+{
+  lwm2m_object_instance_t *instance;
+  for(instance = list_head(instances_list);
+      instance != NULL;
+      instance = instance->next) {
+    if(instance->instance_id == instance_id) {
+      return instance;
+    }
+  }
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t
@@ -134,13 +183,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   lwm2m_security_value_t *security;
   security = (lwm2m_security_value_t *) object;
 
-  if(ctx->operation == LWM2M_OP_CREATE) {
-    PRINTF("SEC: Creating new instance: %d\n", ctx->object_instance_id);
-    if(lwm2m_security_create(ctx->object_instance_id)) {
-      return LWM2M_STATUS_OK;
-    }
-    return LWM2M_STATUS_ERROR;
-  } else if(ctx->operation == LWM2M_OP_WRITE) {
+  if(ctx->operation == LWM2M_OP_WRITE) {
     /* Handle the writes */
     switch(ctx->resource_id) {
     case LWM2M_SECURITY_SERVER_URI_ID:
@@ -196,18 +239,43 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 }
 
 /*---------------------------------------------------------------------------*/
+lwm2m_security_value_t *
+lwm2m_security_get_first(void)
+{
+  return list_head(instances_list);
+}
+/*---------------------------------------------------------------------------*/
+lwm2m_security_value_t *
+lwm2m_security_get_next(lwm2m_security_value_t *last)
+{
+  return last == NULL ? NULL : (lwm2m_security_value_t *)last->instance.next;
+}
+/*---------------------------------------------------------------------------*/
+static const lwm2m_object_impl_t impl = {
+  .object_id = LWM2M_OBJECT_SECURITY_ID,
+  .get_first = get_first,
+  .get_next = get_next,
+  .get_by_id = get_by_id,
+  .create = create,
+  .delete = delete,
+};
+static lwm2m_object_t reg_object = {
+  .impl = &impl,
+};
+/*---------------------------------------------------------------------------*/
 void
 lwm2m_security_init(void)
 {
-  /* Register the generic object */
-  security_object.object_id = LWM2M_OBJECT_SECURITY_ID;
-  security_object.instance_id = 0xffff; /* Generic instance */
-  security_object.resource_ids = resources;
-  security_object.resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t);
-  security_object.callback = lwm2m_callback;
+  int i;
 
   PRINTF("*** Init lwm2m-security\n");
-  lwm2m_engine_add_object(&security_object);
+
+  list_init(instances_list);
+
+  for(i = 0; i < MAX_COUNT; i++) {
+    instances[i].instance.instance_id = LWM2M_OBJECT_INSTANCE_NONE;
+  }
+  lwm2m_engine_add_generic_object(&reg_object);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

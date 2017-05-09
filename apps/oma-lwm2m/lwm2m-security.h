@@ -40,7 +40,7 @@
 #define KEY_SIZE 32
 
 typedef struct security_value {
-  lwm2m_object_instance_t reg_object;
+  lwm2m_object_instance_t instance;
   uint16_t server_id;
   uint8_t bootstrap;
   uint8_t security_mode;
@@ -54,8 +54,9 @@ typedef struct security_value {
   uint8_t server_public_key_len;
 } lwm2m_security_value_t;
 
-int lwm2m_security_instance_count(void);
-lwm2m_security_value_t *lwm2m_security_get_instance(int index);
+lwm2m_security_value_t *lwm2m_security_get_first(void);
+lwm2m_security_value_t *lwm2m_security_get_next(lwm2m_security_value_t *last);
+
 void lwm2m_security_init(void);
 
 #endif /* LWM2M_SECURITY_H */

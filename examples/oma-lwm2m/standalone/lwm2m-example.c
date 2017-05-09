@@ -112,15 +112,13 @@ start_application(int argc, char *argv[])
   /* Initialize the OMA LWM2M engine */
   lwm2m_engine_init();
 
-  /* Register default LWM2M objects */
-  /* lwm2m_engine_register_default_objects(); */
-
   ipso_sensor_temp_init();
   ipso_control_test_init();
   ipso_blockwise_test_init();
 
-  lwm2m_firmware_init();
+  /* Register default LWM2M objects */
   lwm2m_device_init();
+  lwm2m_firmware_init();
   lwm2m_security_init();
   lwm2m_server_init();
 

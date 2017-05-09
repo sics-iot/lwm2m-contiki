@@ -1193,7 +1193,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
    * 3 => Object and Instance and Resource
    */
   if(depth < 1) {
-    /* No possible object id found in URL - ignore request */
+    /* No possible object id found in URL - ignore request unless delete all */
     if(REST.get_method_type(request) == METHOD_DELETE) {
       PRINTF("This is a delete all - for bootstrap...\n");
       context.operation = LWM2M_OP_DELETE;
