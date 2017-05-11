@@ -1077,6 +1077,12 @@ lwm2m_engine_get_instance_buffer(void)
   return &instance_buffer;
 }
 /*---------------------------------------------------------------------------*/
+int
+lwm2m_engine_has_instance(uint16_t object_id, uint16_t instance_id)
+{
+  return get_instance(object_id, instance_id, NULL) != NULL;
+}
+/*---------------------------------------------------------------------------*/
 uint16_t
 lwm2m_engine_recommend_instance_id(uint16_t object_id)
 {
