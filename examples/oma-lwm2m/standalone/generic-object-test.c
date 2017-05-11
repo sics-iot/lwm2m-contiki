@@ -50,7 +50,7 @@
 static lwm2m_object_t generic_object;
 
 #define MAX_SIZE 512
-
+#define NUMBER_OF_INSTANCES 20
 
 #define PRINTF printf
 
@@ -142,7 +142,7 @@ get_by_id(uint16_t instance_id, lwm2m_status_t *status)
   if(status != NULL) {
     *status = LWM2M_STATUS_OK;
   }
-  if(instance_id < 1000) {
+  if(instance_id < NUMBER_OF_INSTANCES) {
     instance = lwm2m_engine_get_instance_buffer();
     if(instance == NULL) {
       return NULL;

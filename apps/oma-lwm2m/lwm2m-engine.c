@@ -231,21 +231,21 @@ call_instance(lwm2m_object_instance_t *instance, lwm2m_context_t *context)
  * be the new buffer in ctx.
  */
 static int
-double_buffer_flush(lwm2m_context_t *ctx, lwm2m_buffer_t *outbuf, int size)
+double_buffer_flush(lwm2m_buffer_t *ctxbuf, lwm2m_buffer_t *outbuf, int size)
 {
   /* Copy the data from the double buffer in ctx to the outbuf and move data */
   /* If the buffer is less than size - we will output all and get remaining down
      to zero */
-  if(ctx->outbuf->len < size) {
-    size = ctx->outbuf->len;
+  if(ctxbuf->len < size) {
+    size = ctxbuf->len;
   }
-  if(ctx->outbuf->len >= size && outbuf->size >= size) {
+  if(ctxbuf->len >= size && outbuf->size >= size) {
     PRINTF("Double buffer - copying out %d bytes remaining: %d\n",
-           size, ctx->outbuf->len - size);
-    memcpy(outbuf->buffer, ctx->outbuf->buffer, size);
-    memcpy(ctx->outbuf->buffer, &ctx->outbuf->buffer[size],
-           ctx->outbuf->len - size);
-    ctx->outbuf->len -= size;
+           size, ctxbuf->len - size);
+    memcpy(outbuf->buffer, ctxbuf->buffer, size);
+    memcpy(ctxbuf->buffer, &ctxbuf->buffer[size],
+           ctxbuf->len - size);
+    ctxbuf->len -= size;
     outbuf->len = size;
     return outbuf->len;
   }
@@ -381,59 +381,69 @@ void lwm2m_engine_set_opaque_callback(lwm2m_context_t *ctx, lwm2m_write_opaque_c
 }
 /*---------------------------------------------------------------------------*/
 int
-lwm2m_engine_get_rd_data(uint8_t *rd_data, int size)
+lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
 {
-  lwm2m_object_t *object;
-  lwm2m_object_instance_t *o;
-  int pos;
+  /* remember things here - need to lock lwm2m buffer also!!! */
+  static lwm2m_object_t *object;
+  static lwm2m_object_instance_t *instance;
   int len;
+  /* pick size from outbuf */
+  int maxsize = outbuf->size;
 
-  pos = 0;
-
-  for(o = list_head(object_list); o != NULL; o = o->next) {
-    if(o->instance_id != 0xffff) {
-      len = snprintf((char *) &rd_data[pos], size - pos, (pos > 0) ? ",<%d/%d>" : "<%d/%d>",
-                     o->object_id, o->instance_id);
-    } else {
-      len = snprintf((char *) &rd_data[pos], size - pos, (pos > 0) ? ",<%d>" : "<%d>",
-                     o->object_id);
-    }
-    if(len > 0 && len < size - pos) {
-      pos += len;
-    }
+  if(block == 0) {
+    PRINTF("Starting RD genereation\n");
+    /* start with simple object instances */
+    instance = list_head(object_list);
+    object = NULL;
+  } else {
+    /* object and instance was static... */
   }
-  for(object = list_head(generic_object_list);
-      object != NULL;
-      object = object->next) {
-    if(object->impl != NULL) {
-      o = object->impl->get_first(NULL);
-      if(o == NULL) {
-        if(pos > 0 && pos < size) {
-          rd_data[pos++] = ',';
-        }
-        len = snprintf((char *)&rd_data[pos], size - pos, "<%d>",
-                       object->impl->object_id);
-        if(len > 0 && len < size - pos) {
-          pos += len;
-        }
-      } else {
-        do {
-          if(pos > 0 && pos < size) {
-            rd_data[pos++] = ',';
-          }
-          len = snprintf((char *)&rd_data[pos], size - pos, "<%d/%d>",
-                         object->impl->object_id, o->instance_id);
-          if(len > 0 && len < size - pos) {
-            pos += len;
-          } else {
-            break;
-          }
-        } while((o = object->impl->get_next(o, NULL)) != NULL);
+
+  PRINTF("Generating RD list:");
+  while(instance != NULL || object != NULL) {
+    int pos = lwm2m_buf.len;
+    if(instance != NULL) {
+      len = snprintf((char *) &lwm2m_buf.buffer[pos],
+                     maxsize - pos, (pos > 0 || block > 0) ? ",<%d/%d>" : "<%d/%d>",
+                     instance->object_id, instance->instance_id);
+      PRINTF((pos > 0 || block > 0) ? ",<%d/%d>" : "<%d/%d>",
+             instance->object_id, instance->instance_id);
+    } else if(object->impl != NULL) {
+      len = snprintf((char *) &lwm2m_buf.buffer[pos],
+                     maxsize - pos, (pos > 0 || block > 0) ? ",<%d>" : "<%d>",
+                     object->impl->object_id);
+      PRINTF((pos > 0 || block > 0) ? ",<%d>" : "<%d>",
+             object->impl->object_id);
+    }
+    lwm2m_buf.len += len;
+    instance = next_object_instance(NULL, object, instance);
+
+    /* no object and no instance - we are done with simple object instances */
+    if(object == NULL && instance == NULL) {
+      object = list_head(generic_object_list);
+      if(object != NULL) {
+        instance = object->impl->get_first(NULL);
+      }
+      /* Object exists but not an instance - instances for this object are done - go to next */
+    } else if(object != NULL && instance == NULL) {
+      object = object->next;
+      if(object != NULL) {
+        instance = object->impl->get_first(NULL);
       }
     }
+
+    if(lwm2m_buf.len >= maxsize) {
+      PRINTF("**** CoAP MAX BLOCK Reached!!! **** SEND\n");
+      /* If the produced data is larger than a CoAP block we need to send
+         this now */
+      double_buffer_flush(&lwm2m_buf, outbuf, maxsize);
+      /* there will be more! */
+      return 1;
+    }
   }
-  rd_data[pos] = 0;
-  return pos;
+  PRINTF("\n");
+  double_buffer_flush(&lwm2m_buf, outbuf, maxsize);
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -667,7 +677,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
             num_read++;
             ctx->outbuf->len += len;
             if(len < 0 || ctx->outbuf->len >= size) {
-              double_buffer_flush(ctx, outbuf, size);
+              double_buffer_flush(ctx->outbuf, outbuf, size);
 
               PRINTF("Copied lwm2m buf - remaining: %d\n", lwm2m_buf.len);
               /* switch buffer */
@@ -780,7 +790,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
              this now */
           if(ctx->outbuf->len < 2 * COAP_MAX_BLOCK_SIZE) {
             /* We assume that size is equal to COAP_MAX_BLOCK_SIZE here */
-            double_buffer_flush(ctx, outbuf, size);
+            double_buffer_flush(ctx->outbuf, outbuf, size);
 
             PRINTF("Copied lwm2m buf - remaining: %d\n", lwm2m_buf.len);
             /* switch buffer */
@@ -820,7 +830,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
   }
 
   /* seems like we are done! - flush buffer */
-  len = double_buffer_flush(ctx, outbuf, size);
+  len = double_buffer_flush(ctx->outbuf, outbuf, size);
   ctx->outbuf = outbuf;
   ctx->offset += len;
 
@@ -1171,20 +1181,20 @@ static lwm2m_object_instance_t *
 next_object_instance(const lwm2m_context_t *context, lwm2m_object_t *object,
                      lwm2m_object_instance_t *last)
 {
-  if(context->level >= 2) {
+  if(context != NULL && context->level >= 2) {
     /* Only single instance */
     return NULL;
   }
 
   if(object == NULL) {
     for(last = last->next; last != NULL; last = last->next) {
-      if(last->object_id == context->object_id) {
+      /* if no context is given - this will just give the next object */
+      if(context == NULL || last->object_id == context->object_id) {
         return last;
       }
     }
     return NULL;
   }
-
   return object->impl->get_next(last, NULL);
 }
 /*---------------------------------------------------------------------------*/

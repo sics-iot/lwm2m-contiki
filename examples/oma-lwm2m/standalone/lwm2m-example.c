@@ -43,6 +43,7 @@
 #include "lwm2m-server.h"
 #include "lwm2m-security.h"
 #include "lwm2m-device.h"
+#include "er-coap.h"
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
@@ -50,6 +51,7 @@
 void ipso_sensor_temp_init(void);
 void ipso_control_test_init(void);
 void ipso_blockwise_test_init(void);
+void lwm2m_generic_object_test_init(void);
 
 /* set this above zero to get auto deregister */
 int deregister = -1;
@@ -92,9 +94,13 @@ start_application(int argc, char *argv[])
   const char *default_server = LWM2M_DEFAULT_RD_SERVER;
   coap_endpoint_t server_ep;
   int has_server_ep = 0;
+  char *name = "abcde";
 
   if(argc > 1) {
     default_server = argv[1];
+  }
+  if(argc > 2) {
+    name = argv[2];
   }
 
   if(default_server != NULL && *default_server != '\0') {
@@ -106,8 +112,8 @@ start_application(int argc, char *argv[])
   }
 
   /* Example using network timer */
-  ntimer_set_callback(&nt, callback);
-  ntimer_set(&nt, 10000);
+  //  ntimer_set_callback(&nt, callback);
+  //  ntimer_set(&nt, 10000);
 
   /* Initialize the OMA LWM2M engine */
   lwm2m_engine_init();
@@ -115,8 +121,10 @@ start_application(int argc, char *argv[])
   ipso_sensor_temp_init();
   ipso_control_test_init();
   ipso_blockwise_test_init();
+  lwm2m_generic_object_test_init();
 
   /* Register default LWM2M objects */
+
   lwm2m_device_init();
   lwm2m_firmware_init();
   lwm2m_security_init();
@@ -136,7 +144,8 @@ start_application(int argc, char *argv[])
     lwm2m_rd_client_register_with_server(&server_ep);
 #endif
     lwm2m_rd_client_use_registration_server(1);
-    lwm2m_rd_client_init("abcd");
+
+    lwm2m_rd_client_init(name);
 
     printf("Callback: %p\n", session_callback);
     lwm2m_rd_client_set_session_callback(session_callback);
@@ -144,5 +153,6 @@ start_application(int argc, char *argv[])
   } else {
     fprintf(stderr, "No registration server specified.\n");
   }
+  printf("COAP MAX PACKET: %d (BLOCK:%d)\n", COAP_MAX_PACKET_SIZE, COAP_MAX_BLOCK_SIZE);
 }
 /*---------------------------------------------------------------------------*/

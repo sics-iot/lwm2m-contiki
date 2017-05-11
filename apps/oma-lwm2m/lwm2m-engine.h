@@ -61,7 +61,7 @@ typedef enum {
 
 void lwm2m_engine_init(void);
 
-int lwm2m_engine_get_rd_data(uint8_t *rd_data, int size);
+int lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block);
 
 typedef lwm2m_status_t
 (* lwm2m_object_instance_callback_t)(lwm2m_object_instance_t *object,

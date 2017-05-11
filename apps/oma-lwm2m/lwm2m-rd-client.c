@@ -65,7 +65,7 @@
 #include "net/rpl/rpl.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -92,6 +92,8 @@
 
 static struct lwm2m_session_info session_info;
 static struct request_state rd_request_state;
+
+static coap_packet_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
 /* The states for the RD client state machine */
 /* When node is unregistered it ends up in UNREGISTERED
@@ -124,7 +126,11 @@ static char path_data[32]; /* allocate some data for building the path */
 static char query_data[64]; /* allocate some data for queries and updates */
 static uint8_t rd_data[128]; /* allocate some data for the RD */
 
+static uint32_t rd_block1;
+static uint8_t rd_more;
 static ntimer_t rd_timer;
+
+static ntimer_t block1_timer;
 
 void check_periodic_observations();
 
@@ -132,6 +138,7 @@ void check_periodic_observations();
 static void
 prepare_update(coap_packet_t *request, int triggered) {
   int len;
+  lwm2m_buffer_t outbuf;
   coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
   coap_set_header_uri_path(request, session_info.assigned_ep);
 
@@ -141,9 +148,15 @@ prepare_update(coap_packet_t *request, int triggered) {
 
   if((triggered || rd_flags & FLAG_RD_DATA_UPDATE_ON_DIRTY) && (rd_flags & FLAG_RD_DATA_DIRTY)) {
     rd_flags &= ~FLAG_RD_DATA_DIRTY;
-    /* generate the rd data */
-    len = lwm2m_engine_get_rd_data(rd_data, sizeof(rd_data));
-    coap_set_payload(request, rd_data, len);
+
+    /* setup the output buffer */
+    outbuf.buffer = rd_data;
+    outbuf.size = sizeof(rd_data);
+    outbuf.len = 0;
+
+    /* this will also set the request payload */
+    rd_more = lwm2m_engine_set_rd_data(&outbuf, 0);
+    coap_set_payload(request, rd_data, outbuf.len);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -352,6 +365,38 @@ bootstrap_callback(struct request_state *state)
   }
 }
 /*---------------------------------------------------------------------------*/
+static void
+produce_more_rd(void (*callback)(struct request_state *state))
+{
+  lwm2m_buffer_t outbuf;
+
+  PRINTF("GOT Continue!\n");
+
+  /* setup the output buffer */
+  outbuf.buffer = rd_data;
+  outbuf.size = sizeof(rd_data);
+  outbuf.len = 0;
+
+  rd_block1++;
+
+  /* this will also set the request payload */
+  rd_more = lwm2m_engine_set_rd_data(&outbuf, rd_block1);
+  coap_set_payload(request, rd_data, outbuf.len);
+
+  PRINTF("Setting block1 in request - block: %d more: %d\n", rd_block1, rd_more);
+  coap_set_header_block1(request, rd_block1, rd_more, sizeof(rd_data));
+
+  coap_send_request(&rd_request_state, &session_info.server_ep, request, callback);
+}
+
+static void registration_callback(struct request_state *state);
+
+void
+block1_rd_callback(ntimer_t *timer)
+{
+  produce_more_rd(registration_callback);
+}
+/*---------------------------------------------------------------------------*/
 /*
  * Page 65-66 in 07 April 2016 spec.
  */
@@ -361,7 +406,12 @@ registration_callback(struct request_state *state)
   PRINTF("Registration callback. Response: %d, ", state->response != NULL);
   if(state->response) {
     /* check state and possibly set registration to done */
-    if(CREATED_2_01 == state->response->code) {
+    if(CONTINUE_2_31 == state->response->code) {
+      /* We assume that size never change?! */
+      coap_get_header_block1(state->response, &rd_block1, NULL, NULL, NULL);
+      ntimer_set_callback(&rd_timer, block1_rd_callback);
+      ntimer_set(&rd_timer, 1); /* delay 1 ms */
+    } else if(CREATED_2_01 == state->response->code) {
       if(state->response->location_path_len < LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN) {
         memcpy(session_info.assigned_ep, state->response->location_path,
                state->response->location_path_len);
@@ -449,7 +499,7 @@ deregister_callback(struct request_state *state)
 static void
 periodic_process(ntimer_t *timer)
 {
-  static coap_packet_t request[1];      /* This way the packet can be treated as pointer as usual. */
+  lwm2m_buffer_t outbuf;
   uint64_t now;
 
   /* reschedule the ntimer */
@@ -585,15 +635,27 @@ periodic_process(ntimer_t *timer)
       snprintf(query_data, sizeof(query_data) - 1, "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
       coap_set_header_uri_query(request, query_data);
 
-      /* generate the rd data */
-      len = lwm2m_engine_get_rd_data(rd_data, sizeof(rd_data));
-      coap_set_payload(request, rd_data, len);
+      /* setup the output buffer */
+      outbuf.buffer = rd_data;
+      outbuf.size = sizeof(rd_data);
+      outbuf.len = 0;
+
+      /* this will also set the request payload */
+      rd_more = lwm2m_engine_set_rd_data(&outbuf, 0);
+      coap_set_payload(request, rd_data, outbuf.len);
 
       PRINTF("Registering with [");
       coap_endpoint_print(&session_info.server_ep);
       PRINTF("] lwm2m endpoint '%s': '", query_data);
-      PRINTS(len, rd_data, "%c");
-      PRINTF("'\n");
+      PRINTS(outbuf.len, rd_data, "%c");
+      PRINTF("' More:%d\n", rd_more);
+
+      if(rd_more) {
+        /* set the first block here */
+        PRINTF("Setting block1 in request\n");
+        coap_set_header_block1(request, 0, 1, sizeof(rd_data));
+      }
+
       coap_send_request(&rd_request_state, &session_info.server_ep,
                         request, registration_callback);
       rd_state = REGISTRATION_SENT;
