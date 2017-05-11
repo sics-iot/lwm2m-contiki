@@ -207,6 +207,25 @@ get_instance_by_context(const lwm2m_context_t *context, lwm2m_object_t **o)
   return get_instance(context->object_id, context->object_instance_id, o);
 }
 /*---------------------------------------------------------------------------*/
+static lwm2m_status_t
+call_instance(lwm2m_object_instance_t *instance, lwm2m_context_t *context)
+{
+  if(context->level < 3) {
+    return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+  }
+
+  if(instance == NULL) {
+    /* No instance */
+    return LWM2M_STATUS_NOT_FOUND;
+  }
+
+  if(instance->callback == NULL) {
+    return LWM2M_STATUS_ERROR;
+  }
+
+  return instance->callback(instance, context);
+}
+/*---------------------------------------------------------------------------*/
 /* This is intended to switch out a block2 transfer buffer
  * It assumes that ctx containts the double buffer and that the outbuf is to
  * be the new buffer in ctx.
@@ -249,7 +268,46 @@ get_method_as_string(rest_resource_flags_t method)
     return "UNKNOWN";
   }
 }
-#endif
+#endif /* DEBUG */
+/*--------------------------------------------------------------------------*/
+#if DEBUG
+static const char *
+get_status_as_string(lwm2m_status_t status)
+{
+  static char buffer[8];
+  switch(status) {
+  case LWM2M_STATUS_OK:
+    return "OK";
+  case LWM2M_STATUS_ERROR:
+    return "ERROR";
+  case LWM2M_STATUS_WRITE_ERROR:
+    return "WRITE ERROR";
+  case LWM2M_STATUS_READ_ERROR:
+    return "READ ERROR";
+  case LWM2M_STATUS_BAD_REQUEST:
+    return "BAD REQUEST";
+  case LWM2M_STATUS_UNAUTHORIZED:
+    return "UNAUTHORIZED";
+  case LWM2M_STATUS_FORBIDDEN:
+    return "FORBIDDEN";
+  case LWM2M_STATUS_NOT_FOUND:
+    return "NOT FOUND";
+  case LWM2M_STATUS_OPERATION_NOT_ALLOWED:
+    return "OPERATION NOT ALLOWED";
+  case LWM2M_STATUS_NOT_ACCEPTABLE:
+    return "NOT ACCEPTABLE";
+  case LWM2M_STATUS_UNSUPPORTED_CONTENT_FORMAT:
+    return "UNSUPPORTED CONTENT FORMAT";
+  case LWM2M_STATUS_NOT_IMPLEMENTED:
+    return "NOT IMPLEMENTED";
+  case LWM2M_STATUS_SERVICE_UNAVAILABLE:
+    return "SERVICE UNAVAILABLE";
+  default:
+    snprintf(buffer, sizeof(buffer) - 1, "<%u>", status);
+    return buffer;
+  }
+}
+#endif /* DEBUG */
 /*--------------------------------------------------------------------------*/
 static int
 parse_path(const char *path, int path_len,
@@ -283,7 +341,7 @@ parse_path(const char *path, int path_len,
       ret++;
       pos++;
     } else {
-      PRINTF("Error: illegal char '%c' at pos:%d\n", c, pos);
+      /* PRINTF("Error: illegal char '%c' at pos:%d\n", c, pos); */
       return -1;
     }
   } while(pos < path_len);
@@ -485,6 +543,10 @@ lwm2m_engine_select_reader(lwm2m_context_t *context, unsigned int content_format
     case LWM2M_OLD_TLV:
       context->reader = &oma_tlv_reader;
       break;
+    case LWM2M_JSON:
+    case LWM2M_OLD_JSON:
+      context->reader = &lwm2m_plain_text_reader;
+      break;
     case LWM2M_TEXT_PLAIN:
     case TEXT_PLAIN:
       context->reader = &lwm2m_plain_text_reader;
@@ -515,6 +577,18 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
   uint8_t num_read = 0;
   lwm2m_buffer_t *outbuf;
 
+  if(instance == NULL) {
+    /* No existing instance */
+    return LWM2M_STATUS_NOT_FOUND;
+  }
+
+  if(ctx->level < 3 &&
+     (ctx->content_type == LWM2M_TEXT_PLAIN ||
+      ctx->content_type == TEXT_PLAIN ||
+      ctx->content_type == LWM2M_OLD_OPAQUE)) {
+    return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+  }
+
   /* copy out the out-buffer as read will use its own - will be same for disoc when
      read is fixed */
   outbuf = ctx->outbuf;
@@ -532,11 +606,6 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
 
   PRINTF("MultiRead: %d/%d/%d lv:%d offset:%d\n",
          ctx->object_id, ctx->object_instance_id, ctx->resource_id, ctx->level, ctx->offset);
-
-  if(instance == NULL) {
-    /* No existing instance */
-    return LWM2M_STATUS_NOT_FOUND;
-  }
 
   /* Make use of the double buffer */
   ctx->outbuf = &lwm2m_buf;
@@ -641,11 +710,12 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
                 PRINTF("Doing the callback to the resource %d\n", ctx->outbuf->len);
                 /* No special opaque callback to handle - use regular callback */
                 success = instance->callback(instance, ctx);
-                PRINTF("After the callback to the resource %d %d\n", ctx->outbuf->len, success);
+                PRINTF("After the callback to the resource %d: %s\n",
+                       ctx->outbuf->len, get_status_as_string(success));
 
                 if(success != LWM2M_STATUS_OK) {
                   /* What to do here? */
-                  PRINTF("Callback failed: %d\n", success);
+                  PRINTF("Callback failed: %s\n", get_status_as_string(success));
                   if(lv < 3) {
                     if(success == LWM2M_STATUS_NOT_FOUND) {
                       /* ok with a not found during a multi read - what more
@@ -667,12 +737,11 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
                    we should produce data via that callback until the opaque has fully
                    been handled */
                 ctx->offset = current_opaque_offset;
-                PRINTF("Calling the opaque handler %x\n", ctx->writer_flags);
-                success =
-                  current_opaque_callback(instance, ctx, num_write);
+                /* PRINTF("Calling the opaque handler %x\n", ctx->writer_flags); */
+                success = current_opaque_callback(instance, ctx, num_write);
                 if((ctx->writer_flags & WRITER_HAS_MORE) == 0) {
                   /* This opaque stream is now done! */
-                  PRINTF("Setting opaque callback to null - it is done!\n");
+                  /* PRINTF("Setting opaque callback to null - it is done!\n"); */
                   current_opaque_callback = NULL;
                 } else if(ctx->outbuf->len < COAP_MAX_BLOCK_SIZE) {
                   lwm2m_buf_lock[0] = 0;
@@ -680,20 +749,21 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
                 }
                 current_opaque_offset += num_write;
                 ctx->offset = old_offset;
-                PRINTF("Setting back offset to: %d\n", ctx->offset);
+                /* PRINTF("Setting back offset to: %d\n", ctx->offset); */
               }
 
               /* here we have "read" out something */
               num_read++;
               /* We will need to handle no-success and other things */
-              PRINTF("Called %u/%u/%u outlen:%u ok:%u\n",
+              PRINTF("Called %u/%u/%u outlen:%u %s\n",
                      ctx->object_id, ctx->object_instance_id, ctx->resource_id,
-                     ctx->outbuf->len, success);
+                     ctx->outbuf->len, get_status_as_string(success));
 
               /* we need to handle full buffer, etc here also! */
               ctx->level = lv;
             } else {
-              PRINTF("Resource not readable\n");
+              PRINTF("Resource %u not readable\n",
+                     RSC_ID(instance->resource_ids[last_rsc_pos]));
             }
           }
         }
@@ -877,7 +947,6 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
   inpos = ctx->inbuf->pos;
   insize = ctx->inbuf->size;
 
-  PRINTF("Multi Write \n");
   if(format == LWM2M_JSON || format == LWM2M_OLD_JSON) {
     struct json_data json;
 
@@ -969,7 +1038,7 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
           pos += len2;
         }
       } else if(tlv.type == OMA_TLV_TYPE_RESOURCE) {
-        status = process_tlv_write(ctx, object, tlv.id, (uint8_t *)&inbuf[tlvpos], len);
+        status = process_tlv_write(ctx, object, tlv.id, &inbuf[tlvpos], len);
         if(status != LWM2M_STATUS_OK) {
           return status;
         }
@@ -977,7 +1046,16 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
       }
       tlvpos += len;
     }
+  } else if(format == LWM2M_TEXT_PLAIN ||
+            format == TEXT_PLAIN ||
+            format == LWM2M_OLD_OPAQUE) {
+    return call_instance(instance, ctx);
+
+  } else {
+    /* Unsupported format */
+    return LWM2M_STATUS_UNSUPPORTED_CONTENT_FORMAT;
   }
+
   /* Here we have a success! */
   return LWM2M_STATUS_OK;
 }
@@ -1168,6 +1246,10 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
 
   depth = lwm2m_engine_parse_context(url, url_len, request, response,
                                      buffer, buffer_size, &context);
+  if(depth < 0) {
+    /* Not a LWM2M context */
+    return COAP_HANDLER_STATUS_CONTINUE;
+  }
 
   PRINTF("%s URL:'", get_method_as_string(REST.get_method_type(request)));
   PRINTS(url_len, url, "%c");
@@ -1182,9 +1264,14 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     format = TEXT_PLAIN;
   }
   if(!REST.get_header_accept(request, &accept)) {
-    PRINTF("lwm2m: No Accept header, using same as Content-format %d\n",
-           format);
-    accept = format;
+    if(format == TEXT_PLAIN && depth < 3) {
+      PRINTF("lwm2m: No Accept header, assume JSON\n");
+      accept = LWM2M_JSON;
+    } else {
+      PRINTF("lwm2m: No Accept header, using same as content-format: %d\n",
+             format);
+      accept = format;
+    }
   }
 
   /**
@@ -1237,7 +1324,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return COAP_HANDLER_STATUS_CONTINUE;
   }
 
-  PRINTF("lwm2m Context: %u/%u/%u  found: %d\n",
+  PRINTF("lwm2m: Context: %u/%u/%u  found: %d\n",
          context.object_id,
          context.object_instance_id, context.resource_id, depth);
 
@@ -1287,7 +1374,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
          get_method_as_string(REST.get_method_type(request)),
          format, context.object_id, buffer_size,
          offset != NULL ? ((int)*offset) : 0);
-  if(format == LWM2M_TEXT_PLAIN) {
+  if(format == TEXT_PLAIN) {
     /* a string */
     const uint8_t *data;
     int plen = REST.get_request_payload(request, &data);
@@ -1306,16 +1393,22 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     context.offset = boffset;
   }
 
-    /* This is a discovery operation */
-  if(context.operation == LWM2M_OP_DISCOVER) {
+  /* This is a discovery operation */
+  switch(context.operation) {
+  case LWM2M_OP_DISCOVER:
     /* Assume only one disco at a time... */
     success = perform_multi_resource_read_op(object, instance, &context);
-  } else if(context.operation == LWM2M_OP_READ) {
-    PRINTF("Multi READ\n");
+    break;
+  case LWM2M_OP_READ:
     success = perform_multi_resource_read_op(object, instance, &context);
-  } else if(context.operation == LWM2M_OP_WRITE) {
+    break;
+  case LWM2M_OP_WRITE:
     success = perform_multi_resource_write_op(object, instance, &context, format);
-  } else if(context.operation == LWM2M_OP_DELETE) {
+    break;
+  case LWM2M_OP_EXECUTE:
+    success = call_instance(instance, &context);
+    break;
+  case LWM2M_OP_DELETE:
     if(object != NULL && object->impl != NULL && object->impl->delete != NULL) {
       object->impl->delete(context.object_instance_id, &success);
 #if USE_RD_CLIENT
@@ -1324,14 +1417,10 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     } else {
       success = LWM2M_STATUS_OPERATION_NOT_ALLOWED;
     }
-  } else if(instance == NULL) {
-    /* No instance */
-    success = LWM2M_STATUS_NOT_FOUND;
-  } else if(instance->callback == NULL) {
-    success = LWM2M_STATUS_ERROR;
-  } else {
-    /* If not discovery - this is a regular OP - do the callback */
-    success = instance->callback(instance, &context);
+    break;
+  default:
+    success = LWM2M_STATUS_OPERATION_NOT_ALLOWED;
+    break;
   }
 
   if(success == LWM2M_STATUS_OK) {
@@ -1362,16 +1451,26 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       PRINTF("] no data in reply\n");
     }
   } else {
-    if(success == LWM2M_STATUS_NOT_FOUND) {
+    switch(success) {
+    case LWM2M_STATUS_NOT_FOUND:
       coap_set_status_code(response, NOT_FOUND_4_04);
-    } else if(success == LWM2M_STATUS_OPERATION_NOT_ALLOWED) {
+      break;
+    case LWM2M_STATUS_OPERATION_NOT_ALLOWED:
       coap_set_status_code(response, METHOD_NOT_ALLOWED_4_05);
-    } else {
+      break;
+    case LWM2M_STATUS_NOT_ACCEPTABLE:
+      coap_set_status_code(response, NOT_ACCEPTABLE_4_06);
+      break;
+    case LWM2M_STATUS_UNSUPPORTED_CONTENT_FORMAT:
+      coap_set_status_code(response, UNSUPPORTED_MEDIA_TYPE_4_15);
+      break;
+    default:
       /* Failed to handle the request */
       coap_set_status_code(response, INTERNAL_SERVER_ERROR_5_00);
+      break;
     }
     PRINTPRE("lwm2m: [", url_len, url);
-    PRINTF("] resource failed: %d\n", success);
+    PRINTF("] resource failed: %s\n", get_status_as_string(success));
   }
   return COAP_HANDLER_STATUS_PROCESSED;
 }
