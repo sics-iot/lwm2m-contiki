@@ -58,18 +58,70 @@ static const lwm2m_resource_id_t resources[] =
     RW(IPSO_DIMMER),
     RW(IPSO_ON_TIME)
   };
+/*---------------------------------------------------------------------------*/
+lwm2m_status_t
+ipso_control_set_on(ipso_control_t *control, uint8_t onoroff)
+{
+  uint8_t v;
 
+  if(onoroff) {
+    v = control->value & 0x7f;
+    if(v == 0) {
+      v = 100;
+    }
+  } else {
+    v = 0;
+  }
+
+  return ipso_control_set_value(control, v);
+}
+/*---------------------------------------------------------------------------*/
+lwm2m_status_t
+ipso_control_set_value(ipso_control_t *control, uint8_t value)
+{
+  lwm2m_status_t status = LWM2M_STATUS_OK;
+  int was_on;
+
+  was_on = ipso_control_is_on(control);
+
+  if(value == 0) {
+    if(was_on) {
+      /* Turn off */
+      status = control->set_value(0);
+      if(status == LWM2M_STATUS_OK) {
+        control->value &= 0x7f;
+        control->on_time += (ntimer_uptime() - control->last_on_time) / 1000;
+      }
+    }
+  } else {
+    /* Restrict value between 0 - 100 */
+    if(value > 100) {
+      value = 100;
+    }
+    value |= 0x80;
+
+    if(value != control->value) {
+      status = control->set_value(value & 0x7f);
+      if(status == LWM2M_STATUS_OK) {
+        control->value = value;
+        if(! was_on) {
+          control->last_on_time = ntimer_uptime();
+        }
+      }
+    }
+  }
+  return status;
+}
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t
-lwm2m_callback(lwm2m_object_instance_t *object,
-               lwm2m_context_t *ctx)
+lwm2m_callback(lwm2m_object_instance_t *object, lwm2m_context_t *ctx)
 {
-  /* Here we cast to our sensor-template struct */
   ipso_control_t *control;
   size_t len;
   int32_t v;
 
-  control = (ipso_control_t *) object;
+  /* Here we cast to our sensor-template struct */
+  control = (ipso_control_t *)object;
 
   /* Do the stuff */
   if(ctx->level < 3) {
@@ -81,14 +133,16 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     if(ctx->operation == LWM2M_OP_READ) {
       switch(ctx->resource_id) {
       case IPSO_ONOFF:
-        v = control->value > 0;
+        v = ipso_control_is_on(control) ? 1 : 0;
         break;
       case IPSO_DIMMER:
-        v = control->value;
+        v = ipso_control_get_value(control);
         break;
       case IPSO_ON_TIME:
-        v = control->on_time +
-          (ntimer_uptime() - control->last_on_time) / 1000;
+        v = control->on_time;
+        if(ipso_control_is_on(control)) {
+          v += (ntimer_uptime() - control->last_on_time) / 1000;
+        }
         break;
       default:
         return LWM2M_STATUS_ERROR;
@@ -97,30 +151,22 @@ lwm2m_callback(lwm2m_object_instance_t *object,
     } else if(ctx->operation == LWM2M_OP_WRITE) {
       switch(ctx->resource_id) {
       case IPSO_ONOFF:
+        len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
+        if(len == 0) {
+          return LWM2M_STATUS_ERROR;
+        }
+        return ipso_control_set_on(control, v > 0);
       case IPSO_DIMMER:
         len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
         if(len == 0) {
           return LWM2M_STATUS_ERROR;
         }
-        if(v > 100) {
-          v = 100;
-        }
         if(v < 0) {
           v = 0;
+        } else if(v > 100) {
+          v = 100;
         }
-        if(v != control->value) {
-          if(v == 0 && control->value > 0) {
-            control->on_time += (ntimer_uptime() - control->last_on_time) / 1000;
-          }
-          if(v > 0 && control->value == 0) {
-            control->last_on_time = ntimer_uptime();
-          }
-          /* Call the callback and if ok update the value */
-          if(control->set_value(v) == LWM2M_STATUS_OK) {
-            control->value = v;
-          }
-        }
-        break;
+        return ipso_control_set_value(control, v & 0xff);
       case IPSO_ON_TIME:
         len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
         if(len == 0) {
@@ -128,6 +174,13 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         }
         if(v == 0) {
           control->on_time = 0;
+          if(ipso_control_is_on(control)) {
+            control->last_on_time = ntimer_uptime();
+          }
+          return LWM2M_STATUS_OK;
+        } else {
+          /* Only allowed to write 0 to reset ontime */
+          return LWM2M_STATUS_FORBIDDEN;
         }
         break;
       default:
@@ -141,17 +194,22 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 int
 ipso_control_add(ipso_control_t *control)
 {
-  if(control->reg_object.instance_id == 0) {
+  /*
+   * Select a suitable instance id if none has been specified or if
+   * an instance with the id already been registered.
+   */
+  if((ipso_control_get_instance_id(control) == LWM2M_OBJECT_INSTANCE_NONE) ||
+     lwm2m_engine_has_instance(ipso_control_get_object_id(control),
+                               ipso_control_get_instance_id(control))) {
     control->reg_object.instance_id =
-      lwm2m_engine_recommend_instance_id(control->reg_object.object_id);
+      lwm2m_engine_recommend_instance_id(ipso_control_get_object_id(control));
   }
   control->reg_object.resource_ids = resources;
   control->reg_object.resource_count =
     sizeof(resources) / sizeof(lwm2m_resource_id_t);
 
   control->reg_object.callback = lwm2m_callback;
-  lwm2m_engine_add_object(&control->reg_object);
-  return 1;
+  return lwm2m_engine_add_object(&control->reg_object);
 }
 /*---------------------------------------------------------------------------*/
 int

@@ -67,4 +67,33 @@ struct ipso_control {
 int ipso_control_add(ipso_control_t *control);
 int ipso_control_remove(ipso_control_t *control);
 
+static inline uint16_t
+ipso_control_get_object_id(const ipso_control_t *control)
+{
+  return control->reg_object.object_id;
+}
+
+static inline uint16_t
+ipso_control_get_instance_id(const ipso_control_t *control)
+{
+  return control->reg_object.instance_id;
+}
+
+static inline uint8_t
+ipso_control_is_on(const ipso_control_t *control)
+{
+  return (control->value & 0x80) != 0;
+}
+
+static inline uint8_t
+ipso_control_get_value(const ipso_control_t *control)
+{
+  return (control->value & 0x80) != 0 ? (control->value & 0x7f) : 0;
+}
+
+lwm2m_status_t ipso_control_set_on(ipso_control_t *control, uint8_t onoroff);
+
+lwm2m_status_t ipso_control_set_value(ipso_control_t *control, uint8_t dimm_value);
+
 #endif /* IPSO_CONTROL_TEMPLATE_H_ */
+/** @} */
