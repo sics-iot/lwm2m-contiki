@@ -143,7 +143,7 @@ prepare_update(coap_packet_t *request, int triggered) {
   coap_set_header_uri_path(request, session_info.assigned_ep);
 
   snprintf(query_data, sizeof(query_data) - 1, "?lt=%d", session_info.lifetime);
-  printf("UPDATE:%s %s\n", session_info.assigned_ep, query_data);
+  PRINTF("UPDATE:%s %s\n", session_info.assigned_ep, query_data);
   coap_set_header_uri_query(request, query_data);
 
   if((triggered || rd_flags & FLAG_RD_DATA_UPDATE_ON_DIRTY) && (rd_flags & FLAG_RD_DATA_DIRTY)) {
@@ -409,8 +409,8 @@ registration_callback(struct request_state *state)
     if(CONTINUE_2_31 == state->response->code) {
       /* We assume that size never change?! */
       coap_get_header_block1(state->response, &rd_block1, NULL, NULL, NULL);
-      ntimer_set_callback(&rd_timer, block1_rd_callback);
-      ntimer_set(&rd_timer, 1); /* delay 1 ms */
+      ntimer_set_callback(&block1_timer, block1_rd_callback);
+      ntimer_set(&block1_timer, 1); /* delay 1 ms */
     } else if(CREATED_2_01 == state->response->code) {
       if(state->response->location_path_len < LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN) {
         memcpy(session_info.assigned_ep, state->response->location_path,
