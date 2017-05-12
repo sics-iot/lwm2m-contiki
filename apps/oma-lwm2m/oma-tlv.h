@@ -42,7 +42,6 @@
 #ifndef OAM_TLV_H_
 #define OAM_TLV_H_
 
-#include "contiki-conf.h"
 #include <stdint.h>
 #include <stddef.h>
 

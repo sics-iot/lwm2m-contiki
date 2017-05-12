@@ -184,10 +184,19 @@ oma_tlv_get_int32(const oma_tlv_t *tlv)
 {
   int i;
   int32_t value = 0;
-  /* will probably need to handle MSB as a sign bit? */
+
   for(i = 0; i < tlv->length; i++) {
     value = (value << 8) | tlv->value[i];
   }
+
+  /* Ensure that we set all the bits above what we read in */
+  if(tlv->value[0] & 0x80) {
+    while(i < 4) {
+      value = value | (0xff << (i * 8));
+      i++;
+    }
+  }
+
   return value;
 }
 /*---------------------------------------------------------------------------*/
@@ -308,3 +317,18 @@ oma_tlv_float32_to_fix(const oma_tlv_t *tlv, int32_t *value, int bits)
 }
 /*---------------------------------------------------------------------------*/
 /** @} */
+
+#if 0
+int main(int argc, char *argv[])
+{
+  oma_tlv_t tlv;
+  uint8_t data[4];
+  /* Make -1 */
+  tlv.length = 2;
+  tlv.value = data;
+  data[0] = 0x00;
+  data[1] = 0x80,
+
+  PRINTF("TLV:%d\n", oma_tlv_get_int32(&tlv));
+}
+#endif
