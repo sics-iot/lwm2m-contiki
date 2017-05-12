@@ -46,7 +46,7 @@
 #include <stdint.h>
 #include "oma-tlv.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -204,24 +204,27 @@ size_t
 oma_tlv_write_int32(uint8_t type, int16_t id, int32_t value, uint8_t *buffer, size_t len)
 {
   oma_tlv_t tlv;
-  size_t tlvlen = 0;
   uint8_t buf[4];
   int i;
+  int v;
+  int last_bit;
   PRINTF("Exporting int32 %d %ld ", id, (long)value);
 
-  buf[3] = value & 0xff;
-  value = value >> 8;
-  for(i = 1; value > 0 && i < 4; i++) {
+  v = value < 0 ? -1 : 0;
+  i = 0;
+  do {
     buf[3 - i] = value & 0xff;
+    /* check if the last MSB indicates that we need another byte */
+    last_bit = (v == 0 && (value & 0x80) > 0) || (v == -1 && (value & 0x80) == 0);
     value = value >> 8;
-  }
-  tlvlen = i;
+    i++;
+  } while((value != v || last_bit) && i < 4);
 
   /* export INT as TLV */
-  PRINTF("len: %zu\n", tlvlen);
+  PRINTF("len: %zu\n", i);
   tlv.type = type;
-  tlv.length = tlvlen;
-  tlv.value = &buf[3 - (tlvlen - 1)];
+  tlv.length = i;
+  tlv.value = &buf[3 - (i - 1)];
   tlv.id = id;
   return oma_tlv_write(&tlv, buffer, len);
 }
@@ -322,7 +325,7 @@ oma_tlv_float32_to_fix(const oma_tlv_t *tlv, int32_t *value, int bits)
 int main(int argc, char *argv[])
 {
   oma_tlv_t tlv;
-  uint8_t data[4];
+  uint8_t data[24];
   /* Make -1 */
   tlv.length = 2;
   tlv.value = data;
@@ -330,5 +333,8 @@ int main(int argc, char *argv[])
   data[1] = 0x80,
 
   PRINTF("TLV:%d\n", oma_tlv_get_int32(&tlv));
+
+  PRINTF("Len: %d\n", oma_tlv_write_int32(0, 1, -0x88987f, data, 24));
+
 }
 #endif
