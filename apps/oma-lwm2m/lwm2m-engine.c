@@ -390,14 +390,29 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
   /* pick size from outbuf */
   int maxsize = outbuf->size;
 
+  if(lwm2m_buf_lock[0] != 0 && (lwm2m_buf_lock_timeout > ntimer_uptime()) &&
+     ((lwm2m_buf_lock[1] != 0xffff) ||
+      (lwm2m_buf_lock[2] != 0xffff))) {
+    PRINTF("Set-RD: already exporting resource: %d/%d/%d\n",
+           lwm2m_buf_lock[1], lwm2m_buf_lock[2], lwm2m_buf_lock[3]);
+    /* fail - what should we return here? */
+    return 0;
+  }
+
   if(block == 0) {
     PRINTF("Starting RD genereation\n");
     /* start with simple object instances */
     instance = list_head(object_list);
     object = NULL;
+    lwm2m_buf_lock[0] = 1; /* lock "flag" */
+    lwm2m_buf_lock[1] = 0xffff;
+    lwm2m_buf_lock[2] = 0xffff;
+    lwm2m_buf_lock[3] = 0xffff;
   } else {
     /* object and instance was static... */
   }
+
+  lwm2m_buf_lock_timeout = ntimer_uptime() + 1000;
 
   PRINTF("Generating RD list:");
   while(instance != NULL || object != NULL) {
@@ -437,12 +452,14 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
       /* If the produced data is larger than a CoAP block we need to send
          this now */
       double_buffer_flush(&lwm2m_buf, outbuf, maxsize);
-      /* there will be more! */
+      /* there will be more - keep lock! */
       return 1;
     }
   }
   PRINTF("\n");
   double_buffer_flush(&lwm2m_buf, outbuf, maxsize);
+  /* unlock the buffer */
+  lwm2m_buf_lock[0] = 0;
   return 0;
 }
 /*---------------------------------------------------------------------------*/
@@ -1497,7 +1514,6 @@ void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
   char path[20]; /* 60000/60000/60000 */
   if(obj != NULL) {
     snprintf(path, 20, "%d/%d/%d", obj->object_id, obj->instance_id, resource);
-    PRINTF("Notify PATH: %s\n", path);
     coap_notify_observers_sub(NULL, path);
   }
 }

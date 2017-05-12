@@ -129,16 +129,37 @@ static uint8_t rd_data[128]; /* allocate some data for the RD */
 static uint32_t rd_block1;
 static uint8_t rd_more;
 static ntimer_t rd_timer;
+static void (*rd_callback)(struct request_state *state);
 
 static ntimer_t block1_timer;
 
 void check_periodic_observations();
+static void update_callback(struct request_state *state);
 
+static int
+set_rd_data(coap_packet_t *request)
+{
+  lwm2m_buffer_t outbuf;
+
+  /* setup the output buffer */
+  outbuf.buffer = rd_data;
+  outbuf.size = sizeof(rd_data);
+  outbuf.len = 0;
+
+  /* this will also set the request payload */
+  rd_more = lwm2m_engine_set_rd_data(&outbuf, 0);
+  coap_set_payload(request, rd_data, outbuf.len);
+
+  if(rd_more) {
+    /* set the first block here */
+    PRINTF("Setting block1 in request\n");
+    coap_set_header_block1(request, 0, 1, sizeof(rd_data));
+  }
+  return outbuf.len;
+}
 /*---------------------------------------------------------------------------*/
 static void
 prepare_update(coap_packet_t *request, int triggered) {
-  int len;
-  lwm2m_buffer_t outbuf;
   coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
   coap_set_header_uri_path(request, session_info.assigned_ep);
 
@@ -148,15 +169,8 @@ prepare_update(coap_packet_t *request, int triggered) {
 
   if((triggered || rd_flags & FLAG_RD_DATA_UPDATE_ON_DIRTY) && (rd_flags & FLAG_RD_DATA_DIRTY)) {
     rd_flags &= ~FLAG_RD_DATA_DIRTY;
-
-    /* setup the output buffer */
-    outbuf.buffer = rd_data;
-    outbuf.size = sizeof(rd_data);
-    outbuf.len = 0;
-
-    /* this will also set the request payload */
-    rd_more = lwm2m_engine_set_rd_data(&outbuf, 0);
-    coap_set_payload(request, rd_data, outbuf.len);
+    set_rd_data(request);
+    rd_callback = update_callback;
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -366,7 +380,7 @@ bootstrap_callback(struct request_state *state)
 }
 /*---------------------------------------------------------------------------*/
 static void
-produce_more_rd(void (*callback)(struct request_state *state))
+produce_more_rd(void)
 {
   lwm2m_buffer_t outbuf;
 
@@ -386,7 +400,7 @@ produce_more_rd(void (*callback)(struct request_state *state))
   PRINTF("Setting block1 in request - block: %d more: %d\n", rd_block1, rd_more);
   coap_set_header_block1(request, rd_block1, rd_more, sizeof(rd_data));
 
-  coap_send_request(&rd_request_state, &session_info.server_ep, request, callback);
+  coap_send_request(&rd_request_state, &session_info.server_ep, request, rd_callback);
 }
 
 static void registration_callback(struct request_state *state);
@@ -394,7 +408,7 @@ static void registration_callback(struct request_state *state);
 void
 block1_rd_callback(ntimer_t *timer)
 {
-  produce_more_rd(registration_callback);
+  produce_more_rd();
 }
 /*---------------------------------------------------------------------------*/
 /*
@@ -499,7 +513,6 @@ deregister_callback(struct request_state *state)
 static void
 periodic_process(ntimer_t *timer)
 {
-  lwm2m_buffer_t outbuf;
   uint64_t now;
 
   /* reschedule the ntimer */
@@ -625,7 +638,6 @@ periodic_process(ntimer_t *timer)
     }
     if(session_info.use_registration && !session_info.registered &&
        update_registration_server()) {
-
       int len;
 
       /* prepare request, TID was set by COAP_BLOCKING_REQUEST() */
@@ -635,26 +647,14 @@ periodic_process(ntimer_t *timer)
       snprintf(query_data, sizeof(query_data) - 1, "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
       coap_set_header_uri_query(request, query_data);
 
-      /* setup the output buffer */
-      outbuf.buffer = rd_data;
-      outbuf.size = sizeof(rd_data);
-      outbuf.len = 0;
-
-      /* this will also set the request payload */
-      rd_more = lwm2m_engine_set_rd_data(&outbuf, 0);
-      coap_set_payload(request, rd_data, outbuf.len);
+      len = set_rd_data(request);
+      rd_callback = registration_callback;
 
       PRINTF("Registering with [");
       coap_endpoint_print(&session_info.server_ep);
       PRINTF("] lwm2m endpoint '%s': '", query_data);
-      PRINTS(outbuf.len, rd_data, "%c");
+      PRINTS(len, rd_data, "%c");
       PRINTF("' More:%d\n", rd_more);
-
-      if(rd_more) {
-        /* set the first block here */
-        PRINTF("Setting block1 in request\n");
-        coap_set_header_block1(request, 0, 1, sizeof(rd_data));
-      }
 
       coap_send_request(&rd_request_state, &session_info.server_ep,
                         request, registration_callback);
