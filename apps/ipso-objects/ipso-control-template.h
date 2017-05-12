@@ -58,7 +58,7 @@ struct ipso_control {
   lwm2m_object_instance_t reg_object;
   uint8_t flags;
   uint8_t value;  /* used to emulate on/off and dim-value */
-  uint32_t on_time; /* on-time in millis - value > 0 is counted */
+  uint32_t on_time; /* on-time in seconds */
   uint64_t last_on_time;
   ipso_control_set_value_t set_value;
 };

@@ -117,78 +117,69 @@ static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object, lwm2m_context_t *ctx)
 {
   ipso_control_t *control;
-  size_t len;
   int32_t v;
 
   /* Here we cast to our sensor-template struct */
   control = (ipso_control_t *)object;
 
-  /* Do the stuff */
-  if(ctx->level < 3) {
-    return LWM2M_STATUS_ERROR;
-  }
-  if(ctx->level == 3) {
-    /* This is a get request on 3303/0/3700 */
-    /* NOW we assume a get.... which might be wrong... */
-    if(ctx->operation == LWM2M_OP_READ) {
-      switch(ctx->resource_id) {
-      case IPSO_ONOFF:
-        v = ipso_control_is_on(control) ? 1 : 0;
-        break;
-      case IPSO_DIMMER:
-        v = ipso_control_get_value(control);
-        break;
-      case IPSO_ON_TIME:
-        v = control->on_time;
-        if(ipso_control_is_on(control)) {
-          v += (ntimer_uptime() - control->last_on_time) / 1000;
-        }
-        break;
-      default:
-        return LWM2M_STATUS_ERROR;
+  if(ctx->operation == LWM2M_OP_READ) {
+    switch(ctx->resource_id) {
+    case IPSO_ONOFF:
+      v = ipso_control_is_on(control) ? 1 : 0;
+      break;
+    case IPSO_DIMMER:
+      v = ipso_control_get_value(control);
+      break;
+    case IPSO_ON_TIME:
+      v = control->on_time;
+      if(ipso_control_is_on(control)) {
+        v += (ntimer_uptime() - control->last_on_time) / 1000;
       }
-      lwm2m_object_write_int(ctx, v);
-    } else if(ctx->operation == LWM2M_OP_WRITE) {
-      switch(ctx->resource_id) {
-      case IPSO_ONOFF:
-        len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
-        if(len == 0) {
-          return LWM2M_STATUS_ERROR;
-        }
-        return ipso_control_set_on(control, v > 0);
-      case IPSO_DIMMER:
-        len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
-        if(len == 0) {
-          return LWM2M_STATUS_ERROR;
-        }
-        if(v < 0) {
-          v = 0;
-        } else if(v > 100) {
-          v = 100;
-        }
-        return ipso_control_set_value(control, v & 0xff);
-      case IPSO_ON_TIME:
-        len = lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v);
-        if(len == 0) {
-          return LWM2M_STATUS_ERROR;
-        }
-        if(v == 0) {
-          control->on_time = 0;
-          if(ipso_control_is_on(control)) {
-            control->last_on_time = ntimer_uptime();
-          }
-          return LWM2M_STATUS_OK;
-        } else {
-          /* Only allowed to write 0 to reset ontime */
-          return LWM2M_STATUS_FORBIDDEN;
-        }
-        break;
-      default:
-        return LWM2M_STATUS_ERROR;
-      }
+      printf("ON-TIME: %"PRId32"   (last on: %"PRIu32"\n", v, control->on_time);
+      break;
+    default:
+      return LWM2M_STATUS_ERROR;
     }
+    lwm2m_object_write_int(ctx, v);
+    return LWM2M_STATUS_OK;
+
+  } else if(ctx->operation == LWM2M_OP_WRITE) {
+    switch(ctx->resource_id) {
+    case IPSO_ONOFF:
+      if(lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v) == 0) {
+        return LWM2M_STATUS_ERROR;
+      }
+      return ipso_control_set_on(control, v > 0);
+    case IPSO_DIMMER:
+      if(lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v) == 0) {
+        return LWM2M_STATUS_ERROR;
+      }
+      if(v < 0) {
+        v = 0;
+      } else if(v > 100) {
+        v = 100;
+      }
+      return ipso_control_set_value(control, v & 0xff);
+    case IPSO_ON_TIME:
+      if(lwm2m_object_read_int(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &v) == 0) {
+        return LWM2M_STATUS_ERROR;
+      }
+
+      if(v == 0) {
+        control->on_time = 0;
+        control->last_on_time = ntimer_uptime();
+        return LWM2M_STATUS_OK;
+      } else {
+        /* Only allowed to write 0 to reset ontime */
+        return LWM2M_STATUS_FORBIDDEN;
+      }
+      break;
+    default:
+      return LWM2M_STATUS_ERROR;
+    }
+  } else {
+    return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
   }
-  return LWM2M_STATUS_OK;
 }
 /*---------------------------------------------------------------------------*/
 int
