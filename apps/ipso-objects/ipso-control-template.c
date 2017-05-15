@@ -185,16 +185,6 @@ lwm2m_callback(lwm2m_object_instance_t *object, lwm2m_context_t *ctx)
 int
 ipso_control_add(ipso_control_t *control)
 {
-  /*
-   * Select a suitable instance id if none has been specified or if
-   * an instance with the id already been registered.
-   */
-  if((ipso_control_get_instance_id(control) == LWM2M_OBJECT_INSTANCE_NONE) ||
-     lwm2m_engine_has_instance(ipso_control_get_object_id(control),
-                               ipso_control_get_instance_id(control))) {
-    control->reg_object.instance_id =
-      lwm2m_engine_recommend_instance_id(ipso_control_get_object_id(control));
-  }
   control->reg_object.resource_ids = resources;
   control->reg_object.resource_count =
     sizeof(resources) / sizeof(lwm2m_resource_id_t);

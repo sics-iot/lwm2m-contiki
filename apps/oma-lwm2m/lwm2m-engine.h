@@ -105,7 +105,6 @@ struct lwm2m_object {
 lwm2m_object_instance_t *lwm2m_engine_get_instance_buffer(void);
 
 int  lwm2m_engine_has_instance(uint16_t object_id, uint16_t instance_id);
-uint16_t lwm2m_engine_recommend_instance_id(uint16_t object_id);
 int  lwm2m_engine_add_object(lwm2m_object_instance_t *object);
 void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
 int  lwm2m_engine_add_generic_object(lwm2m_object_t *object);

@@ -1100,16 +1100,36 @@ lwm2m_engine_has_instance(uint16_t object_id, uint16_t instance_id)
   return get_instance(object_id, instance_id, NULL) != NULL;
 }
 /*---------------------------------------------------------------------------*/
-uint16_t
-lwm2m_engine_recommend_instance_id(uint16_t object_id)
+int
+lwm2m_engine_add_object(lwm2m_object_instance_t *object)
 {
-  lwm2m_object_t *object;
   lwm2m_object_instance_t *instance;
   uint16_t min_id = 0xffff;
   uint16_t max_id = 0;
   int found = 0;
-  for(instance = list_head(object_list); instance != NULL ; instance = instance->next) {
-    if(instance->object_id == object_id) {
+
+  if(object == NULL || object->callback == NULL) {
+    /* Insufficient object configuration */
+    PRINTF("lwm2m-engine: failed to register NULL object\n");
+    return 0;
+  }
+  if(get_object(object->object_id) != NULL) {
+    /* A generic object with this id has already been registered */
+    PRINTF("lwm2m-engine: object with id %u already registered\n",
+           object->object_id);
+    return 0;
+  }
+
+  for(instance = list_head(object_list);
+      instance != NULL;
+      instance = instance->next) {
+    if(object->object_id == instance->object_id) {
+      if(object->instance_id == instance->instance_id) {
+        PRINTF("lwm2m-engine: object with id %u/%u already registered\n",
+               object_id, instance->instance_id);
+        return 0;
+      }
+
       found++;
       if(instance->instance_id > max_id) {
         max_id = instance->instance_id;
@@ -1119,50 +1139,17 @@ lwm2m_engine_recommend_instance_id(uint16_t object_id)
       }
     }
   }
-  if(found == 0) {
-    /* No existing instances found */
-    object = get_object(object_id);
-    if(object != NULL && object->impl != NULL) {
-      for(instance = object->impl->get_first(NULL);
-          instance != NULL;
-          instance = object->impl->get_next(instance, NULL)) {
-        found++;
-        if(instance->instance_id > max_id) {
-          max_id = instance->instance_id;
-        }
-        if(instance->instance_id < min_id) {
-          min_id = instance->instance_id;
-        }
-      }
-    }
-  }
-  if(found == 0) {
-    return 0;
-  }
-  if(min_id > 0) {
-    return min_id - 1;
-  }
-  return max_id + 1;
-}
-/*---------------------------------------------------------------------------*/
-int
-lwm2m_engine_add_object(lwm2m_object_instance_t *object)
-{
-  if(object == NULL || object->callback == NULL) {
-    /* Insufficient object configuration */
-    PRINTF("lwm2m-engine: failed to register NULL object\n");
-    return 0;
-  }
+
   if(object->instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
-    PRINTF("lwm2m-engine: failed to register object %u with no instance id\n",
-           object->object_id);
-    return 0;
-  }
-  if(get_object(object->object_id) != NULL) {
-    /* A generic object with this id has already been registered */
-    PRINTF("lwm2m-engine: object with id %u already registered\n",
-           object->object_id);
-    return 0;
+    /* No instance id has been assigned yet */
+    if(found == 0) {
+      /* First object with this id */
+      object->instance_id = 0;
+    } else if(min_id > 0) {
+      object->instance_id = min_id - 1;
+    } else {
+      object->instance_id = max_id + 1;
+    }
   }
   list_add(object_list, object);
   return 1;
@@ -1182,6 +1169,12 @@ lwm2m_engine_add_generic_object(lwm2m_object_t *object)
      || object->impl->get_next == NULL
      || object->impl->get_by_id == NULL) {
     PRINTF("lwm2m-engine: failed to register NULL object\n");
+    return 0;
+  }
+  if(get_object(object->impl->object_id) != NULL) {
+    /* A generic object with this id has already been registered */
+    PRINTF("lwm2m-engine: object with id %u already registered\n",
+           object->impl->object_id);
     return 0;
   }
   if(has_non_generic_object(object->impl->object_id)) {

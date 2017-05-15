@@ -210,7 +210,7 @@ ipso_sensor_add(const ipso_sensor_t *sensor)
   sensor->sensor_value->reg_object.object_id = sensor->object_id;
   sensor->sensor_value->sensor = sensor;
   if(sensor->instance_id == 0) {
-    sensor->sensor_value->reg_object.instance_id = lwm2m_engine_recommend_instance_id(sensor->object_id);
+    sensor->sensor_value->reg_object.instance_id = LWM2M_OBJECT_INSTANCE_NONE;
   } else {
     sensor->sensor_value->reg_object.instance_id = sensor->instance_id;
   }
@@ -218,8 +218,7 @@ ipso_sensor_add(const ipso_sensor_t *sensor)
   sensor->sensor_value->reg_object.resource_ids = resources;
   sensor->sensor_value->reg_object.resource_count =
     sizeof(resources) / sizeof(lwm2m_resource_id_t);
-  lwm2m_engine_add_object(&sensor->sensor_value->reg_object);
-  return 1;
+  return lwm2m_engine_add_object(&sensor->sensor_value->reg_object);
 }
 /*---------------------------------------------------------------------------*/
 int
