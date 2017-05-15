@@ -1478,6 +1478,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     }
   } else {
     switch(success) {
+    case LWM2M_STATUS_FORBIDDEN:
+      coap_set_status_code(response, FORBIDDEN_4_03);
+      break;
     case LWM2M_STATUS_NOT_FOUND:
       coap_set_status_code(response, NOT_FOUND_4_04);
       break;
