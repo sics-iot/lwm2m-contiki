@@ -65,7 +65,7 @@
 #include "net/rpl/rpl.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -420,6 +420,7 @@ registration_callback(struct request_state *state)
   PRINTF("Registration callback. Response: %d, ", state->response != NULL);
   if(state->response) {
     /* check state and possibly set registration to done */
+    /* If we get a continue - we need to call the rd generator one more time */
     if(CONTINUE_2_31 == state->response->code) {
       /* We assume that size never change?! */
       coap_get_header_block1(state->response, &rd_block1, NULL, NULL, NULL);
@@ -467,7 +468,13 @@ update_callback(struct request_state *state)
   PRINTF("Update callback. Response: %d, ", state->response != NULL);
 
   if(state->response) {
-    if(CHANGED_2_04 == state->response->code) {
+    /* If we get a continue - we need to call the rd generator one more time */
+    if(CONTINUE_2_31 == state->response->code) {
+      /* We assume that size never change?! */
+      coap_get_header_block1(state->response, &rd_block1, NULL, NULL, NULL);
+      ntimer_set_callback(&block1_timer, block1_rd_callback);
+      ntimer_set(&block1_timer, 1); /* delay 1 ms */
+    } else if(CHANGED_2_04 == state->response->code) {
       PRINTF("Done!\n");
       /* remember the last reg time */
       last_update = ntimer_uptime();

@@ -50,9 +50,16 @@
 static lwm2m_object_t generic_object;
 
 #define MAX_SIZE 512
-#define NUMBER_OF_INSTANCES 20
+#define NUMBER_OF_INSTANCES 50
 
-#define PRINTF printf
+#define DEBUG 0
+
+#if DEBUG
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...)
+
+#endif
 
 static const lwm2m_resource_id_t resources[] =
   {

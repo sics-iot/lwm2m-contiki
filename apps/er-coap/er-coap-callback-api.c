@@ -46,7 +46,7 @@
 #include "er-coap-callback-api.h"
 #include "er-coap-transactions.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -98,7 +98,9 @@ static void
 coap_request_callback(void *callback_data, void *response)
 {
   struct request_state *state = (struct request_state *)callback_data;
+
   state->response = (coap_packet_t *)response;
+  uint32_t res_block1;
 
   PRINTF("COAP: request callback\n");
 
@@ -110,13 +112,17 @@ coap_request_callback(void *callback_data, void *response)
 
   /* Got a response */
   coap_get_header_block2(state->response, &res_block, &more, NULL, NULL);
-  PRINTF("Received #%lu%s (%u bytes)\n",
+  coap_get_header_block1(state->response, &res_block1, NULL, NULL, NULL);
+
+  PRINTF("Received #%lu%s B1:%lu (%u bytes)\n",
          (unsigned long) res_block, (unsigned) more ? "+" : "",
+         (unsigned long) res_block1,
          state->response->payload_len);
 
   if(res_block == state->block_num) {
     /* Call the callback function as we have more data */
     state->callback(state);
+    /* this is only for counting BLOCK2 blocks.*/
     ++(state->block_num);
   } else {
     PRINTF("WRONG BLOCK %lu/%lu\n", (unsigned long) res_block,

@@ -49,7 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTEP(ep) coap_endpoint_print(ep)
@@ -293,6 +293,13 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
     }
     PRINTF("\n");
   }
+
+#if 0
+  if((rand() & 0xffff) < 0x1000) {
+    printf("*********---- PACKET LOSS ----********\n");
+    return;
+  }
+#endif
 
 #if WITH_DTLS
   /* DTLS receive??? */
