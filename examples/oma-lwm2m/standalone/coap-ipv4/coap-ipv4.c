@@ -283,7 +283,8 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
   PRINTF(" %u bytes\n", len);
   coap_buf_len = len;
 
-  if(DEBUG) {
+#if DEBUG
+  {
     int i;
     uint8_t *data;
     data = coap_databuf();
@@ -293,6 +294,7 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
     }
     PRINTF("\n");
   }
+#endif /* DEBUG */
 
 #if 0
   if((rand() & 0xffff) < 0x1000) {
