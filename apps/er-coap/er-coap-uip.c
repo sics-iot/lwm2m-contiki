@@ -44,6 +44,9 @@
 #include "er-coap-endpoint.h"
 #include "er-coap-transport.h"
 #include "er-coap-transactions.h"
+#if UIP_CONF_IPV6_RPL
+#include "net/rpl/rpl.h"
+#endif /* UIP_CONF_IPV6_RPL */
 
 #define DEBUG DEBUG_NONE
 #include "net/ip/uip-debug.h"
@@ -159,6 +162,25 @@ get_src_endpoint(void)
   uip_ipaddr_copy(&src.ipaddr, &UIP_IP_BUF->srcipaddr);
   src.port = UIP_UDP_BUF->srcport;
   return &src;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_is_connected(const coap_endpoint_t *ep)
+{
+#if UIP_CONF_IPV6_RPL
+  if(rpl_get_any_dag() == NULL) {
+    return 0;
+  }
+#endif /* UIP_CONF_IPV6_RPL */
+
+  /* Assume connected */
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_connect(coap_endpoint_t *ep)
+{
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 uint8_t *
