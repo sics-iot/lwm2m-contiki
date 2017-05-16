@@ -429,6 +429,8 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
                      object->impl->object_id);
       PRINTF((pos > 0 || block > 0) ? ",<%d>" : "<%d>",
              object->impl->object_id);
+    } else {
+      len = 0;
     }
     lwm2m_buf.len += len;
     instance = next_object_instance(NULL, object, instance);

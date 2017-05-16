@@ -126,7 +126,6 @@ static int
 delete(uint16_t instance_id, lwm2m_status_t *status)
 {
   lwm2m_object_instance_t *instance;
-  int i;
 
   if(instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
     /* Remove all instances */

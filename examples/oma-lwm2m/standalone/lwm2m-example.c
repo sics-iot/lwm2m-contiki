@@ -48,6 +48,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define WITH_TEST_NOTIFICATION 1
+
 void ipso_sensor_temp_init(void);
 void ipso_control_test_init(void);
 void ipso_blockwise_test_init(void);
@@ -57,10 +59,11 @@ void lwm2m_generic_object_test_init(void);
 int deregister = -1;
 
 /*---------------------------------------------------------------------------*/
+#if WITH_TEST_NOTIFICATION
 static void
 callback(ntimer_t *timer)
 {
-  /* Automatic notifcation on device timer for test!*/
+  /* Automatic notification on device timer for test!*/
   lwm2m_notify_observers("3/0/13");
   ntimer_reset(timer, 10000);
   if(deregister > 0) {
@@ -71,6 +74,7 @@ callback(ntimer_t *timer)
     }
   }
 }
+#endif /* WITH_TEST_NOTIFICATION */
 /*---------------------------------------------------------------------------*/
 static void
 session_callback(struct lwm2m_session_info *si, int state)
@@ -90,7 +94,6 @@ session_callback(struct lwm2m_session_info *si, int state)
 void
 start_application(int argc, char *argv[])
 {
-  static ntimer_t nt;
   const char *default_server = LWM2M_DEFAULT_RD_SERVER;
   coap_endpoint_t server_ep;
   int has_server_ep = 0;
@@ -112,8 +115,13 @@ start_application(int argc, char *argv[])
   }
 
   /* Example using network timer */
-  //  ntimer_set_callback(&nt, callback);
-  //  ntimer_set(&nt, 10000);
+#if WITH_TEST_NOTIFICATION
+  {
+    static ntimer_t nt;
+    ntimer_set_callback(&nt, callback);
+    ntimer_set(&nt, 10000);
+  }
+#endif /* WITH_TEST_NOTIFICATION */
 
   /* Initialize the OMA LWM2M engine */
   lwm2m_engine_init();

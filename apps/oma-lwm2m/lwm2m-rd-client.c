@@ -122,7 +122,6 @@ static uint8_t rd_flags = FLAG_RD_DATA_UPDATE_ON_DIRTY;
 static uint64_t wait_until_network_check = 0;
 static uint64_t last_update;
 
-static char path_data[32]; /* allocate some data for building the path */
 static char query_data[64]; /* allocate some data for queries and updates */
 static uint8_t rd_data[128]; /* allocate some data for the RD */
 
@@ -582,7 +581,6 @@ periodic_process(ntimer_t *timer)
     /* check that we should still use bootstrap */
     if(session_info.use_bootstrap) {
       lwm2m_security_value_t *security;
-      int i;
       PRINTF("*** Bootstrap - checking for server info...\n");
       /* get the security object - ignore bootstrap servers */
       for(security = lwm2m_security_get_first();
@@ -640,7 +638,7 @@ periodic_process(ntimer_t *timer)
   case DO_REGISTRATION:
     if(!coap_endpoint_is_connected(&session_info.server_ep)) {
       /* Not connected... wait a bit... */
-      printf("Wait until connected... \n");
+      PRINTF("Wait until connected... \n");
       return;
     }
     if(session_info.use_registration && !session_info.registered &&
@@ -660,13 +658,16 @@ periodic_process(ntimer_t *timer)
       PRINTF("Registering with [");
       coap_endpoint_print(&session_info.server_ep);
       PRINTF("] lwm2m endpoint '%s': '", query_data);
-      PRINTS(len, rd_data, "%c");
+      if(len) {
+        PRINTS(len, rd_data, "%c");
+      }
       PRINTF("' More:%d\n", rd_more);
 
       coap_send_request(&rd_request_state, &session_info.server_ep,
                         request, registration_callback);
       rd_state = REGISTRATION_SENT;
     }
+    break;
   case REGISTRATION_SENT:
     /* just wait until the callback kicks us to the next state... */
     break;

@@ -122,8 +122,6 @@ coap_send_transaction(coap_transaction_t *t)
 
       /* interval updated above */
       ntimer_set(&t->retrans_timer, t->retrans_interval);
-
-      t = NULL;
     } else {
       /* timed out */
       PRINTF("Timeout\n");

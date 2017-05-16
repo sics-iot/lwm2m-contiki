@@ -142,7 +142,7 @@ static int
 delete(uint16_t instance_id, lwm2m_status_t *status)
 {
   lwm2m_object_instance_t *instance;
-  int i;
+
   if(status) {
     *status = LWM2M_STATUS_OK;
   }

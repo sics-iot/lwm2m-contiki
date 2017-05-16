@@ -221,7 +221,7 @@ oma_tlv_write_int32(uint8_t type, int16_t id, int32_t value, uint8_t *buffer, si
   } while((value != v || last_bit) && i < 4);
 
   /* export INT as TLV */
-  PRINTF("len: %zu\n", i);
+  PRINTF("len: %d\n", i);
   tlv.type = type;
   tlv.length = i;
   tlv.value = &buf[3 - (i - 1)];

@@ -19,6 +19,7 @@ endif
 TARGETCDIRS  += ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}
 SOURCEDIRS   += ${addprefix $(TARGETCDIR)/,. $(APPSDIRS)}
 
+CFLAGS += -Wall -Werror
 CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
 
 TRANSPORT ?= ipv4
