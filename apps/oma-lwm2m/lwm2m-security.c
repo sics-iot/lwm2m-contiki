@@ -46,6 +46,7 @@
 #include <string.h>
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-server.h"
 #include "lwm2m-security.h"
 
 #define DEBUG 0
@@ -62,11 +63,7 @@
 #define PRINTPRE(p,l,s);
 #endif
 
-#ifdef LWM2M_CONF_SERVER_MAX_COUNT
-#define MAX_COUNT LWM2M_CONF_SERVER_MAX_COUNT
-#else
-#define MAX_COUNT 2
-#endif
+#define MAX_COUNT LWM2M_SERVER_MAX_COUNT
 
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);

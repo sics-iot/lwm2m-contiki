@@ -36,6 +36,14 @@
 #ifndef LWM2M_SERVER_H
 #define LWM2M_SERVER_H
 
+#include "contiki-conf.h"
+
+#ifdef LWM2M_SERVER_CONF_MAX_COUNT
+#define LWM2M_SERVER_MAX_COUNT LWM2M_SERVER_CONF_MAX_COUNT
+#else
+#define LWM2M_SERVER_MAX_COUNT 2
+#endif
+
 typedef struct server_value {
   lwm2m_object_instance_t instance;
   uint16_t server_id;
