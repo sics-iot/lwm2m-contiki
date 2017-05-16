@@ -93,7 +93,7 @@
 #endif
 
 /* MACRO for getting out resource ID from resource array ID + flags */
-#define RSC_ID(x) (x & 0xffff)
+#define RSC_ID(x)       ((uint16_t)(x & 0xffff))
 #define RSC_READABLE(x) ((x & LWM2M_RESOURCE_READ) > 0)
 #define RSC_WRITABLE(x) ((x & LWM2M_RESOURCE_WRITE) > 0)
 
