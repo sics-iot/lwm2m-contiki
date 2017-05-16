@@ -37,6 +37,8 @@
 #define LWM2M_RD_CLIENT_DEREGISTER_FAILED  4
 #define LWM2M_RD_CLIENT_DISCONNECTED       5
 
+#include "lwm2m-object.h"
+
 struct lwm2m_session_info;
 typedef void (*session_callback_t)(struct lwm2m_session_info *session, int status);
 
