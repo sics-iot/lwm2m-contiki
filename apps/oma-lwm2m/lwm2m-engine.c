@@ -1154,6 +1154,9 @@ lwm2m_engine_add_object(lwm2m_object_instance_t *object)
     }
   }
   list_add(object_list, object);
+#if USE_RD_CLIENT
+  lwm2m_rd_client_set_update_rd();
+#endif
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -1161,6 +1164,9 @@ void
 lwm2m_engine_remove_object(lwm2m_object_instance_t *object)
 {
   list_remove(object_list, object);
+#if USE_RD_CLIENT
+  lwm2m_rd_client_set_update_rd();
+#endif
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -1186,6 +1192,11 @@ lwm2m_engine_add_generic_object(lwm2m_object_t *object)
     return 0;
   }
   list_add(generic_object_list, object);
+
+#if USE_RD_CLIENT
+  lwm2m_rd_client_set_update_rd();
+#endif
+
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -1193,6 +1204,9 @@ void
 lwm2m_engine_remove_generic_object(lwm2m_object_t *object)
 {
   list_remove(generic_object_list, object);
+#if USE_RD_CLIENT
+  lwm2m_rd_client_set_update_rd();
+#endif
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
