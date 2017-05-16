@@ -194,10 +194,13 @@ lwm2m_callback(lwm2m_object_instance_t *object,
       break;
     case LWM2M_SECURITY_BOOTSTRAP_SERVER_ID:
       value = lwm2m_object_read_boolean(ctx, ctx->inbuf->buffer, ctx->inbuf->size, &iv);
-      PRINTF("Set Bootstrap: %d\n", iv);
       if(value > 0) {
+        PRINTF("Set Bootstrap: %d\n", iv);
         security->bootstrap = (uint8_t) iv;
+      } else {
+        PRINTF("Failed to set bootstrap\n");
       }
+      break;
     case LWM2M_SECURITY_MODE_ID:
       {
         int32_t v2;
