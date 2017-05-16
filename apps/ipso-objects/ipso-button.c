@@ -86,17 +86,18 @@ static int32_t counter = 0;
 static int32_t edge_selection = 3; /* both */
 static int32_t debounce_time = 10;
 
-static const uint16_t resources[] =
-  {IPSO_INPUT_STATE, IPSO_INPUT_COUNTER, IPSO_INPUT_POLARITY,
-   IPSO_INPUT_DEBOUNCE, IPSO_INPUT_EDGE_SEL, IPSO_INPUT_CTR_RESET,
-   IPSO_INPUT_SENSOR_TYPE};
+static const lwm2m_resource_id_t resources[] = {
+  RO(IPSO_INPUT_STATE), RO(IPSO_INPUT_COUNTER), RW(IPSO_INPUT_POLARITY),
+  RW(IPSO_INPUT_DEBOUNCE), RW(IPSO_INPUT_EDGE_SEL), EX(IPSO_INPUT_CTR_RESET),
+  RO(IPSO_INPUT_SENSOR_TYPE)
+};
 
 /* Only support for one button for now */
 static lwm2m_object_instance_t reg_object = {
   .object_id = 3200,
   .instance_id = 0,
   .resource_ids = resources,
-  .resource_count = sizeof(resources) / sizeof(uint16_t),
+  .resource_count = sizeof(resources) / sizeof(lwm2m_resource_id_t),
   .callback = lwm2m_callback,
 };
 
@@ -120,43 +121,34 @@ static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
-  /* Do the stuff */
-  if(ctx->level < 3) {
-    /* Should not happen 3303 */
-    return LWM2M_STATUS_ERROR;
-  }
-  if(ctx->level == 3) {
-    /* This is a get request on 3303/0/3700 */
-    /* NOW we assume a get.... which might be wrong... */
-    if(ctx->operation == LWM2M_OP_READ) {
-      switch(ctx->resource_id) {
-      case IPSO_INPUT_STATE:
-        lwm2m_object_write_int(ctx, read_state());
-        break;
-      case IPSO_INPUT_COUNTER:
-        lwm2m_object_write_int(ctx, counter);
-        break;
-      case IPSO_INPUT_POLARITY:
-        lwm2m_object_write_int(ctx, polarity);
-        break;
-      case IPSO_INPUT_DEBOUNCE:
-        lwm2m_object_write_int(ctx, debounce_time);
-        break;
-      case IPSO_INPUT_EDGE_SEL:
-        lwm2m_object_write_int(ctx, edge_selection);
-        break;
-      case IPSO_INPUT_SENSOR_TYPE:
-        lwm2m_object_write_string(ctx, "button", strlen("button"));
-        break;
-      default:
-        return LWM2M_STATUS_ERROR;
-      }
-    } else if(ctx->operation == LWM2M_OP_EXECUTE) {
-      if(ctx->resource_id == IPSO_INPUT_CTR_RESET) {
-        counter = 0;
-      } else {
-        return LWM2M_STATUS_ERROR;
-      }
+  if(ctx->operation == LWM2M_OP_READ) {
+    switch(ctx->resource_id) {
+    case IPSO_INPUT_STATE:
+      lwm2m_object_write_int(ctx, read_state());
+      break;
+    case IPSO_INPUT_COUNTER:
+      lwm2m_object_write_int(ctx, counter);
+      break;
+    case IPSO_INPUT_POLARITY:
+      lwm2m_object_write_int(ctx, polarity);
+      break;
+    case IPSO_INPUT_DEBOUNCE:
+      lwm2m_object_write_int(ctx, debounce_time);
+      break;
+    case IPSO_INPUT_EDGE_SEL:
+      lwm2m_object_write_int(ctx, edge_selection);
+      break;
+    case IPSO_INPUT_SENSOR_TYPE:
+      lwm2m_object_write_string(ctx, "button", strlen("button"));
+      break;
+    default:
+      return LWM2M_STATUS_ERROR;
+    }
+  } else if(ctx->operation == LWM2M_OP_EXECUTE) {
+    if(ctx->resource_id == IPSO_INPUT_CTR_RESET) {
+      counter = 0;
+    } else {
+      return LWM2M_STATUS_ERROR;
     }
   }
   return LWM2M_STATUS_OK;
