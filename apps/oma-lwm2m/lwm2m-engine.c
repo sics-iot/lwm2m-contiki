@@ -419,21 +419,23 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
     int pos = lwm2m_buf.len;
     if(instance != NULL) {
       len = snprintf((char *) &lwm2m_buf.buffer[pos],
-                     maxsize - pos, (pos > 0 || block > 0) ? ",<%d/%d>" : "<%d/%d>",
+                     maxsize - pos, (pos > 0 || block > 0) ? ",</%d/%d>" : "</%d/%d>",
                      instance->object_id, instance->instance_id);
-      PRINTF((pos > 0 || block > 0) ? ",<%d/%d>" : "<%d/%d>",
+      PRINTF((pos > 0 || block > 0) ? ",</%d/%d>" : "</%d/%d>",
              instance->object_id, instance->instance_id);
     } else if(object->impl != NULL) {
       len = snprintf((char *) &lwm2m_buf.buffer[pos],
-                     maxsize - pos, (pos > 0 || block > 0) ? ",<%d>" : "<%d>",
+                     maxsize - pos, (pos > 0 || block > 0) ? ",</%d>" : "</%d>",
                      object->impl->object_id);
-      PRINTF((pos > 0 || block > 0) ? ",<%d>" : "<%d>",
+      PRINTF((pos > 0 || block > 0) ? ",</%d>" : "</%d>",
              object->impl->object_id);
     } else {
       len = 0;
     }
     lwm2m_buf.len += len;
-    instance = next_object_instance(NULL, object, instance);
+    if(instance != NULL) {
+      instance = next_object_instance(NULL, object, instance);
+    }
 
     /* no object and no instance - we are done with simple object instances */
     if(object == NULL && instance == NULL) {
@@ -1215,6 +1217,11 @@ next_object_instance(const lwm2m_context_t *context, lwm2m_object_t *object,
 {
   if(context != NULL && context->level >= 2) {
     /* Only single instance */
+    return NULL;
+  }
+
+  /* There has to be a last to get a next */
+  if(last == NULL) {
     return NULL;
   }
 
