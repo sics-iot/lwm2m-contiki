@@ -478,6 +478,7 @@ update_callback(struct request_state *state)
       /* remember the last reg time */
       last_update = ntimer_uptime();
       rd_state = REGISTRATION_DONE;
+      rd_flags &= ~FLAG_RD_DATA_UPDATE_TRIGGERED;
       return;
     }
     /* Possible error response codes are 4.00 Bad request & 4.04 Not Found */
