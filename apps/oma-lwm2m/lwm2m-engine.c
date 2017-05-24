@@ -419,13 +419,14 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
     int pos = lwm2m_buf.len;
     if(instance != NULL) {
       len = snprintf((char *) &lwm2m_buf.buffer[pos],
-                     maxsize - pos, (pos > 0 || block > 0) ? ",</%d/%d>" : "</%d/%d>",
+                     lwm2m_buf.size - pos, (pos > 0 || block > 0) ? ",</%d/%d>" : "</%d/%d>",
                      instance->object_id, instance->instance_id);
       PRINTF((pos > 0 || block > 0) ? ",</%d/%d>" : "</%d/%d>",
              instance->object_id, instance->instance_id);
     } else if(object->impl != NULL) {
       len = snprintf((char *) &lwm2m_buf.buffer[pos],
-                     maxsize - pos, (pos > 0 || block > 0) ? ",</%d>" : "</%d>",
+                     lwm2m_buf.size - pos,
+                     (pos > 0 || block > 0) ? ",</%d>" : "</%d>",
                      object->impl->object_id);
       PRINTF((pos > 0 || block > 0) ? ",</%d>" : "</%d>",
              object->impl->object_id);
@@ -1130,7 +1131,7 @@ lwm2m_engine_add_object(lwm2m_object_instance_t *object)
     if(object->object_id == instance->object_id) {
       if(object->instance_id == instance->instance_id) {
         PRINTF("lwm2m-engine: object with id %u/%u already registered\n",
-               object_id, instance->instance_id);
+               instance->object_id, instance->instance_id);
         return 0;
       }
 
