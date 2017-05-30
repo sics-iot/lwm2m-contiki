@@ -58,6 +58,9 @@
 #endif
 #endif /* LWM2M_DEVICE_FIRMWARE_VERSION */
 
+int32_t lwm2m_device_get_time(void);
+void    lwm2m_device_set_time(int32_t time);
+
 void lwm2m_device_init(void);
 
 #endif /* LWM2M_DEVICE_H_ */
