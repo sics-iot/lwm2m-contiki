@@ -129,6 +129,14 @@ update_last_value(ipso_sensor_value_t *sval, int32_t value, uint8_t notify)
   }
 }
 /*---------------------------------------------------------------------------*/
+static inline size_t
+write_float32fix(lwm2m_context_t *ctx, int32_t value)
+{
+  int64_t tmp = value;
+  tmp = (tmp * 1024) / 1000;
+  return lwm2m_object_write_float32fix(ctx, (int32_t)tmp, 10);
+}
+/*---------------------------------------------------------------------------*/
 static lwm2m_status_t
 lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
@@ -159,23 +167,23 @@ lwm2m_callback(lwm2m_object_instance_t *object,
         }
         break;
       case IPSO_SENSOR_MAX_RANGE:
-        lwm2m_object_write_float32fix(ctx, (sensor->max_range * 1024) / 1000, 10);
+        write_float32fix(ctx, sensor->max_range);
         break;
       case IPSO_SENSOR_MIN_RANGE:
-        lwm2m_object_write_float32fix(ctx, (sensor->min_range * 1024) / 1000, 10);
+        write_float32fix(ctx, sensor->min_range);
         break;
       case IPSO_SENSOR_MAX_VALUE:
-        lwm2m_object_write_float32fix(ctx, (value->max_value * 1024) / 1000, 10);
+        write_float32fix(ctx, value->max_value);
         break;
       case IPSO_SENSOR_MIN_VALUE:
-        lwm2m_object_write_float32fix(ctx, (value->min_value * 1024) / 1000, 10);
+        write_float32fix(ctx, value->min_value);
         break;
       case IPSO_SENSOR_VALUE:
         if(sensor->get_value_in_millis != NULL) {
           int32_t v;
           if(sensor->get_value_in_millis(sensor, &v) == LWM2M_STATUS_OK) {
             update_last_value(value, v, 0);
-            lwm2m_object_write_float32fix(ctx, (value->last_value * 1024) / 1000, 10);
+            write_float32fix(ctx, value->last_value);
           }
         }
         break;
