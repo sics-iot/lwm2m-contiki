@@ -897,12 +897,13 @@ static lwm2m_object_instance_t *
 create_instance(lwm2m_context_t *context, lwm2m_object_t *object)
 {
   lwm2m_object_instance_t *instance;
-  if(object == NULL || object->impl == NULL || object->impl->create == NULL) {
+  if(object == NULL || object->impl == NULL ||
+     object->impl->create_instance == NULL) {
     return NULL;
   }
 
   /* NOTE: context->object_instance_id needs to be set before calling */
-  instance = object->impl->create(context->object_instance_id, NULL);
+  instance = object->impl->create_instance(context->object_instance_id, NULL);
   if(instance != NULL) {
     PRINTF("Created instance: %u/%u\n", context->object_id, context->object_instance_id);
     REST.set_response_status(context->response, CREATED_2_01);
@@ -1363,8 +1364,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       for(object = list_head(generic_object_list);
           object != NULL;
           object = object->next) {
-        if(object->impl != NULL && object->impl->delete != NULL) {
-          object->impl->delete(LWM2M_OBJECT_INSTANCE_NONE, NULL);
+        if(object->impl != NULL && object->impl->delete_instance != NULL) {
+          object->impl->delete_instance(LWM2M_OBJECT_INSTANCE_NONE, NULL);
         }
       }
 #if USE_RD_CLIENT
@@ -1482,8 +1483,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     success = call_instance(instance, &context);
     break;
   case LWM2M_OP_DELETE:
-    if(object != NULL && object->impl != NULL && object->impl->delete != NULL) {
-      object->impl->delete(context.object_instance_id, &success);
+    if(object != NULL && object->impl != NULL &&
+       object->impl->delete_instance != NULL) {
+      object->impl->delete_instance(context.object_instance_id, &success);
 #if USE_RD_CLIENT
       lwm2m_rd_client_set_update_rd();
 #endif

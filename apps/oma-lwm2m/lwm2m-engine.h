@@ -86,9 +86,9 @@ struct lwm2m_object_instance {
 
 typedef struct {
   uint16_t object_id;
-  lwm2m_object_instance_t *(* create)(uint16_t instance_id,
-                                      lwm2m_status_t *status);
-  int (* delete)(uint16_t instance_id, lwm2m_status_t *status);
+  lwm2m_object_instance_t *(* create_instance)(uint16_t instance_id,
+                                               lwm2m_status_t *status);
+  int (* delete_instance)(uint16_t instance_id, lwm2m_status_t *status);
   lwm2m_object_instance_t *(* get_first)(lwm2m_status_t *status);
   lwm2m_object_instance_t *(* get_next)(lwm2m_object_instance_t *instance,
                                         lwm2m_status_t *status);
