@@ -404,6 +404,19 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
     /* start with simple object instances */
     instance = list_head(object_list);
     object = NULL;
+
+    if(instance == NULL) {
+      /* No simple object instances available */
+      object = list_head(generic_object_list);
+      if(object == NULL) {
+        /* No objects of any kind available */
+        return 0;
+      }
+      if(object->impl != NULL) {
+        instance = object->impl->get_first(NULL);
+      }
+    }
+
     lwm2m_buf_lock[0] = 1; /* lock "flag" */
     lwm2m_buf_lock[1] = 0xffff;
     lwm2m_buf_lock[2] = 0xffff;
@@ -438,17 +451,27 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
       instance = next_object_instance(NULL, object, instance);
     }
 
-    /* no object and no instance - we are done with simple object instances */
-    if(object == NULL && instance == NULL) {
-      object = list_head(generic_object_list);
-      if(object != NULL) {
+    if(instance == NULL) {
+      if(object == NULL) {
+        /*
+         * No object and no instance - we are done with simple object instances.
+         */
+        object = list_head(generic_object_list);
+      } else {
+        /*
+         * Object exists but not an instance - instances for this object are
+         * done - go to next.
+         */
+        object = object->next;
+      }
+
+      if(object != NULL && object->impl != NULL) {
         instance = object->impl->get_first(NULL);
       }
-      /* Object exists but not an instance - instances for this object are done - go to next */
-    } else if(object != NULL && instance == NULL) {
-      object = object->next;
-      if(object != NULL) {
-        instance = object->impl->get_first(NULL);
+
+      if(instance == NULL && object == NULL && lwm2m_buf.len <= maxsize) {
+        /* Data generation is done. No more packets are needed after this. */
+        break;
       }
     }
 
@@ -763,7 +786,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
                 }
               }
               if(current_opaque_callback != NULL) {
-                int old_offset = ctx->offset;
+                uint32_t old_offset = ctx->offset;
                 int num_write = COAP_MAX_BLOCK_SIZE - ctx->outbuf->len;
                 /* Check if the callback did set a opaque callback function - then
                    we should produce data via that callback until the opaque has fully
