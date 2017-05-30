@@ -89,8 +89,9 @@ opaque_callback(lwm2m_object_instance_t *object,
   PRINTF("opaque-stream callback num_to_write: %d off: %d outlen: %d\n",
          num_to_write, ctx->offset, ctx->outbuf->len);
 
-  len = read_data(&ctx->outbuf->buffer[ctx->outbuf->len], ctx->object_instance_id,
-                  ctx->offset + ctx->outbuf->len, num_to_write);
+  len = read_data(&ctx->outbuf->buffer[ctx->outbuf->len],
+                  ctx->object_instance_id,
+                  ctx->offset, num_to_write);
 
   ctx->outbuf->len += len;
 
