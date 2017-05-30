@@ -82,7 +82,7 @@ LIST(instances_list);
 static lwm2m_security_value_t instances[MAX_COUNT];
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-create(uint16_t instance_id, lwm2m_status_t *status)
+create_instance(uint16_t instance_id, lwm2m_status_t *status)
 {
   lwm2m_object_instance_t *instance;
   int i;
@@ -120,7 +120,7 @@ create(uint16_t instance_id, lwm2m_status_t *status)
 }
 /*---------------------------------------------------------------------------*/
 static int
-delete(uint16_t instance_id, lwm2m_status_t *status)
+delete_instance(uint16_t instance_id, lwm2m_status_t *status)
 {
   lwm2m_object_instance_t *instance;
 
@@ -255,8 +255,8 @@ static const lwm2m_object_impl_t impl = {
   .get_first = get_first,
   .get_next = get_next,
   .get_by_id = get_by_id,
-  .create = create,
-  .delete = delete,
+  .create_instance = create_instance,
+  .delete_instance = delete_instance,
 };
 static lwm2m_object_t reg_object = {
   .impl = &impl,

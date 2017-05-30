@@ -404,6 +404,19 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
     /* start with simple object instances */
     instance = list_head(object_list);
     object = NULL;
+
+    if(instance == NULL) {
+      /* No simple object instances available */
+      object = list_head(generic_object_list);
+      if(object == NULL) {
+        /* No objects of any kind available */
+        return 0;
+      }
+      if(object->impl != NULL) {
+        instance = object->impl->get_first(NULL);
+      }
+    }
+
     lwm2m_buf_lock[0] = 1; /* lock "flag" */
     lwm2m_buf_lock[1] = 0xffff;
     lwm2m_buf_lock[2] = 0xffff;
@@ -438,17 +451,27 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
       instance = next_object_instance(NULL, object, instance);
     }
 
-    /* no object and no instance - we are done with simple object instances */
-    if(object == NULL && instance == NULL) {
-      object = list_head(generic_object_list);
-      if(object != NULL) {
+    if(instance == NULL) {
+      if(object == NULL) {
+        /*
+         * No object and no instance - we are done with simple object instances.
+         */
+        object = list_head(generic_object_list);
+      } else {
+        /*
+         * Object exists but not an instance - instances for this object are
+         * done - go to next.
+         */
+        object = object->next;
+      }
+
+      if(object != NULL && object->impl != NULL) {
         instance = object->impl->get_first(NULL);
       }
-      /* Object exists but not an instance - instances for this object are done - go to next */
-    } else if(object != NULL && instance == NULL) {
-      object = object->next;
-      if(object != NULL) {
-        instance = object->impl->get_first(NULL);
+
+      if(instance == NULL && object == NULL && lwm2m_buf.len <= maxsize) {
+        /* Data generation is done. No more packets are needed after this. */
+        break;
       }
     }
 
@@ -763,7 +786,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
                 }
               }
               if(current_opaque_callback != NULL) {
-                int old_offset = ctx->offset;
+                uint32_t old_offset = ctx->offset;
                 int num_write = COAP_MAX_BLOCK_SIZE - ctx->outbuf->len;
                 /* Check if the callback did set a opaque callback function - then
                    we should produce data via that callback until the opaque has fully
@@ -874,12 +897,13 @@ static lwm2m_object_instance_t *
 create_instance(lwm2m_context_t *context, lwm2m_object_t *object)
 {
   lwm2m_object_instance_t *instance;
-  if(object == NULL || object->impl == NULL || object->impl->create == NULL) {
+  if(object == NULL || object->impl == NULL ||
+     object->impl->create_instance == NULL) {
     return NULL;
   }
 
   /* NOTE: context->object_instance_id needs to be set before calling */
-  instance = object->impl->create(context->object_instance_id, NULL);
+  instance = object->impl->create_instance(context->object_instance_id, NULL);
   if(instance != NULL) {
     PRINTF("Created instance: %u/%u\n", context->object_id, context->object_instance_id);
     REST.set_response_status(context->response, CREATED_2_01);
@@ -1340,8 +1364,8 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
       for(object = list_head(generic_object_list);
           object != NULL;
           object = object->next) {
-        if(object->impl != NULL && object->impl->delete != NULL) {
-          object->impl->delete(LWM2M_OBJECT_INSTANCE_NONE, NULL);
+        if(object->impl != NULL && object->impl->delete_instance != NULL) {
+          object->impl->delete_instance(LWM2M_OBJECT_INSTANCE_NONE, NULL);
         }
       }
 #if USE_RD_CLIENT
@@ -1459,8 +1483,9 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     success = call_instance(instance, &context);
     break;
   case LWM2M_OP_DELETE:
-    if(object != NULL && object->impl != NULL && object->impl->delete != NULL) {
-      object->impl->delete(context.object_instance_id, &success);
+    if(object != NULL && object->impl != NULL &&
+       object->impl->delete_instance != NULL) {
+      object->impl->delete_instance(context.object_instance_id, &success);
 #if USE_RD_CLIENT
       lwm2m_rd_client_set_update_rd();
 #endif

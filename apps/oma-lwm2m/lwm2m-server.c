@@ -62,9 +62,9 @@
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
                                      lwm2m_context_t *ctx);
 
-static lwm2m_object_instance_t *create(uint16_t instance_id,
-                                       lwm2m_status_t *status);
-static int delete(uint16_t instance_id, lwm2m_status_t *status);
+static lwm2m_object_instance_t *create_instance(uint16_t instance_id,
+                                                lwm2m_status_t *status);
+static int delete_instance(uint16_t instance_id, lwm2m_status_t *status);
 static lwm2m_object_instance_t *get_first(lwm2m_status_t *status);
 static lwm2m_object_instance_t *get_next(lwm2m_object_instance_t *instance,
                                          lwm2m_status_t *status);
@@ -82,8 +82,8 @@ static const lwm2m_object_impl_t impl = {
   .get_first = get_first,
   .get_next = get_next,
   .get_by_id = get_by_id,
-  .create = create,
-  .delete = delete,
+  .create_instance = create_instance,
+  .delete_instance = delete_instance,
 };
 static lwm2m_object_t server_object = {
   .impl = &impl,
@@ -93,7 +93,7 @@ LIST(server_list);
 static server_value_t server_instances[MAX_COUNT];
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
-create(uint16_t instance_id, lwm2m_status_t *status)
+create_instance(uint16_t instance_id, lwm2m_status_t *status)
 {
   lwm2m_object_instance_t *instance;
   int i;
@@ -135,7 +135,7 @@ create(uint16_t instance_id, lwm2m_status_t *status)
 }
 /*---------------------------------------------------------------------------*/
 static int
-delete(uint16_t instance_id, lwm2m_status_t *status)
+delete_instance(uint16_t instance_id, lwm2m_status_t *status)
 {
   lwm2m_object_instance_t *instance;
 
