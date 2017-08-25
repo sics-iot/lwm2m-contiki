@@ -985,6 +985,8 @@ process_tlv_write(lwm2m_context_t *ctx, lwm2m_object_t *object,
   return LWM2M_STATUS_ERROR;
 }
 /*---------------------------------------------------------------------------*/
+static int last_tlv_id = 0;
+
 static lwm2m_status_t
 perform_multi_resource_write_op(lwm2m_object_t *object,
                                 lwm2m_object_instance_t *instance,
@@ -1063,6 +1065,29 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
     oma_tlv_t tlv;
     int tlvpos = 0;
     lwm2m_status_t status;
+
+    /* For handling blockwise (BLOCK1) write */
+    uint32_t num;
+    uint8_t more;
+    uint16_t size;
+    uint32_t offset;
+
+    /* NOTE: this assumes that a BLOCK1 non-first block is not a part of a
+       small TLV but rather a large opaque - this needs to be fixed in the
+       future */
+
+    if(coap_get_header_block1(ctx->request, &num, &more, &size, &offset)) {
+      PRINTF("CoAP BLOCK1: %d/%d/%d offset:%d\n", num, more, size, offset);
+      PRINTF("LWM2M CTX->offset= %d\n", ctx->offset);
+      PRINTF("Last TLV ID:%d final:%d\n", last_tlv_id,
+             lwm2m_object_is_final_incoming(ctx));
+      if(offset > 0) {
+        status = process_tlv_write(ctx, object, last_tlv_id,
+                                   inbuf, size);
+        return status;
+      }
+    }
+
     while(tlvpos < insize) {
       len = oma_tlv_read(&tlv, &inbuf[tlvpos], insize - tlvpos);
       PRINTF("Got TLV format First is: type:%d id:%d len:%d (p:%d len:%d/%d)\n",
@@ -1085,6 +1110,7 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
                  tlv2.type, tlv2.id, (int) tlv2.length,
                  (int) len2, (int) insize);
           if(tlv2.type == OMA_TLV_TYPE_RESOURCE) {
+            last_tlv_id = tlv2.id;
             status = process_tlv_write(ctx, object, tlv2.id,
                                        (uint8_t *)&tlv.value[pos], len2);
             if(status != LWM2M_STATUS_OK) {
@@ -1304,6 +1330,24 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
   context.inbuf->size = coap_get_payload(request, (const uint8_t **) &context.inbuf->buffer);
   context.inbuf->pos = 0;
+
+  /* Maybe this should be part of CoAP itself - this seems not to be working
+     with the leshan server */
+#define LWM2M_CONF_ENTITY_TOO_LARGE_BLOCK1 0
+#if LWM2M_CONF_ENTITY_TOO_LARGE_BLOCK1
+  if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
+    uint16_t bsize;
+    coap_get_header_block1(request, NULL, NULL, &bsize, NULL);
+
+    PRINTF("Block1 size:%d\n", bsize);
+    if(bsize > COAP_MAX_BLOCK_SIZE) {
+      PRINTF("Entity too large...\n");
+      REST.set_response_status(response, REQUEST_ENTITY_TOO_LARGE_4_13);
+      coap_set_header_size1(response, COAP_MAX_BLOCK_SIZE);
+      return COAP_HANDLER_STATUS_PROCESSED;
+    }
+  }
+#endif
 
   /* Set default reader/writer */
   context.reader = &lwm2m_plain_text_reader;
