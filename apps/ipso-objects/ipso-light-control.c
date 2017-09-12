@@ -43,6 +43,7 @@
  */
 
 #include "ipso-objects.h"
+#include "ipso-control-template.h"
 #include "lwm2m-object.h"
 #include "lwm2m-engine.h"
 
