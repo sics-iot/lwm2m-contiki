@@ -109,6 +109,9 @@ int  lwm2m_engine_add_object(lwm2m_object_instance_t *object);
 void lwm2m_engine_remove_object(lwm2m_object_instance_t *object);
 int  lwm2m_engine_add_generic_object(lwm2m_object_t *object);
 void lwm2m_engine_remove_generic_object(lwm2m_object_t *object);
+void lwm2m_notify_instance_observers(uint16_t object_id, uint16_t instance_id);
+void lwm2m_notify_resource_observers(uint16_t object_id, uint16_t instance_id,
+                                     uint16_t resource_id);
 void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
                                    uint16_t resource);
 
