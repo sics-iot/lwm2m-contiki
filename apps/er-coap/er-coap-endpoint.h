@@ -39,6 +39,7 @@
 #define ER_COAP_ENDPOINT_H_
 
 #include "contiki-conf.h"
+#include <stdlib.h>
 
 #ifndef COAP_ENDPOINT_CUSTOM
 #include "net/ip/uip.h"

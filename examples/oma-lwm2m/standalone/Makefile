@@ -12,8 +12,8 @@ ifneq ($(MAKE_WITH_DTLS),)
   CFLAGS += -DWITH_DTLS=1
   TINYDTLS_DIRS = aes ecc sha2
   APPSDIRS += tinydtls ${addprefix tinydtls/,$(TINYDTLS_DIRS)}
-  SOURCEDIRS += tinydtls-support
   SOURCE_FILES += dtls-support.c
+  SOURCEDIRS += tinydtls-support
 endif
 
 TARGETCDIRS  += ${addprefix $(TARGETCDIR)/,$(COREDIRS) $(APPSDIRS)}

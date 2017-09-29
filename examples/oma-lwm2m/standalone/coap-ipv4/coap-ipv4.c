@@ -49,7 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTEP(ep) coap_endpoint_print(ep)
@@ -83,7 +83,6 @@ static uint16_t coap_buf_len;
 
 static dtls_handler_t cb;
 static dtls_context_t *dtls_context = NULL;
-static dtls_context_t *orig_dtls_context = NULL;
 
 /* The PSK information for DTLS */
 #define PSK_ID_MAXLEN 256
@@ -167,7 +166,15 @@ coap_endpoint_copy(coap_endpoint_t *destination, const coap_endpoint_t *from)
 int
 coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
 {
-  return memcmp(e1, e2, sizeof(coap_endpoint_t)) == 0;
+  /* need to compare only relevant parts of sockaddr */
+  switch(e1->addr.sin_family) {
+  case AF_INET:
+    return e1->addr.sin_port == e2->addr.sin_port &&
+      memcmp(&e1->addr.sin_addr, &e2->addr.sin_addr,
+             sizeof(struct in_addr)) == 0;
+  default:
+    return 0;
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -306,7 +313,7 @@ coap_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 #if WITH_DTLS
   /* DTLS receive??? */
   last_source.secure = 1;
-  dtls_handle_message(dtls_context, &last_source, coap_databuf(), coap_datalen());
+  dtls_handle_message(dtls_context, (coap_endpoint_t *) coap_src_endpoint(), coap_databuf(), coap_datalen());
 #else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
 #endif
@@ -460,7 +467,7 @@ get_psk_info(struct dtls_context_t *ctx,
              const unsigned char *id, size_t id_len,
              unsigned char *result, size_t result_length)
 {
-
+  PRINTF("---===>>> Getting the Key or ID <<<===---\n");
   switch (type) {
   case DTLS_PSK_IDENTITY:
     if (id_len) {

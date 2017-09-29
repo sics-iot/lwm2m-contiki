@@ -88,42 +88,7 @@ free_context(dtls_context_t *context)
 #ifndef NDEBUG
 size_t
 dsrv_print_addr(const session_t *addr, char *buf, size_t len) {
-  const void *addrptr = NULL;
-  in_port_t port;
-  char *p = buf;
-
-  switch(addr->addr.sin_family) {
-  case AF_INET:
-    if(len < INET_ADDRSTRLEN) {
-      return 0;
-    }
-
-    addrptr = &addr->addr.sin_addr;
-    port = ntohs(addr->addr.sin_port);
-    break;
-  default:
-    memcpy(buf, "(unknown address type)", min(22, len));
-    return min(22, len);
-  }
-
-  if(inet_ntop(addr->addr.sin_family, addrptr, p, len) == 0) {
-    perror("dsrv_print_addr");
-    return 0;
-  }
-
-  p += strnlen(p, len);
-
-  if(addr->addr.sin_family == AF_INET6) {
-    if(p < buf + len) {
-      *p++ = ']';
-    } else {
-      return 0;
-    }
-  }
-
-  p += snprintf(p, buf + len - p + 1, ":%d", port);
-
-  return p - buf;
+  return 0;
 }
 #endif /* NDEBUG */
 /*---------------------------------------------------------------------------*/
@@ -272,25 +237,34 @@ dtls_session_equals(const session_t *a, const session_t *b)
   /* printf("SESSION_EQUALS: A:%d,%d B:%d,%d\n", */
   /*        a->size, a->addr.sin_family, */
   /*        b->size, b->addr.sin_family); */
+  coap_endpoint_t *e1 = (coap_endpoint_t *) a;
+  coap_endpoint_t *e2 = (coap_endpoint_t *) b;
 
-  if(a->size != b->size || a->addr.sin_family != b->addr.sin_family) {
-    return 0;
-  }
+  printf(" **** EP:");
+  coap_endpoint_print(e1);
+  printf(" =?= ");
+  coap_endpoint_print(e2);
+  printf(" => %d\n", coap_endpoint_cmp(e1, e2));
 
-  /* need to compare only relevant parts of sockaddr */
-  switch(a->addr.sin_family) {
-  case AF_INET:
-    return a->addr.sin_port == b->addr.sin_port &&
-      memcmp(&a->addr.sin_addr, &b->addr.sin_addr,
-             sizeof(struct in_addr)) == 0;
-  default:
-    return 0;
-  }
+  return coap_endpoint_cmp(e1, e2);
 }
 /*---------------------------------------------------------------------------*/
 /* The init */
 void
 dtls_support_init(void)
 {
+}
+/*---------------------------------------------------------------------------*/
+void *
+dtls_session_get_address(const session_t *a)
+{
+  /* improve this to only contain the addressing info */
+  return (void *)a;
+}
+
+int dtls_session_get_address_size(const session_t *a)
+{
+  /* improve this to only contain the addressing info */
+  return sizeof(session_t);
 }
 /*---------------------------------------------------------------------------*/
