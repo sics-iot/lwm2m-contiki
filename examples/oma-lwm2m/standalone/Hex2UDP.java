@@ -99,10 +99,10 @@ public class Hex2UDP implements Runnable {
         InputStream in = System.in;
         final PrintStream out;
         System.err.println("Connecting to " + args[0]);
-        if(args.length > 1) {
+        if(args.length > 2) {
             Runtime rt = Runtime.getRuntime();
-            Process pr = rt.exec(args[1]);
-            System.err.println("Started " + args[1]);
+            Process pr = rt.exec(args[2]);
+            System.err.println("Started " + args[2]);
             in = pr.getInputStream();
             out = new PrintStream(pr.getOutputStream());
         } else {
@@ -110,7 +110,7 @@ public class Hex2UDP implements Runnable {
         }
 
         /* Create a Hex2UDP that print on this out stream */
-        Hex2UDP udpc = new Hex2UDP(args[0], 5683) {
+        Hex2UDP udpc = new Hex2UDP(args[0], Integer.parseInt(args[1])) {
                 public void receive(byte[] data) {
                     String s = DatatypeConverter.printHexBinary(data);
                     out.println("COAPHEX:" + s);

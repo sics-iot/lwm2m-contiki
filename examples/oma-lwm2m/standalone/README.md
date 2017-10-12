@@ -51,3 +51,14 @@ make copy
 Copy the example directory contents to a directory outside Contiki.
 Remove the Makefile ```Makefile.contiki``` and the remaining Makefile
 will compile the example independent of the Contiki source tree.
+
+
+The Hex Transport can be tested together with DTLS using:
+
+>make TRANSPORT=hex MAKE_WITH_DTLS=1
+>java Hex2UDP leshan.eclipse.org 5684 ./lwm2m-example
+
+Note that you need to configure the leshan server with the correct
+key and ID.
+
+(without DTLS it should be 5683 for CoAP)
