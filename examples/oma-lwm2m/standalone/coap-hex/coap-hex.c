@@ -51,6 +51,12 @@
 #define PRINTEP(ep)
 #endif
 
+#if WITH_DTLS
+#include "tinydtls.h"
+#include "dtls.h"
+#include "dtls_debug.h"
+#endif /* WITH_DTLS */
+
 #define BUFSIZE 1280
 
 typedef union {
@@ -61,6 +67,23 @@ typedef union {
 static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
+
+#if WITH_DTLS
+#define PSK_DEFAULT_IDENTITY "Client_identity"
+#define PSK_DEFAULT_KEY      "secretPSK"
+
+static dtls_handler_t cb;
+static dtls_context_t *dtls_context = NULL;
+
+/* The PSK information for DTLS */
+#define PSK_ID_MAXLEN 256
+#define PSK_MAXLEN 256
+static unsigned char psk_id[PSK_ID_MAXLEN];
+static size_t psk_id_length = 0;
+static unsigned char psk_key[PSK_MAXLEN];
+static size_t psk_key_length = 0;
+#endif
+
 /*---------------------------------------------------------------------------*/
 static const coap_endpoint_t *
 coap_src_endpoint(void)
@@ -71,26 +94,29 @@ coap_src_endpoint(void)
 void
 coap_endpoint_copy(coap_endpoint_t *destination, const coap_endpoint_t *from)
 {
-  *destination = *from;
+  memcpy(destination, from, sizeof(coap_endpoint_t));
 }
 /*---------------------------------------------------------------------------*/
 int
 coap_endpoint_cmp(const coap_endpoint_t *e1, const coap_endpoint_t *e2)
 {
-  return *e1 == *e2;
+  return e1->addr == e2->addr;
 }
 /*---------------------------------------------------------------------------*/
 void
 coap_endpoint_print(const coap_endpoint_t *ep)
 {
-  printf("%u", *ep);
+  printf("%u", ep->addr);
 }
 /*---------------------------------------------------------------------------*/
 int
 coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 {
   /* Hex based CoAP has no addresses, just writes data to standard out */
-  *ep = last_source = 0;
+  ep->addr = last_source.addr;
+#if WITH_DTLS
+  ep->secure = 1;
+#endif
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -168,7 +194,13 @@ stdin_callback(const char *line)
     PRINTF("\n");
   }
 
+#if WITH_DTLS
+  /* DTLS receive??? */
+  last_source.secure = 1;
+  dtls_handle_message(dtls_context, (coap_endpoint_t *) coap_src_endpoint(), coap_databuf(), coap_datalen());
+#else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
+#endif
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -177,11 +209,42 @@ coap_transport_init(void)
   select_set_stdin_callback(stdin_callback);
 
   printf("CoAP listening on standard in\n");
+
+#if WITH_DTLS
+  /* create new contet with app-data - no real app-data... */
+  dtls_context = dtls_new_context(&last_source);
+  if (!dtls_context) {
+    PRINTF("DTLS: cannot create context\n");
+    exit(-1);
+  }
+
+#ifdef DTLS_PSK
+  psk_id_length = strlen(PSK_DEFAULT_IDENTITY);
+  psk_key_length = strlen(PSK_DEFAULT_KEY);
+  memcpy(psk_id, PSK_DEFAULT_IDENTITY, psk_id_length);
+  memcpy(psk_key, PSK_DEFAULT_KEY, psk_key_length);
+#endif /* DTLS_PSK */
+  PRINTF("Setting DTLS handler\n");
+  dtls_set_handler(dtls_context, &cb);
+#endif
+
 }
 /*---------------------------------------------------------------------------*/
 void
 coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
 {
+  if(!coap_endpoint_is_connected(ep)) {
+    PRINTF("CoAP endpoint not connected\n");
+    return;
+  }
+
+#if WITH_DTLS
+  if(coap_endpoint_is_secure(ep)) {
+    dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, len);
+    return;
+  }
+#endif
+
   int i;
   printf("COAPHEX:");
   for(i = 0; i < len; i++) {
@@ -189,4 +252,176 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
   }
   printf("\n");
 }
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_connect(coap_endpoint_t *ep)
+{
+  if(ep->secure == 0) {
+    return 1;
+  }
+#if WITH_DTLS
+  PRINTF("DTLS EP:");
+  PRINTEP(ep);
+  PRINTF(" len:%d\n", ep->size);
+
+  /* setup all address info here... should be done to connect */
+
+  dtls_connect(dtls_context, ep);
+#endif
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+void
+coap_endpoint_disconnect(coap_endpoint_t *ep)
+{
+#if WITH_DTLS
+  dtls_close(dtls_context, ep);
+#endif /* WITH_DTLS */
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_is_secure(const coap_endpoint_t *ep)
+{
+  return ep->secure;
+}
+/*---------------------------------------------------------------------------*/
+int
+coap_endpoint_is_connected(const coap_endpoint_t *ep)
+{
+  if(ep->secure) {
+#if WITH_DTLS
+    dtls_peer_t *peer;
+    peer = dtls_get_peer(dtls_context, ep);
+    if(peer != NULL) {
+      /* only if handshake is done! */
+      PRINTF("peer state for ");
+      PRINTEP(ep);
+      PRINTF(" is %d %d\n", peer->state, dtls_peer_is_connected(peer));
+      return dtls_peer_is_connected(peer);
+    } else {
+      PRINTF("Did not find peer ");
+      PRINTEP(ep);
+      PRINTF("\n");
+    }
+#endif /* WITH_DTLS */
+    return 0;
+  }
+  /* Assume that the UDP socket is already up... */
+  return 1;
+}
+
+/* DTLS */
+#if WITH_DTLS
+
+/* This is input coming from the DTLS code - e.g. de-crypted input from
+   the other side - peer */
+static int
+input_from_peer(struct dtls_context_t *ctx,
+                session_t *session, uint8 *data, size_t len)
+{
+  size_t i;
+  dtls_peer_t *peer;
+
+  printf("received data:");
+  for (i = 0; i < len; i++)
+    printf("%c", data[i]);
+  printf("\nHex:");
+  for (i = 0; i < len; i++)
+    printf("%02x", data[i]);
+  printf("\n");
+
+  /* Send this into coap-input */
+  memmove(coap_databuf(), data, len);
+  coap_buf_len = len;
+
+  peer = dtls_get_peer(ctx, session);
+  /* If we have a peer then ensure that the endpoint is tagged as secure */
+  if(peer) {
+    session->secure = 1;
+  }
+
+  coap_receive(session, coap_databuf(), coap_datalen());
+
+  return 0;
+}
+
+/* This is output from the DTLS code to be sent to peer (encrypted) */
+static int
+output_to_peer(struct dtls_context_t *ctx,
+               session_t *session, uint8 *data, size_t len)
+{
+  int fd = *(int *)dtls_get_app_data(ctx);
+  printf("output_to_peer len:%d %d (s-size: %d)\n", (int)len, fd,
+         session->size);
+
+
+  int i;
+  printf("COAPHEX:");
+  for(i = 0; i < len; i++) {
+    printf("%02x", data[i]);
+  }
+  printf("\n");
+
+  return len;
+}
+
+
+/* This function is the "key store" for tinyDTLS. It is called to
+ * retrieve a key for the given identity within this particular
+ * session. */
+static int
+get_psk_info(struct dtls_context_t *ctx,
+             const session_t *session,
+             dtls_credentials_type_t type,
+             const unsigned char *id, size_t id_len,
+             unsigned char *result, size_t result_length)
+{
+  PRINTF("---===>>> Getting the Key or ID <<<===---\n");
+  switch (type) {
+  case DTLS_PSK_IDENTITY:
+    if (id_len) {
+      dtls_debug("got psk_identity_hint: '%.*s'\n", id_len, id);
+    }
+
+    if (result_length < psk_id_length) {
+      dtls_warn("cannot set psk_identity -- buffer too small\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    memcpy(result, psk_id, psk_id_length);
+    return psk_id_length;
+  case DTLS_PSK_KEY:
+    if (id_len != psk_id_length || memcmp(psk_id, id, id_len) != 0) {
+      dtls_warn("PSK for unknown id requested, exiting\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_ILLEGAL_PARAMETER);
+    } else if (result_length < psk_key_length) {
+      dtls_warn("cannot set psk -- buffer too small\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    memcpy(result, psk_key, psk_key_length);
+    return psk_key_length;
+  default:
+    dtls_warn("unsupported request type: %d\n", type);
+  }
+
+  return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+}
+
+
+static dtls_handler_t cb = {
+  .write = output_to_peer,
+  .read  = input_from_peer,
+  .event = NULL,
+#ifdef DTLS_PSK
+  .get_psk_info = get_psk_info,
+#endif /* DTLS_PSK */
+#ifdef DTLS_ECC
+  /* .get_ecdsa_key = get_ecdsa_key, */
+  /* .verify_ecdsa_key = verify_ecdsa_key */
+#endif /* DTLS_ECC */
+};
+
+#endif /* WITH_DTLS */
+
 /*---------------------------------------------------------------------------*/

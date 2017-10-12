@@ -40,6 +40,10 @@
 
 #define COAP_ENDPOINT_CUSTOM 1
 
-typedef uint8_t coap_endpoint_t;
+typedef struct {
+  int addr; /* if we want to switch on something... */
+  unsigned int size;
+  int secure;
+} coap_endpoint_t;
 
 #endif /* COAP_HEX_H_ */
