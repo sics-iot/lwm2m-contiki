@@ -187,11 +187,11 @@ stdin_callback(const char *line)
     int i;
     uint8_t *data;
     data = coap_databuf();
-    PRINTF("Received:");
+    printf("Received:");
     for(i = 0; i < len; i++) {
-      PRINTF("%02x", data[i]);
+      printf("%02x", data[i]);
     }
-    PRINTF("\n");
+    printf("\n");
   }
 
 #if WITH_DTLS
