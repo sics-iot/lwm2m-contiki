@@ -56,6 +56,7 @@ will compile the example independent of the Contiki source tree.
 The Hex Transport can be tested together with DTLS using:
 
 >make TRANSPORT=hex MAKE_WITH_DTLS=1
+>javac Hex2UDP.java
 >java Hex2UDP leshan.eclipse.org 5684 ./lwm2m-example
 
 Note that you need to configure the leshan server with the correct
