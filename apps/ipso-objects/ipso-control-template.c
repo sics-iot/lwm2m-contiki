@@ -45,6 +45,7 @@
 #include "ipso-control-template.h"
 #include "lwm2m-engine.h"
 #include "sys/ntimer.h"
+#include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
 
