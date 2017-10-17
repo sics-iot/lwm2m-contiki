@@ -3,3 +3,23 @@ er-coap_src = er-coap.c er-coap-engine.c er-coap-transactions.c      \
   er-coap-block1.c er-coap-observe-client.c \
   rest-engine.c \
   er-coap-uip.c er-coap-blocking-api.c er-coap-callback-api.c
+
+MAKE_WITH_DTLS ?= 0
+
+ifeq ($(MAKE_WITH_DTLS),1)
+
+ TINYDTLS_DIR = $(CONTIKI)/lib/tinydtls
+ ifeq (${wildcard $(TINYDTLS_DIR)/Makefile},)
+  ${error Could not find the tinyDTLS submodule. Please run "git submodule update --init" and try again}
+ endif
+
+ CFLAGS += -DWITH_DTLS=1
+
+ MODULES += apps/er-coap/tinydtls-support
+
+ EXTERNALDIRS += $(TINYDTLS_DIR) $(TINYDTLS_DIR)/aes $(TINYDTLS_DIR)/sha2 $(TINYDTLS_DIR)/ecc
+
+ CONTIKI_SOURCEFILES += dtls.c dtls-crypto.c dtls-hmac.c \
+	rijndael.c sha2.c dtls-ccm.c netq.c ecc.c dtls-peer.c
+
+endif
