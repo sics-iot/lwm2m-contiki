@@ -42,6 +42,9 @@
 #include "ipso-objects.h"
 #include "ipso-sensor-template.h"
 #include "ipso-control-template.h"
+#include "lwm2m-server.h"
+#include "lwm2m-security.h"
+#include "lwm2m-device.h"
 #include "dev/leds.h"
 
 #define DEBUG DEBUG_NONE
@@ -188,7 +191,9 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
   lwm2m_engine_init();
 
   /* Register default LWM2M objects */
-  lwm2m_engine_register_default_objects();
+  lwm2m_device_init();
+  lwm2m_security_init();
+  lwm2m_server_init();
 
 #if BOARD_SENSORTAG
   ipso_sensor_add(&temp_sensor);
