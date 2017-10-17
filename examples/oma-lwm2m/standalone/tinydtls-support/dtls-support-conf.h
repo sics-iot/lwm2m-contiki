@@ -41,4 +41,8 @@
 
 typedef coap_endpoint_t session_t;
 
+#define DTLS_TICKS_PER_SECOND 1000
+
+typedef uint64_t dtls_tick_t;
+
 #endif /* DTLS_SUPPORT_CONF_H_ */
