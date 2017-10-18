@@ -10,6 +10,8 @@ typedef coap_endpoint_t session_t;
 #include "sys/ctimer.h"
 #include <stdint.h>
 
+#define NETQ_MAXCNT 1
+
 typedef struct {
   struct ctimer retransmit_timer;
 } dtls_support_context_state_t;

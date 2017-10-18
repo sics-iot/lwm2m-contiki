@@ -42,6 +42,14 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#define DEBUG 1
+
+#if DEBUG
+#define PRINTF(X) printf(X)
+#else
+#define PRINTF(X)
+#endif
+
 static dtls_context_t the_dtls_context;
 static dtls_cipher_context_t cipher_context;
 static uint8_t lock_context = 0;
@@ -53,6 +61,7 @@ malloc_context(void)
     return NULL;
   }
   lock_context = 1;
+  PRINTF("DS: Allocated context\n");
   return &the_dtls_context;
 }
 /*---------------------------------------------------------------------------*/
@@ -210,6 +219,7 @@ dsrv_log(log_t level, char *format, ...)
   vprintf(format, ap);
   va_end(ap);
 }
+
 #endif /* HAVE_VPRINTF */
 /*---------------------------------------------------------------------------*/
 void
@@ -253,5 +263,6 @@ dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, s
 void
 dtls_support_init(void)
 {
+  dtls_info("dtls_support_init.\n");
 }
 /*---------------------------------------------------------------------------*/

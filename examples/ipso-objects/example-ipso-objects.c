@@ -38,6 +38,7 @@
 
 #include "contiki.h"
 #include "lwm2m-engine.h"
+#include "lwm2m-device.h"
 #include "lwm2m-rd-client.h"
 #include "ipso-objects.h"
 #include "ipso-sensor-template.h"
@@ -155,7 +156,11 @@ static const ipso_sensor_t bar_sensor = {
 
 
 #ifndef LWM2M_SERVER_ADDRESS
-#define LWM2M_SERVER_ADDRESS "coap://[fd02::1]"
+/* #define LWM2M_SERVER_ADDRESS "coap://[fd02::1]" */
+/* #define LWM2M_SERVER_ADDRESS "coap://[0::ffff:0527:53ce]" */
+#define LWM2M_SERVER_ADDRESS "coaps://[0::ffff:0527:53ce]"
+/* Acreo server at 194.28.123.244 */
+/* #define LWM2M_SERVER_ADDRESS "coap://[0::ffff:c21c:7bf4]" */
 #endif
 
 PROCESS(example_ipso_objects, "IPSO object example");
@@ -186,7 +191,6 @@ PROCESS_THREAD(example_ipso_objects, ev, data)
 
   PRINTF("Starting IPSO objects example Bootstrap:%d\n",
          REGISTER_WITH_LWM2M_BOOTSTRAP_SERVER);
-
   /* Initialize the OMA LWM2M engine */
   lwm2m_engine_init();
 

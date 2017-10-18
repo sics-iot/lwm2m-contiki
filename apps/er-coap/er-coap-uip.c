@@ -44,11 +44,13 @@
 #include "er-coap-endpoint.h"
 #include "er-coap-transport.h"
 #include "er-coap-transactions.h"
+#include "er-coap-constants.h"
+
 #if UIP_CONF_IPV6_RPL
 #include "net/rpl/rpl.h"
 #endif /* UIP_CONF_IPV6_RPL */
 
-#define DEBUG DEBUG_NONE
+#define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
 
 #if DEBUG
@@ -69,7 +71,8 @@
 #error "UIP_CONF_BUFFER_SIZE too small for REST_MAX_CHUNK_SIZE"
 #endif
 
-#define SERVER_LISTEN_PORT      UIP_HTONS(COAP_SERVER_PORT)
+#define SERVER_LISTEN_PORT        UIP_HTONS(COAP_DEFAULT_PORT)
+#define SERVER_LISTEN_SECURE_PORT UIP_HTONS(COAP_DEFAULT_SECURE_PORT)
 
 /* direct access into the buffer */
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
@@ -102,6 +105,11 @@ static struct uip_udp_conn *udp_conn = NULL;
 void
 coap_endpoint_print(const coap_endpoint_t *ep)
 {
+  if(ep->secure) {
+    printf("coaps:");
+  } else {
+    printf("coap:");
+  }
   printf("[");
   uip_debug_ipaddr_print(&ep->ipaddr);
   printf("]:%u", uip_ntohs(ep->port));
@@ -113,6 +121,11 @@ coap_endpoint_copy(coap_endpoint_t *destination,
 {
   uip_ipaddr_copy(&destination->ipaddr, &from->ipaddr);
   destination->port = from->port;
+  destination->secure = from->secure;
+
+  printf("EP copy: from sec:%d to sec:%d\n", from->secure,
+         destination->secure);
+
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -170,9 +183,12 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
        * Secure CoAP should use a different port but for now
        * the same port is used.
        */
-      ep->port = SERVER_LISTEN_PORT;
+      PRINTF("Using secure port (coaps)\n");
+      ep->port = SERVER_LISTEN_SECURE_PORT;
+      ep->secure = 1;
     } else {
       ep->port = SERVER_LISTEN_PORT;
+      ep->secure = 0;
     }
     return 1;
   } else {
@@ -232,12 +248,15 @@ int
 coap_endpoint_connect(coap_endpoint_t *ep)
 {
   if(ep->secure == 0) {
+    PRINTF("Connect - Non secure EP:");
+    PRINTEP(ep);
+    PRINTF("\n");
     return 1;
   }
 #if WITH_DTLS
-  PRINTF("DTLS EP:");
+  PRINTF("Connect - DTLS EP:");
   PRINTEP(ep);
-  PRINTF(" len:%d\n", ep->size);
+  PRINTF(" len:%d\n", sizeof(ep));
 
   /* setup all address info here... should be done to connect */
 
@@ -271,7 +290,8 @@ coap_transport_init(void)
 {
   process_start(&coap_engine, NULL);
 #if WITH_DTLS
-  //  dtls_set_log_level(8);
+  dtls_support_init();
+  dtls_set_log_level(8);
 #endif
 
 }
@@ -326,7 +346,7 @@ PROCESS_THREAD(coap_engine, ev, data)
 
 #if WITH_DTLS
   /* create new contet with app-data */
-  dtls_context = dtls_new_context(&udp_conn);
+  dtls_context = dtls_new_context(udp_conn);
   if (!dtls_context) {
     PRINTF("DTLS: cannot create context\n");
   }
