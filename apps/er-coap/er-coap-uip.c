@@ -51,6 +51,19 @@
 #define DEBUG DEBUG_NONE
 #include "net/ip/uip-debug.h"
 
+#if DEBUG
+#define PRINTEP(X) coap_endpoint_print(X)
+#else
+#define PRINTEP(X)
+#endif
+
+#if WITH_DTLS
+#include "tinydtls.h"
+#include "dtls.h"
+#include "dtls_debug.h"
+#endif /* WITH_DTLS */
+
+
 /* sanity check for configured values */
 #if COAP_MAX_PACKET_SIZE > (UIP_BUFSIZE - UIP_IPH_LEN - UIP_UDPH_LEN)
 #error "UIP_CONF_BUFFER_SIZE too small for REST_MAX_CHUNK_SIZE"
@@ -64,6 +77,22 @@
 #define UIP_UDP_BUF  ((struct uip_udp_hdr *)&uip_buf[uip_l2_l3_hdr_len])
 #else
 #define UIP_UDP_BUF  ((struct uip_udp_hdr *)&uip_buf[UIP_LLH_LEN + UIP_IPH_LEN])
+#endif
+
+#if WITH_DTLS
+#define PSK_DEFAULT_IDENTITY "Client_identity"
+#define PSK_DEFAULT_KEY      "secretPSK"
+
+static dtls_handler_t cb;
+static dtls_context_t *dtls_context = NULL;
+
+/* The PSK information for DTLS */
+#define PSK_ID_MAXLEN 256
+#define PSK_MAXLEN 256
+static unsigned char psk_id[PSK_ID_MAXLEN];
+static size_t psk_id_length = 0;
+static unsigned char psk_key[PSK_MAXLEN];
+static size_t psk_key_length = 0;
 #endif
 
 PROCESS(coap_engine, "CoAP Engine");
@@ -165,6 +194,12 @@ get_src_endpoint(void)
 }
 /*---------------------------------------------------------------------------*/
 int
+coap_endpoint_is_secure(const coap_endpoint_t *ep)
+{
+  return ep->secure;
+}
+/*---------------------------------------------------------------------------*/
+int
 coap_endpoint_is_connected(const coap_endpoint_t *ep)
 {
 #if UIP_CONF_IPV6_RPL
@@ -172,6 +207,22 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
     return 0;
   }
 #endif /* UIP_CONF_IPV6_RPL */
+#if WITH_DTLS
+  dtls_peer_t *peer;
+  peer = dtls_get_peer(dtls_context, ep);
+  if(peer != NULL) {
+    /* only if handshake is done! */
+    PRINTF("peer state for ");
+    PRINTEP(ep);
+    PRINTF(" is %d %d\n", peer->state, dtls_peer_is_connected(peer));
+    return dtls_peer_is_connected(peer);
+  } else {
+    PRINTF("Did not find peer ");
+    PRINTEP(ep);
+    PRINTF("\n");
+  }
+#endif /* WITH_DTLS */
+
 
   /* Assume connected */
   return 1;
@@ -180,7 +231,27 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
 int
 coap_endpoint_connect(coap_endpoint_t *ep)
 {
+  if(ep->secure == 0) {
+    return 1;
+  }
+#if WITH_DTLS
+  PRINTF("DTLS EP:");
+  PRINTEP(ep);
+  PRINTF(" len:%d\n", ep->size);
+
+  /* setup all address info here... should be done to connect */
+
+  dtls_connect(dtls_context, ep);
+#endif
   return 1;
+}
+/*---------------------------------------------------------------------------*/
+void
+coap_endpoint_disconnect(coap_endpoint_t *ep)
+{
+#if WITH_DTLS
+  dtls_close(dtls_context, ep);
+#endif /* WITH_DTLS */
 }
 /*---------------------------------------------------------------------------*/
 uint8_t *
@@ -199,6 +270,10 @@ void
 coap_transport_init(void)
 {
   process_start(&coap_engine, NULL);
+#if WITH_DTLS
+  //  dtls_set_log_level(8);
+#endif
+
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -209,7 +284,15 @@ process_data(void)
   PRINTF(":%u\n  Length: %u\n", uip_ntohs(UIP_UDP_BUF->srcport),
          uip_datalen());
 
+#if WITH_DTLS
+  /* DTLS receive??? */
+  /* last_source.secure = 1; */ /* TODO - what here? */
+  dtls_handle_message(dtls_context, (coap_endpoint_t *) get_src_endpoint(),
+                      uip_appdata, uip_datalen());
+#else
   coap_receive(get_src_endpoint(), uip_appdata, uip_datalen());
+#endif
+
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -219,8 +302,15 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data,
   if(ep == NULL) {
     PRINTF("failed to send - no endpoint\n");
   } else {
-    uip_udp_packet_sendto(udp_conn, data, length, &ep->ipaddr, ep->port);
 
+#if WITH_DTLS
+    if(coap_endpoint_is_secure(ep)) {
+      dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, length);
+      return;
+    }
+#endif
+
+    uip_udp_packet_sendto(udp_conn, data, length, &ep->ipaddr, ep->port);
     PRINTF("-sent UDP datagram (%u)-\n", length);
   }
 }
@@ -234,6 +324,24 @@ PROCESS_THREAD(coap_engine, ev, data)
   udp_bind(udp_conn, SERVER_LISTEN_PORT);
   PRINTF("Listening on port %u\n", uip_ntohs(udp_conn->lport));
 
+#if WITH_DTLS
+  /* create new contet with app-data */
+  dtls_context = dtls_new_context(&udp_conn);
+  if (!dtls_context) {
+    PRINTF("DTLS: cannot create context\n");
+  }
+
+#ifdef DTLS_PSK
+  psk_id_length = strlen(PSK_DEFAULT_IDENTITY);
+  psk_key_length = strlen(PSK_DEFAULT_KEY);
+  memcpy(psk_id, PSK_DEFAULT_IDENTITY, psk_id_length);
+  memcpy(psk_key, PSK_DEFAULT_KEY, psk_key_length);
+#endif /* DTLS_PSK */
+
+  dtls_set_handler(dtls_context, &cb);
+#endif
+
+
   while(1) {
     PROCESS_YIELD();
 
@@ -246,4 +354,112 @@ PROCESS_THREAD(coap_engine, ev, data)
 
   PROCESS_END();
 }
+/*---------------------------------------------------------------------------*/
+
+/* DTLS */
+#if WITH_DTLS
+
+/* This is input coming from the DTLS code - e.g. de-crypted input from
+   the other side - peer */
+static int
+input_from_peer(struct dtls_context_t *ctx,
+                session_t *session, uint8 *data, size_t len)
+{
+  size_t i;
+  dtls_peer_t *peer;
+
+  printf("received data:");
+  for (i = 0; i < len; i++)
+    printf("%c", data[i]);
+  printf("\nHex:");
+  for (i = 0; i < len; i++)
+    printf("%02x", data[i]);
+  printf("\n");
+
+  /* Send this into coap-input */
+  /* memmove(UIP_UDP_BUF, data, len); */
+  /* uip_len = len + 8 + 40; */
+
+  peer = dtls_get_peer(ctx, session);
+  /* If we have a peer then ensure that the endpoint is tagged as secure */
+  if(peer) {
+    session->secure = 1;
+  }
+
+  coap_receive(session, data, len);
+
+  return 0;
+}
+
+/* This is output from the DTLS code to be sent to peer (encrypted) */
+static int
+output_to_peer(struct dtls_context_t *ctx,
+               session_t *session, uint8 *data, size_t len)
+{
+  struct uip_udp_conn *udp_connection = (struct uip_udp_conn *) dtls_get_app_data(ctx);
+  printf("output_to_peer len:%d\n", (int)len);
+  uip_udp_packet_sendto(udp_connection, data, len,
+                        &session->ipaddr, session->port);
+  return len;
+}
+
+
+/* This function is the "key store" for tinyDTLS. It is called to
+ * retrieve a key for the given identity within this particular
+ * session. */
+static int
+get_psk_info(struct dtls_context_t *ctx,
+             const session_t *session,
+             dtls_credentials_type_t type,
+             const unsigned char *id, size_t id_len,
+             unsigned char *result, size_t result_length)
+{
+  PRINTF("---===>>> Getting the Key or ID <<<===---\n");
+  switch (type) {
+  case DTLS_PSK_IDENTITY:
+    if (id_len) {
+      PRINTF("got psk_identity_hint: '%.*s'\n", id_len, id);
+    }
+
+    if (result_length < psk_id_length) {
+      PRINTF("cannot set psk_identity -- buffer too small\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    memcpy(result, psk_id, psk_id_length);
+    return psk_id_length;
+  case DTLS_PSK_KEY:
+    if (id_len != psk_id_length || memcmp(psk_id, id, id_len) != 0) {
+      PRINTF("PSK for unknown id requested, exiting\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_ILLEGAL_PARAMETER);
+    } else if (result_length < psk_key_length) {
+      PRINTF("cannot set psk -- buffer too small\n");
+      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    memcpy(result, psk_key, psk_key_length);
+    return psk_key_length;
+  default:
+    PRINTF("unsupported request type: %d\n", type);
+  }
+
+  return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+}
+
+
+static dtls_handler_t cb = {
+  .write = output_to_peer,
+  .read  = input_from_peer,
+  .event = NULL,
+#ifdef DTLS_PSK
+  .get_psk_info = get_psk_info,
+#endif /* DTLS_PSK */
+#ifdef DTLS_ECC
+  /* .get_ecdsa_key = get_ecdsa_key, */
+  /* .verify_ecdsa_key = verify_ecdsa_key */
+#endif /* DTLS_ECC */
+};
+
+#endif /* WITH_DTLS */
+
 /*---------------------------------------------------------------------------*/

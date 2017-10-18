@@ -47,6 +47,7 @@
 typedef struct {
   uip_ipaddr_t ipaddr;
   uint16_t port;
+  uint8_t secure;
 } coap_endpoint_t;
 #endif /* COAP_ENDPOINT_CUSTOM */
 
