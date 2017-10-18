@@ -80,7 +80,7 @@ static dtls_cipher_context_t cipher_context;
 #define UNLOCK(P) pthread_mutex_unlock(P)
 
 dtls_cipher_context_t *
-dtls_cipher_context_aquire(void)
+dtls_cipher_context_acquire(void)
 {
   LOCK(&cipher_context_mutex);
   return &cipher_context;
