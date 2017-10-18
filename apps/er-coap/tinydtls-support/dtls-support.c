@@ -161,6 +161,18 @@ int dtls_session_get_address_size(const session_t *a)
   return sizeof(session_t);
 }
 /*---------------------------------------------------------------------------*/
+size_t
+dsrv_print_addr(const session_t *addr, char *buf, size_t len)
+{
+  if(len > 1) {
+    /* TODO print endpoint */
+    buf[0] = '[';
+    buf[1] = ']';
+    return 2;
+  }
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
 void
 dtls_support_init(void)
 {

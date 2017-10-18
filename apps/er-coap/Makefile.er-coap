@@ -19,7 +19,7 @@ ifeq ($(MAKE_WITH_DTLS),1)
 
  EXTERNALDIRS += $(TINYDTLS_DIR) $(TINYDTLS_DIR)/aes $(TINYDTLS_DIR)/sha2 $(TINYDTLS_DIR)/ecc
 
- CONTIKI_SOURCEFILES += dtls.c dtls-crypto.c dtls-hmac.c \
-	rijndael.c sha2.c dtls-ccm.c netq.c ecc.c dtls-peer.c
+ CONTIKI_SOURCEFILES += dtls.c dtls-crypto.c dtls-hmac.c dtls-ccm.c \
+	rijndael.c sha2.c netq.c ecc.c dtls-peer.c dtls_debug.c
 
 endif
