@@ -37,7 +37,10 @@
  */
 
 #include "dtls-support.h"
+#include "dtls_debug.h"
 #include "lib/random.h"
+#include <stdio.h>
+#include <stdarg.h>
 
 static dtls_context_t the_dtls_context;
 static dtls_cipher_context_t cipher_context;
@@ -161,6 +164,12 @@ int dtls_session_get_address_size(const session_t *a)
   return sizeof(session_t);
 }
 /*---------------------------------------------------------------------------*/
+void
+dtls_session_print(const session_t *a)
+{
+  coap_endpoint_print((const coap_endpoint_t *)a);
+}
+/*---------------------------------------------------------------------------*/
 size_t
 dsrv_print_addr(const session_t *addr, char *buf, size_t len)
 {
@@ -171,6 +180,74 @@ dsrv_print_addr(const session_t *addr, char *buf, size_t len)
     return 2;
   }
   return 0;
+}
+/*---------------------------------------------------------------------------*/
+extern char *loglevels[];
+static inline size_t
+print_timestamp(log_t level)
+{
+  dtls_tick_t now;
+  dtls_ticks(&now);
+  if(level <= DTLS_LOG_DEBUG) {
+    printf("%s ", loglevels[level]);
+  }
+  return printf("%5lu ", (unsigned long)now);
+}
+/*---------------------------------------------------------------------------*/
+#ifdef HAVE_VPRINTF
+void
+dsrv_log(log_t level, char *format, ...)
+{
+  va_list ap;
+
+  if(dtls_get_log_level() < level) {
+    return;
+  }
+
+  print_timestamp(level);
+
+  va_start(ap, format);
+  vprintf(format, ap);
+  va_end(ap);
+}
+#endif /* HAVE_VPRINTF */
+/*---------------------------------------------------------------------------*/
+void
+dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, size_t length, int extend)
+{
+  int n = 0;
+
+  if(dtls_get_log_level() < level) {
+    return;
+  }
+
+  print_timestamp(level);
+
+  if(extend) {
+    printf("%s: (%zu bytes):\n", name, length);
+
+    while(length--) {
+      if(n % 16 == 0) {
+        printf("%08X ", n);
+      }
+      printf("%02X ", *buf++);
+
+      n++;
+      if(n % 8 == 0) {
+	if(n % 16 == 0) {
+	  printf("\n");
+	} else {
+	  printf(" ");
+        }
+      }
+    }
+  } else {
+    printf("%s: (%zu bytes): ", name, length);
+    while(length--) {
+      printf("%02X", *buf++);
+    }
+  }
+  printf("\n");
 }
 /*---------------------------------------------------------------------------*/
 void
