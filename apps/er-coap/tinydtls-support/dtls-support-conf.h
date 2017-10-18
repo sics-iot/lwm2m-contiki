@@ -1,6 +1,8 @@
 #ifndef DTLS_SUPPORT_CONF_H_
 #define DTLS_SUPPORT_CONF_H_
 
+#undef HAVE_VPRINTF
+
 #include "er-coap-endpoint.h"
 
 typedef coap_endpoint_t session_t;
