@@ -49,6 +49,9 @@
 #include "dev/soc-adc.h"
 #include "dev/sys-ctrl.h"
 #include "reg.h"
+
+static uint8_t random_init_done = 0;
+
 /*---------------------------------------------------------------------------*/
 /**
  * \brief      Generates a new random number using the cc2538 RNG.
@@ -80,11 +83,17 @@ random_rand(void)
  *             in normal operation. If it is absolutely necessary to do so, the
  *             radio will need re-initialised.
  */
+
 void
 random_init(unsigned short seed)
 {
   int i;
   unsigned short s = 0;
+
+  /* not more than once! - it will mess up the radio... */
+  if(random_init_done > 0) return;
+
+  random_init_done = 1;
 
   /* Make sure the RNG is on */
   REG(SOC_ADC_ADCCON1) &= ~(SOC_ADC_ADCCON1_RCTRL1 | SOC_ADC_ADCCON1_RCTRL0);
