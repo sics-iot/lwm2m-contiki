@@ -30,6 +30,9 @@
 #ifndef PROJECT_CONF_H_
 #define PROJECT_CONF_H_
 
+/* No sleep on CC2538 to enable full 32 KiB RAM */
+#define LPM_CONF_ENABLE 0
+
 #ifdef BOARD_STRING
 #define LWM2M_DEVICE_MODEL_NUMBER BOARD_STRING
 #elif defined(CONTIKI_TARGET_WISMOTE)
