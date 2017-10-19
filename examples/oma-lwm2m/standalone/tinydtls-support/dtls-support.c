@@ -217,39 +217,18 @@ dtls_ticks(dtls_tick_t *t)
 }
 /*---------------------------------------------------------------------------*/
 int
-dtls_get_random(unsigned long *rand)
-{
-  FILE *urandom = fopen("/dev/urandom", "r");
-  unsigned char buf[sizeof(unsigned long)];
-
-  if (!urandom) {
-    dtls_emerg("cannot initialize PRNG\n");
-    return 0;
-  }
-
-  if (fread(buf, 1, sizeof(buf), urandom) != sizeof(buf)) {
-    dtls_emerg("cannot initialize PRNG\n");
-    return 0;
-  }
-
-  fclose(urandom);
-
-  *rand = (unsigned long)*buf;
-  return 1;
-}
-
-int
-dtls_fill_random(unsigned char *buf, size_t len)
+dtls_fill_random(uint8_t *buf, size_t len)
 {
   FILE *urandom = fopen("/dev/urandom", "r");
 
-  if (!urandom) {
+  if(!urandom) {
     dtls_emerg("cannot initialize PRNG\n");
     return 0;
   }
 
-  if (fread(buf, 1, len, urandom) != len) {
+  if(fread(buf, 1, len, urandom) != len) {
     dtls_emerg("cannot initialize PRNG\n");
+    fclose(urandom);
     return 0;
   }
 

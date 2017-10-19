@@ -91,15 +91,12 @@ dtls_ticks(dtls_tick_t *t)
 }
 /*---------------------------------------------------------------------------*/
 int
-dtls_get_random(unsigned long *result)
+dtls_fill_random(uint8_t *buf, size_t len)
 {
-  uint8_t *ptr;
   int i;
-  ptr = (uint8_t *)result;
-
-  if(ptr) {
-    for(i = 0; i < sizeof(unsigned long); i++) {
-      ptr[i] = random_rand() & 0xff;
+  if(buf) {
+    for(i = 0; i < len; i++) {
+      buf[i] = random_rand() & 0xff;
     }
     return 1;
   }
