@@ -416,7 +416,7 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
    the other side - peer */
 static int
 input_from_peer(struct dtls_context_t *ctx,
-                session_t *session, uint8 *data, size_t len)
+                session_t *session, uint8_t *data, size_t len)
 {
   size_t i;
   dtls_peer_t *peer;
@@ -447,7 +447,7 @@ input_from_peer(struct dtls_context_t *ctx,
 /* This is output from the DTLS code to be sent to peer (encrypted) */
 static int
 output_to_peer(struct dtls_context_t *ctx,
-               session_t *session, uint8 *data, size_t len)
+               session_t *session, uint8_t *data, size_t len)
 {
   int fd = *(int *)dtls_get_app_data(ctx);
   printf("output_to_peer len:%d %d (s-size: %d)\n", (int)len, fd,

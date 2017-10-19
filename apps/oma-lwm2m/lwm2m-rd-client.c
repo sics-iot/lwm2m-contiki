@@ -162,7 +162,7 @@ prepare_update(coap_packet_t *request, int triggered) {
   coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
   coap_set_header_uri_path(request, session_info.assigned_ep);
 
-  snprintf(query_data, sizeof(query_data) - 1, "?lt=%d", session_info.lifetime);
+  snprintf(query_data, sizeof(query_data) - 1, "?lt=%d&b=%s", session_info.lifetime, session_info.binding);
   PRINTF("UPDATE:%s %s\n", session_info.assigned_ep, query_data);
   coap_set_header_uri_query(request, query_data);
 
@@ -530,11 +530,7 @@ periodic_process(coap_timer_t *timer)
   switch(rd_state) {
   case INIT:
     PRINTF("RD Client started with endpoint '%s' and client lifetime %d\n", session_info.ep, session_info.lifetime);
-    if(coap_endpoint_connect(&session_info.server_ep)) {
-      rd_state = WAIT_NETWORK;
-    } else {
-      PRINTF("Failed to connect... trying again...\n");
-    }
+    rd_state = WAIT_NETWORK;
     break;
   case WAIT_NETWORK:
     if(now > wait_until_network_check) {
@@ -636,7 +632,8 @@ periodic_process(coap_timer_t *timer)
     break;
   case DO_REGISTRATION:
     if(!coap_endpoint_is_connected(&session_info.server_ep)) {
-      /* Not connected... wait a bit... */
+      /* Not connected... wait a bit... and retry connection */
+      coap_endpoint_connect(&session_info.server_ep);
       PRINTF("Wait until connected... \n");
       return;
     }
@@ -648,7 +645,7 @@ periodic_process(coap_timer_t *timer)
       coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
       coap_set_header_uri_path(request, "/rd");
 
-      snprintf(query_data, sizeof(query_data) - 1, "?ep=%s&lt=%d", session_info.ep, session_info.lifetime);
+      snprintf(query_data, sizeof(query_data) - 1, "?ep=%s&lt=%d&b=%s", session_info.ep, session_info.lifetime, session_info.binding);
       coap_set_header_uri_query(request, query_data);
 
       len = set_rd_data(request);
@@ -713,6 +710,8 @@ void
 lwm2m_rd_client_init(const char *ep)
 {
   session_info.ep = ep;
+  /* default binding U = UDP, UQ = UDP Q-mode*/
+  session_info.binding = "U";
   if(session_info.lifetime == 0) {
     session_info.lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME;
   }

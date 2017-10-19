@@ -239,7 +239,6 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
   }
 #endif /* WITH_DTLS */
 
-
   /* Assume connected */
   return 1;
 }

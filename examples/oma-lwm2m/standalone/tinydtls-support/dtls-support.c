@@ -237,6 +237,27 @@ dtls_get_random(unsigned long *rand)
   *rand = (unsigned long)*buf;
   return 1;
 }
+
+int
+dtls_fill_random(unsigned char *buf, size_t len)
+{
+  FILE *urandom = fopen("/dev/urandom", "r");
+
+  if (!urandom) {
+    dtls_emerg("cannot initialize PRNG\n");
+    return 0;
+  }
+
+  if (fread(buf, 1, len, urandom) != len) {
+    dtls_emerg("cannot initialize PRNG\n");
+    return 0;
+  }
+
+  fclose(urandom);
+
+  return 1;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 dtls_set_retransmit_timer(dtls_context_t *ctx, unsigned int timeout)

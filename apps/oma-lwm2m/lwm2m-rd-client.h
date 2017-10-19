@@ -68,6 +68,7 @@ void lwm2m_rd_client_set_session_callback(session_callback_t cb);
 /*---------------------------------------------------------------------------*/
 struct lwm2m_session_info {
   const char *ep;
+  const char *binding;
   char assigned_ep[LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN];
   uint16_t lifetime;
   coap_endpoint_t bs_server_ep;
