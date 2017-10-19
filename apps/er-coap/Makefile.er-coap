@@ -8,18 +8,13 @@ MAKE_WITH_DTLS ?= 0
 
 ifeq ($(MAKE_WITH_DTLS),1)
 
- TINYDTLS_DIR = $(CONTIKI)/lib/tinydtls
- ifeq (${wildcard $(TINYDTLS_DIR)/Makefile},)
+ ifeq (${wildcard $(CONTIKI)/lib/tinydtls/Makefile},)
   ${error Could not find the tinyDTLS submodule. Please run "git submodule update --init" and try again}
  endif
 
  CFLAGS += -DWITH_DTLS=1
 
  MODULES += apps/er-coap/tinydtls-support
-
- EXTERNALDIRS += $(TINYDTLS_DIR) $(TINYDTLS_DIR)/aes $(TINYDTLS_DIR)/sha2 $(TINYDTLS_DIR)/ecc
-
- CONTIKI_SOURCEFILES += dtls.c dtls-crypto.c dtls-hmac.c dtls-ccm.c \
-	rijndael.c sha2.c netq.c ecc.c dtls-peer.c dtls_debug.c
+ MODULES += lib/tinydtls ${addprefix lib/tinydtls/,aes sha2 ecc}
 
 endif
