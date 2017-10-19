@@ -29,22 +29,22 @@
 
 /**
  * \file
- *         Network timer API.
+ *         CoAP timer API.
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef NTIMER_H_
-#define NTIMER_H_
+#ifndef COAP_TIMER_H_
+#define COAP_TIMER_H_
 
 #include "contiki-conf.h"
 #include <stdint.h>
 
-typedef struct ntimer ntimer_t;
-struct ntimer {
-  ntimer_t *next;
-  void (* callback)(ntimer_t *);
+typedef struct coap_timer coap_timer_t;
+struct coap_timer {
+  coap_timer_t *next;
+  void (* callback)(coap_timer_t *);
   void *user_data;
   uint64_t expiration_time;
 };
@@ -53,87 +53,87 @@ typedef struct {
   void     (* init)(void);
   uint64_t (* uptime)(void);
   void     (* update)(void);
-} ntimer_driver_t;
+} coap_timer_driver_t;
 
-#ifndef NTIMER_DRIVER
-#ifdef NTIMER_CONF_DRIVER
-#define NTIMER_DRIVER NTIMER_CONF_DRIVER
-#else /* NTIMER_CONF_DRIVER */
-#define NTIMER_DRIVER ntimer_default_driver
-#endif /* NTIMER_CONF_DRIVER */
-#endif /* NTIMER_DRIVER */
+#ifndef COAP_TIMER_DRIVER
+#ifdef COAP_TIMER_CONF_DRIVER
+#define COAP_TIMER_DRIVER COAP_TIMER_CONF_DRIVER
+#else /* COAP_TIMER_CONF_DRIVER */
+#define COAP_TIMER_DRIVER coap_timer_default_driver
+#endif /* COAP_TIMER_CONF_DRIVER */
+#endif /* COAP_TIMER_DRIVER */
 
-extern const ntimer_driver_t NTIMER_DRIVER;
+extern const coap_timer_driver_t COAP_TIMER_DRIVER;
 
 /*
  * milliseconds since boot
  */
 static inline uint64_t
-ntimer_uptime(void)
+coap_timer_uptime(void)
 {
-  return NTIMER_DRIVER.uptime();
+  return COAP_TIMER_DRIVER.uptime();
 }
 
 /*
  * seconds since boot
  */
 static inline uint32_t
-ntimer_seconds(void)
+coap_timer_seconds(void)
 {
-  return (uint32_t)(NTIMER_DRIVER.uptime() / 1000);
+  return (uint32_t)(COAP_TIMER_DRIVER.uptime() / 1000);
 }
 
 static inline void
-ntimer_set_callback(ntimer_t *timer, void (* callback)(ntimer_t *))
+coap_timer_set_callback(coap_timer_t *timer, void (* callback)(coap_timer_t *))
 {
   timer->callback = callback;
 }
 
 static inline void *
-ntimer_get_user_data(ntimer_t *timer)
+coap_timer_get_user_data(coap_timer_t *timer)
 {
   return timer->user_data;
 }
 
 static inline void
-ntimer_set_user_data(ntimer_t *timer, void *data)
+coap_timer_set_user_data(coap_timer_t *timer, void *data)
 {
   timer->user_data = data;
 }
 
 static inline int
-ntimer_expired(const ntimer_t *timer)
+coap_timer_expired(const coap_timer_t *timer)
 {
-  return timer->expiration_time <= ntimer_uptime();
+  return timer->expiration_time <= coap_timer_uptime();
 }
 
-void ntimer_stop(ntimer_t *timer);
+void coap_timer_stop(coap_timer_t *timer);
 
-void ntimer_set(ntimer_t *timer, uint64_t time);
+void coap_timer_set(coap_timer_t *timer, uint64_t time);
 
 /**
- * Set the ntimer to expire the specified time after the previous
+ * Set the CoAP timer to expire the specified time after the previous
  * expiration time. If the new expiration time has already passed, the
  * timer will expire as soon as possible.
  *
  * If the timer has not yet expired when this function is called, the
  * time until the timer expires will be extended by the specified time.
  */
-void ntimer_reset(ntimer_t *timer, uint64_t time);
+void coap_timer_reset(coap_timer_t *timer, uint64_t time);
 
 /**
  * Returns the time until next timer expires or 0 if there already
  * exists expired timers that have not yet been processed.
  * Returns a time in the future if there are no timers pending.
  */
-uint64_t ntimer_time_to_next_expiration(void);
+uint64_t coap_timer_time_to_next_expiration(void);
 
 /**
- * Must be called periodically to process any expired ntimers.
+ * Must be called periodically to process any expired CoAP timers.
  * Returns non-zero if it needs to run again to process more timers.
  */
-int ntimer_run(void);
+int coap_timer_run(void);
 
-void ntimer_init(void);
+void coap_timer_init(void);
 
-#endif /* NTIMER_H_ */
+#endif /* COAP_TIMER_H_ */

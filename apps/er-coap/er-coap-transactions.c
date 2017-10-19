@@ -38,7 +38,7 @@
 
 #include "er-coap-transactions.h"
 #include "er-coap-observe.h"
-#include "sys/ntimer.h"
+#include "coap-timer.h"
 #include "lib/memb.h"
 #include "lib/list.h"
 #include <stdlib.h>
@@ -59,11 +59,11 @@ LIST(transactions_list);
 
 /*---------------------------------------------------------------------------*/
 static void
-coap_retransmit_transaction(ntimer_t *nt)
+coap_retransmit_transaction(coap_timer_t *nt)
 {
-  coap_transaction_t *t = ntimer_get_user_data(nt);
+  coap_transaction_t *t = coap_timer_get_user_data(nt);
   if(t == NULL) {
-    PRINTF("No retransmission data in ntimer!\n");
+    PRINTF("No retransmission data in coap_timer!\n");
     return;
   }
   ++(t->retrans_counter);
@@ -107,8 +107,8 @@ coap_send_transaction(coap_transaction_t *t)
       PRINTF("Keeping transaction %u\n", t->mid);
 
       if(t->retrans_counter == 0) {
-        ntimer_set_callback(&t->retrans_timer, coap_retransmit_transaction);
-        ntimer_set_user_data(&t->retrans_timer, t);
+        coap_timer_set_callback(&t->retrans_timer, coap_retransmit_transaction);
+        coap_timer_set_user_data(&t->retrans_timer, t);
         t->retrans_interval =
           COAP_RESPONSE_TIMEOUT_TICKS + (rand() %
                                          COAP_RESPONSE_TIMEOUT_BACKOFF_MASK);
@@ -121,7 +121,7 @@ coap_send_transaction(coap_transaction_t *t)
       }
 
       /* interval updated above */
-      ntimer_set(&t->retrans_timer, t->retrans_interval);
+      coap_timer_set(&t->retrans_timer, t->retrans_interval);
     } else {
       /* timed out */
       PRINTF("Timeout\n");
@@ -148,11 +148,12 @@ coap_clear_transaction(coap_transaction_t *t)
   if(t) {
     PRINTF("Freeing transaction %u: %p\n", t->mid, t);
 
-    ntimer_stop(&t->retrans_timer);
+    coap_timer_stop(&t->retrans_timer);
     list_remove(transactions_list, t);
     memb_free(&transactions_memb, t);
   }
 }
+/*---------------------------------------------------------------------------*/
 coap_transaction_t *
 coap_get_transaction_by_mid(uint16_t mid)
 {
@@ -166,3 +167,4 @@ coap_get_transaction_by_mid(uint16_t mid)
   }
   return NULL;
 }
+/*---------------------------------------------------------------------------*/

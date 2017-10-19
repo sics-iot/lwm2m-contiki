@@ -46,7 +46,7 @@
 
 typedef struct coap_observable {
   uint32_t observe_clock;
-  ntimer_t orphan_timer;
+  coap_timer_t orphan_timer;
   list_t observers;
   coap_packet_t notification;
   uint8_t buffer[COAP_MAX_PACKET_SIZE + 1];
@@ -63,7 +63,7 @@ typedef struct coap_observer {
 
   int32_t obs_counter;
 
-  ntimer_t retrans_timer;
+  coap_timer_t retrans_timer;
   uint8_t retrans_counter;
 } coap_observer_t;
 

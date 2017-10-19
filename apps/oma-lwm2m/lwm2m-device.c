@@ -101,13 +101,13 @@ static uint16_t power_current[] = LWM2M_DEVICE_POWER_CURRENT;
 int32_t
 lwm2m_device_get_time(void)
 {
-  return ntimer_seconds() + time_offset;
+  return coap_timer_seconds() + time_offset;
 }
 /*---------------------------------------------------------------------------*/
 void
 lwm2m_device_set_time(int32_t time)
 {
-  time_offset = time - ntimer_seconds();
+  time_offset = time - coap_timer_seconds();
 }
 /*---------------------------------------------------------------------------*/
 static lwm2m_status_t

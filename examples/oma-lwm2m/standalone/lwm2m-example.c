@@ -36,7 +36,6 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include "sys/ntimer.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
 #include "lwm2m-firmware.h"
@@ -44,6 +43,7 @@
 #include "lwm2m-security.h"
 #include "lwm2m-device.h"
 #include "er-coap.h"
+#include "coap-timer.h"
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
@@ -61,11 +61,11 @@ int deregister = -1;
 /*---------------------------------------------------------------------------*/
 #if WITH_TEST_NOTIFICATION
 static void
-callback(ntimer_t *timer)
+callback(coap_timer_t *timer)
 {
   /* Automatic notification on device timer for test!*/
   lwm2m_notify_observers("3/0/13");
-  ntimer_reset(timer, 10000);
+  coap_timer_reset(timer, 10000);
   if(deregister > 0) {
     deregister--;
     if(deregister == 0) {
@@ -117,9 +117,9 @@ start_application(int argc, char *argv[])
   /* Example using network timer */
 #if WITH_TEST_NOTIFICATION
   {
-    static ntimer_t nt;
-    ntimer_set_callback(&nt, callback);
-    ntimer_set(&nt, 10000);
+    static coap_timer_t nt;
+    coap_timer_set_callback(&nt, callback);
+    coap_timer_set(&nt, 10000);
   }
 #endif /* WITH_TEST_NOTIFICATION */
 

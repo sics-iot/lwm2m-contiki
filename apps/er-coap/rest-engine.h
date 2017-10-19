@@ -41,7 +41,7 @@
 #define REST_ENGINE_H_
 
 #include <stdio.h>
-#include "sys/ntimer.h"
+#include "coap-timer.h"
 #include "lib/list.h"
 #include "rest-constants.h"
 
@@ -92,7 +92,7 @@ struct resource_s {
 
 struct periodic_resource_s {
   uint32_t period;
-  ntimer_t periodic_timer;
+  coap_timer_t periodic_timer;
   const restful_periodic_handler periodic_handler;
 };
 

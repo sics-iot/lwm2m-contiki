@@ -390,7 +390,7 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
   /* pick size from outbuf */
   int maxsize = outbuf->size;
 
-  if(lwm2m_buf_lock[0] != 0 && (lwm2m_buf_lock_timeout > ntimer_uptime()) &&
+  if(lwm2m_buf_lock[0] != 0 && (lwm2m_buf_lock_timeout > coap_timer_uptime()) &&
      ((lwm2m_buf_lock[1] != 0xffff) ||
       (lwm2m_buf_lock[2] != 0xffff))) {
     PRINTF("Set-RD: already exporting resource: %d/%d/%d\n",
@@ -425,7 +425,7 @@ lwm2m_engine_set_rd_data(lwm2m_buffer_t *outbuf, int block)
     /* object and instance was static... */
   }
 
-  lwm2m_buf_lock_timeout = ntimer_uptime() + 1000;
+  lwm2m_buf_lock_timeout = coap_timer_uptime() + 1000;
 
   PRINTF("Generating RD list:");
   while(instance != NULL || object != NULL) {
@@ -650,7 +650,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
 
   /* Currently we only handle one incoming read request at a time - so we return
      BUZY or service unavailable */
-  if(lwm2m_buf_lock[0] != 0 && (lwm2m_buf_lock_timeout > ntimer_uptime()) &&
+  if(lwm2m_buf_lock[0] != 0 && (lwm2m_buf_lock_timeout > coap_timer_uptime()) &&
      ((lwm2m_buf_lock[1] != ctx->object_id) ||
       (lwm2m_buf_lock[2] != ctx->object_instance_id) ||
       (lwm2m_buf_lock[3] != ctx->resource_id))) {
@@ -691,7 +691,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
       ctx->outbuf->buffer[0] = ' ';
     }
   }
-  lwm2m_buf_lock_timeout = ntimer_uptime() + 1000;
+  lwm2m_buf_lock_timeout = coap_timer_uptime() + 1000;
 
   while(instance != NULL) {
     /* Do the discovery or read */

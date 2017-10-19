@@ -39,7 +39,7 @@
 
 #include <string.h>
 #include <stdio.h>
-#include "sys/ntimer.h"
+#include "coap-timer.h"
 #include "lib/list.h"
 #include "rest-engine.h"
 
@@ -55,7 +55,7 @@
 #define PRINTLLADDR(addr)
 #endif
 
-static void process_callback(ntimer_t *t);
+static void process_callback(coap_timer_t *t);
 
 /*---------------------------------------------------------------------------*/
 LIST(restful_services);
@@ -117,9 +117,9 @@ rest_activate_resource(resource_t *resource, const char *path)
            resource->periodic->resource->url);
     list_add(restful_periodic_services, resource->periodic);
     periodic = resource->periodic;
-    ntimer_set_callback(&periodic->periodic_timer, process_callback);
-    ntimer_set_user_data(&periodic->periodic_timer, resource);
-    ntimer_set(&periodic->periodic_timer, periodic->period);
+    coap_timer_set_callback(&periodic->periodic_timer, process_callback);
+    coap_timer_set_user_data(&periodic->periodic_timer, resource);
+    coap_timer_set(&periodic->periodic_timer, periodic->period);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -193,10 +193,10 @@ rest_invoke_restful_service(void *request, void *response, uint8_t *buffer,
 /*---------------------------------------------------------------------------*/
 /* This callback occurs when t is expired */
 static void
-process_callback(ntimer_t *t)
+process_callback(coap_timer_t *t)
 {
   resource_t *resource;
-  resource = ntimer_get_user_data(t);
+  resource = coap_timer_get_user_data(t);
   if(resource != NULL && (resource->flags & IS_PERIODIC)
      && resource->periodic != NULL && resource->periodic->period) {
     PRINTF("Periodic: timer expired for /%s (period: %lu)\n",
@@ -209,7 +209,7 @@ process_callback(ntimer_t *t)
       resource->periodic->periodic_handler();
     }
 
-    ntimer_set(t, resource->periodic->period);
+    coap_timer_set(t, resource->periodic->period);
   }
 }
 /*---------------------------------------------------------------------------*/

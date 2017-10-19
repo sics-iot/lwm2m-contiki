@@ -68,7 +68,7 @@ static void update_last_value(ipso_sensor_value_t *sval, int32_t value,
                               uint8_t notify);
 /*---------------------------------------------------------------------------*/
 static int init = 0;
-static ntimer_t nt;
+static coap_timer_t nt;
 
 /* Currently support max 4 periodic sensors */
 #define MAX_PERIODIC 4
@@ -78,10 +78,10 @@ struct periodic_sensor {
 } periodics[MAX_PERIODIC];
 
 static void
-timer_callback(ntimer_t *timer)
+timer_callback(coap_timer_t *timer)
 {
   int i;
-  ntimer_reset(timer, 1000);
+  coap_timer_reset(timer, 1000);
 
   for(i = 0; i < MAX_PERIODIC; i++) {
     if(periodics[i].value != NULL) {
@@ -205,8 +205,8 @@ ipso_sensor_add(const ipso_sensor_t *sensor)
 {
   if(sensor->update_interval > 0) {
     if(init == 0) {
-      ntimer_set_callback(&nt, timer_callback);
-      ntimer_set(&nt, 1000);
+      coap_timer_set_callback(&nt, timer_callback);
+      coap_timer_set(&nt, 1000);
       init = 1;
     }
     add_periodic(sensor);

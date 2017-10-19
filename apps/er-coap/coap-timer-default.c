@@ -29,16 +29,18 @@
 
 /**
  * \file
- *         Example posix implementation of ntimer driver.
+ *         CoAP timer driver implementation based on Contiki etimers
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include "sys/ntimer.h"
-#include <sys/time.h>
+#include "coap-timer.h"
+#include "sys/clock.h"
+#include "sys/etimer.h"
+#include "sys/process.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -46,59 +48,82 @@
 #define PRINTF(...)
 #endif
 
-/* The maximal time allowed to move forward between updates */
-#define MAX_TIME_CHANGE_MSEC 360000UL
+PROCESS(coap_timer_process, "coap timer process");
 
-static uint64_t uptime_msec = 0;
-static uint64_t last_msec;
+static uint64_t current_time;
+static struct etimer timer;
+/*---------------------------------------------------------------------------*/
+static void
+update_timer(void)
+{
+  uint64_t remaining;
+  remaining = coap_timer_time_to_next_expiration();
+  PRINTF("coap-timer-default: remaining %lu msec\n", (unsigned long)remaining);
+  if(remaining == 0) {
+    /* Run as soon as possible */
+    process_poll(&coap_timer_process);
+  } else {
+    remaining *= CLOCK_SECOND;
+    remaining /= 1000;
+    if(remaining > CLOCK_SECOND * 60) {
+      /* Make sure the CoAP timer clock is updated at least once per minute */
+      remaining = CLOCK_SECOND * 60;
+    } else if(remaining < 1) {
+      /* Wait minimum one system clock tick */
+      remaining = 1;
+    }
+    etimer_set(&timer, (clock_time_t)remaining);
+  }
+}
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(coap_timer_process, ev, data)
+{
+  PROCESS_BEGIN();
+
+  etimer_set(&timer, CLOCK_SECOND);
+  while(1) {
+    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER ||
+                             ev == PROCESS_EVENT_POLL);
+
+    if(coap_timer_run()) {
+      /* Needs to run again */
+      process_poll(&coap_timer_process);
+    } else {
+      update_timer();
+    }
+  }
+  PROCESS_END();
+}
 /*---------------------------------------------------------------------------*/
 static uint64_t
 uptime(void)
 {
-  struct timeval tv;
-  uint64_t t;
+  static clock_time_t last;
+  clock_time_t now;
+  uint64_t diff;
 
-  if(gettimeofday(&tv, NULL)) {
-    PRINTF("*** failed to retrieve system time\n");
-    return last_msec;
+  now = clock_time();
+  diff = (clock_time_t)(now - last);
+  if(diff > 0) {
+    current_time += (diff * 1000) / CLOCK_SECOND;
+    last = now;
   }
-
-  t = tv.tv_sec * (uint64_t)1000;
-  t += tv.tv_usec / (uint64_t)1000;
-
-  if(last_msec == 0) {
-    /* No update first time */
-  } else if(t < last_msec) {
-    /* System time has moved backwards */
-    PRINTF("*** system time has moved backwards %lu msec\n",
-           (unsigned long)(last_msec - t));
-
-  } else if(t - last_msec > MAX_TIME_CHANGE_MSEC) {
-    /* Too large jump forward in system time */
-    PRINTF("*** system time has moved forward %lu msec\n",
-           (unsigned long)(t - last_msec));
-    uptime_msec += 1000UL;
-  } else {
-    uptime_msec += t - last_msec;
-  }
-
-  last_msec = t;
-
-  return uptime_msec;
+  return current_time;
 }
 /*---------------------------------------------------------------------------*/
 static void
 init(void)
 {
-  uptime();
+  process_start(&coap_timer_process, NULL);
 }
 /*---------------------------------------------------------------------------*/
 static void
 update(void)
 {
+  process_poll(&coap_timer_process);
 }
 /*---------------------------------------------------------------------------*/
-const ntimer_driver_t ntimer_native_driver = {
+const coap_timer_driver_t coap_timer_default_driver = {
   .init = init,
   .uptime = uptime,
   .update = update,

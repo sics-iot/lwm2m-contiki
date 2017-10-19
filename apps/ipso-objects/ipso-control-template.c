@@ -44,7 +44,7 @@
  */
 #include "ipso-control-template.h"
 #include "lwm2m-engine.h"
-#include "sys/ntimer.h"
+#include "coap-timer.h"
 #include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
@@ -91,7 +91,8 @@ ipso_control_set_value(ipso_control_t *control, uint8_t value)
       status = control->set_value(0);
       if(status == LWM2M_STATUS_OK) {
         control->value &= 0x7f;
-        control->on_time += (ntimer_uptime() - control->last_on_time) / 1000;
+        control->on_time +=
+          (coap_timer_uptime() - control->last_on_time) / 1000;
       }
     }
   } else {
@@ -106,7 +107,7 @@ ipso_control_set_value(ipso_control_t *control, uint8_t value)
       if(status == LWM2M_STATUS_OK) {
         control->value = value;
         if(! was_on) {
-          control->last_on_time = ntimer_uptime();
+          control->last_on_time = coap_timer_uptime();
         }
       }
     }
@@ -134,7 +135,7 @@ lwm2m_callback(lwm2m_object_instance_t *object, lwm2m_context_t *ctx)
     case IPSO_ON_TIME:
       v = control->on_time;
       if(ipso_control_is_on(control)) {
-        v += (ntimer_uptime() - control->last_on_time) / 1000;
+        v += (coap_timer_uptime() - control->last_on_time) / 1000;
       }
       printf("ON-TIME: %"PRId32"   (last on: %"PRIu32"\n", v, control->on_time);
       break;
@@ -168,7 +169,7 @@ lwm2m_callback(lwm2m_object_instance_t *object, lwm2m_context_t *ctx)
 
       if(v == 0) {
         control->on_time = 0;
-        control->last_on_time = ntimer_uptime();
+        control->last_on_time = coap_timer_uptime();
         return LWM2M_STATUS_OK;
       } else {
         /* Only allowed to write 0 to reset ontime */

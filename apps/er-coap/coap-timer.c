@@ -29,13 +29,13 @@
 
 /**
  * \file
- *         Network timer implementation.
+ *         CoAP timer implementation.
  * \author
  *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include "sys/ntimer.h"
+#include "coap-timer.h"
 #include "lib/list.h"
 
 #define DEBUG 0
@@ -54,16 +54,16 @@ LIST(timer_list);
 static uint8_t is_initialized;
 /*---------------------------------------------------------------------------*/
 static void
-add_timer(ntimer_t *timer)
+add_timer(coap_timer_t *timer)
 {
-  ntimer_t *n, *l, *p;
+  coap_timer_t *n, *l, *p;
 
   if(!is_initialized) {
-    /* The ntimer system has not yet been initialized */
-    ntimer_init();
+    /* The coap_timer system has not yet been initialized */
+    coap_timer_init();
   }
 
-  PRINTF("ntimer: adding timer %p at %lu\n", timer,
+  PRINTF("coap-timer: adding timer %p at %lu\n", timer,
          (unsigned long)timer->expiration_time);
 
   p = list_head(timer_list);
@@ -85,40 +85,40 @@ add_timer(ntimer_t *timer)
 
   if(p != list_head(timer_list)) {
     /* The next timer to expire has changed so we need to notify the driver */
-    NTIMER_DRIVER.update();
+    COAP_TIMER_DRIVER.update();
   }
 }
 /*---------------------------------------------------------------------------*/
 void
-ntimer_stop(ntimer_t *timer)
+coap_timer_stop(coap_timer_t *timer)
 {
-  PRINTF("ntimer: stopping timer %p\n", timer);
+  PRINTF("coap-timer: stopping timer %p\n", timer);
 
   /* Mark timer as expired right now */
-  timer->expiration_time = ntimer_uptime();
+  timer->expiration_time = coap_timer_uptime();
 
   list_remove(timer_list, timer);
 }
 /*---------------------------------------------------------------------------*/
 void
-ntimer_set(ntimer_t *timer, uint64_t time)
+coap_timer_set(coap_timer_t *timer, uint64_t time)
 {
-  timer->expiration_time = ntimer_uptime() + time;
+  timer->expiration_time = coap_timer_uptime() + time;
   add_timer(timer);
 }
 /*---------------------------------------------------------------------------*/
 void
-ntimer_reset(ntimer_t *timer, uint64_t time)
+coap_timer_reset(coap_timer_t *timer, uint64_t time)
 {
   timer->expiration_time += time;
   add_timer(timer);
 }
 /*---------------------------------------------------------------------------*/
 uint64_t
-ntimer_time_to_next_expiration(void)
+coap_timer_time_to_next_expiration(void)
 {
   uint64_t now;
-  ntimer_t *next;
+  coap_timer_t *next;
 
   next = list_head(timer_list);
   if(next == NULL) {
@@ -126,7 +126,7 @@ ntimer_time_to_next_expiration(void)
     return 60000;
   }
 
-  now = ntimer_uptime();
+  now = coap_timer_uptime();
   if(now < next->expiration_time) {
     return next->expiration_time - now;
   }
@@ -135,13 +135,13 @@ ntimer_time_to_next_expiration(void)
 }
 /*---------------------------------------------------------------------------*/
 int
-ntimer_run(void)
+coap_timer_run(void)
 {
   uint64_t now;
-  ntimer_t *next;
+  coap_timer_t *next;
 
   /* Always get the current time because it might trigger clock updates */
-  now = ntimer_uptime();
+  now = coap_timer_uptime();
 
   next = list_head(timer_list);
   if(next == NULL) {
@@ -150,7 +150,7 @@ ntimer_run(void)
   }
 
   if(next->expiration_time <= now) {
-    PRINTF("ntimer: timer %p expired at %lu\n", next,
+    PRINTF("coap-timer: timer %p expired at %lu\n", next,
            (unsigned long)now);
 
     /* This timer should expire now */
@@ -161,11 +161,11 @@ ntimer_run(void)
     }
 
     /* The next timer has changed */
-    NTIMER_DRIVER.update();
+    COAP_TIMER_DRIVER.update();
 
     /* Check if there is another pending timer */
     next = list_head(timer_list);
-    if(next != NULL && next->expiration_time <= ntimer_uptime()) {
+    if(next != NULL && next->expiration_time <= coap_timer_uptime()) {
       /* Need to run again */
       return 1;
     }
@@ -175,15 +175,15 @@ ntimer_run(void)
 }
 /*---------------------------------------------------------------------------*/
 void
-ntimer_init(void)
+coap_timer_init(void)
 {
   if(is_initialized) {
     return;
   }
   is_initialized = 1;
   list_init(timer_list);
-  if(NTIMER_DRIVER.init) {
-    NTIMER_DRIVER.init();
+  if(COAP_TIMER_DRIVER.init) {
+    COAP_TIMER_DRIVER.init();
   }
 }
 /*---------------------------------------------------------------------------*/

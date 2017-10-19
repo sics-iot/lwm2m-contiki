@@ -40,7 +40,7 @@
 #define COAP_TRANSACTIONS_H_
 
 #include "er-coap.h"
-#include "sys/ntimer.h"
+#include "coap-timer.h"
 
 /*
  * Modulo mask (thus +1) for a random number to get the tick number for the random
@@ -54,7 +54,7 @@ typedef struct coap_transaction {
   struct coap_transaction *next;        /* for LIST */
 
   uint16_t mid;
-  ntimer_t retrans_timer;
+  coap_timer_t retrans_timer;
   uint32_t retrans_interval;
   uint8_t retrans_counter;
 

@@ -42,7 +42,7 @@
 
 #include "posix-main.h"
 
-#define NTIMER_CONF_DRIVER ntimer_native_driver
+#define COAP_TIMER_CONF_DRIVER coap_timer_native_driver
 
 #define LWM2M_ENGINE_CLIENT_ENDPOINT_NAME "lwm2m-ex"
 #define LWM2M_DEVICE_MANUFACTURER "SICS, Swedish ICT AB"

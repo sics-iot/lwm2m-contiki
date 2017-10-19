@@ -127,10 +127,10 @@ static uint8_t rd_data[128]; /* allocate some data for the RD */
 
 static uint32_t rd_block1;
 static uint8_t rd_more;
-static ntimer_t rd_timer;
+static coap_timer_t rd_timer;
 static void (*rd_callback)(struct request_state *state);
 
-static ntimer_t block1_timer;
+static coap_timer_t block1_timer;
 
 void check_periodic_observations();
 static void update_callback(struct request_state *state);
@@ -317,7 +317,7 @@ void
 lwm2m_rd_client_update_triggered(void)
 {
   rd_flags |= FLAG_RD_DATA_UPDATE_TRIGGERED;
-  /* Here we need to do an ntimer poll - to get a quick request transmission! */
+  /* Here we need to do an CoAP timer poll - to get a quick request transmission! */
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -401,11 +401,9 @@ produce_more_rd(void)
 
   coap_send_request(&rd_request_state, &session_info.server_ep, request, rd_callback);
 }
-
-static void registration_callback(struct request_state *state);
-
-void
-block1_rd_callback(ntimer_t *timer)
+/*---------------------------------------------------------------------------*/
+static void
+block1_rd_callback(coap_timer_t *timer)
 {
   produce_more_rd();
 }
@@ -423,8 +421,8 @@ registration_callback(struct request_state *state)
     if(CONTINUE_2_31 == state->response->code) {
       /* We assume that size never change?! */
       coap_get_header_block1(state->response, &rd_block1, NULL, NULL, NULL);
-      ntimer_set_callback(&block1_timer, block1_rd_callback);
-      ntimer_set(&block1_timer, 1); /* delay 1 ms */
+      coap_timer_set_callback(&block1_timer, block1_rd_callback);
+      coap_timer_set(&block1_timer, 1); /* delay 1 ms */
     } else if(CREATED_2_01 == state->response->code) {
       if(state->response->location_path_len < LWM2M_RD_CLIENT_ASSIGNED_ENDPOINT_MAX_LEN) {
         memcpy(session_info.assigned_ep, state->response->location_path,
@@ -433,7 +431,7 @@ registration_callback(struct request_state *state)
         /* if we decide to not pass the lt-argument on registration, we should force an initial "update" to register lifetime with server */
         rd_state = REGISTRATION_DONE;
         /* remember the last reg time */
-        last_update = ntimer_uptime();
+        last_update = coap_timer_uptime();
         PRINTF("Done (assigned EP='%s')!\n", session_info.assigned_ep);
         perform_session_callback(LWM2M_RD_CLIENT_REGISTERED);
         return;
@@ -471,12 +469,12 @@ update_callback(struct request_state *state)
     if(CONTINUE_2_31 == state->response->code) {
       /* We assume that size never change?! */
       coap_get_header_block1(state->response, &rd_block1, NULL, NULL, NULL);
-      ntimer_set_callback(&block1_timer, block1_rd_callback);
-      ntimer_set(&block1_timer, 1); /* delay 1 ms */
+      coap_timer_set_callback(&block1_timer, block1_rd_callback);
+      coap_timer_set(&block1_timer, 1); /* delay 1 ms */
     } else if(CHANGED_2_04 == state->response->code) {
       PRINTF("Done!\n");
       /* remember the last reg time */
-      last_update = ntimer_uptime();
+      last_update = coap_timer_uptime();
       rd_state = REGISTRATION_DONE;
       rd_flags &= ~FLAG_RD_DATA_UPDATE_TRIGGERED;
       return;
@@ -516,18 +514,18 @@ deregister_callback(struct request_state *state)
   }
 }
 /*---------------------------------------------------------------------------*/
-/* ntimer callback */
+/* CoAP timer callback */
 static void
-periodic_process(ntimer_t *timer)
+periodic_process(coap_timer_t *timer)
 {
   uint64_t now;
 
-  /* reschedule the ntimer */
-  ntimer_reset(&rd_timer, STATE_MACHINE_UPDATE_INTERVAL);
-  now = ntimer_uptime();
+  /* reschedule the CoAP timer */
+  coap_timer_reset(&rd_timer, STATE_MACHINE_UPDATE_INTERVAL);
+  now = coap_timer_uptime();
 
   PRINTF("RD Client - state: %d, ms: %lu\n", rd_state,
-         (unsigned long) ntimer_uptime());
+         (unsigned long)coap_timer_uptime());
 
   switch(rd_state) {
   case INIT:
@@ -719,9 +717,10 @@ lwm2m_rd_client_init(const char *ep)
     session_info.lifetime = LWM2M_DEFAULT_CLIENT_LIFETIME;
   }
   rd_state = INIT;
-  /* Example using network timer */
-  ntimer_set_callback(&rd_timer, periodic_process);
-  ntimer_set(&rd_timer, STATE_MACHINE_UPDATE_INTERVAL); /* call the RD client 2 times per second */
+
+  /* call the RD client periodically */
+  coap_timer_set_callback(&rd_timer, periodic_process);
+  coap_timer_set(&rd_timer, STATE_MACHINE_UPDATE_INTERVAL);
 }
 /*---------------------------------------------------------------------------*/
 void

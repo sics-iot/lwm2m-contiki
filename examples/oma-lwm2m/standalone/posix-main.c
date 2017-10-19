@@ -35,9 +35,9 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include "sys/ntimer.h"
 #include "lwm2m-engine.h"
 #include "lwm2m-rd-client.h"
+#include "coap-timer.h"
 #include <unistd.h>
 #include <sys/select.h>
 #include <errno.h>
@@ -168,13 +168,13 @@ main(int argc, char *argv[])
     tv.tv_sec = 0;
     tv.tv_usec = 250;
 
-    next_time = ntimer_time_to_next_expiration();
+    next_time = coap_timer_time_to_next_expiration();
     if(next_time > 0) {
       tv.tv_sec = next_time / 1000;
       tv.tv_usec = (next_time % 1000) * 1000;
       if(tv.tv_usec == 0 && tv.tv_sec == 0) {
         /*
-         * ntimer time resolution is milliseconds. Avoid millisecond
+         * CoAP timer time resolution is milliseconds. Avoid millisecond
          * busy loops.
          */
         tv.tv_usec = 250;
@@ -205,7 +205,7 @@ main(int argc, char *argv[])
     }
 
     /* Process network timers */
-    for(retval = 0; retval < 5 && ntimer_run(); retval++);
+    for(retval = 0; retval < 5 && coap_timer_run(); retval++);
   }
 
   return 0;

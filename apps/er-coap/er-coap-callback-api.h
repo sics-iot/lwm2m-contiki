@@ -56,7 +56,7 @@ struct request_state {
   coap_endpoint_t *remote_endpoint;
   uint32_t block_num;
   void *user_data;
-  ntimer_t ntimer;
+  coap_timer_t coap_timer;
   void (*callback)(struct request_state *state);
 };
 
