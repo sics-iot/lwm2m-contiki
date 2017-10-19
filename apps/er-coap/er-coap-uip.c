@@ -382,7 +382,7 @@ PROCESS_THREAD(coap_engine, ev, data)
    the other side - peer */
 static int
 input_from_peer(struct dtls_context_t *ctx,
-                session_t *session, uint8 *data, size_t len)
+                session_t *session, uint8_t *data, size_t len)
 {
   size_t i;
   dtls_peer_t *peer;
@@ -413,7 +413,7 @@ input_from_peer(struct dtls_context_t *ctx,
 /* This is output from the DTLS code to be sent to peer (encrypted) */
 static int
 output_to_peer(struct dtls_context_t *ctx,
-               session_t *session, uint8 *data, size_t len)
+               session_t *session, uint8_t *data, size_t len)
 {
   struct uip_udp_conn *udp_connection = (struct uip_udp_conn *) dtls_get_app_data(ctx);
   printf("output_to_peer len:%d\n", (int)len);
