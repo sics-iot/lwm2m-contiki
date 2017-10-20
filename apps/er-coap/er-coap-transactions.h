@@ -40,6 +40,7 @@
 #define COAP_TRANSACTIONS_H_
 
 #include "er-coap.h"
+#include "er-coap-engine.h"
 #include "coap-timer.h"
 
 /*

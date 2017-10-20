@@ -3,7 +3,7 @@ CP=cp
 MKDIR=mkdir
 
 CORE_FILES = sys/cc.h sys/cc-gcc.h lib/list.c lib/memb.c
-COAP_FILES = ${addprefix er-coap/,${filter-out er-coap-blocking-api.% er-coap-uip.% coap-timer-default.%,${notdir ${wildcard $(CONTIKI)/apps/er-coap/er-coap* $(CONTIKI)/apps/er-coap/coap* $(CONTIKI)/apps/er-coap/rest-*}}}}
+COAP_FILES = ${addprefix er-coap/,${filter-out er-coap-blocking-api.% er-coap-uip.% coap-timer-default.%,${notdir ${wildcard $(CONTIKI)/apps/er-coap/er-coap* $(CONTIKI)/apps/er-coap/coap*}}}}
 LWM2M_FILES = ${addprefix oma-lwm2m/,${filter-out ,${notdir ${wildcard $(CONTIKI)/apps/oma-lwm2m/lwm2m-* $(CONTIKI)/apps/oma-lwm2m/oma-*}}}}
 IPSO_FILES = ${addprefix ipso-objects/,${filter-out ipso-leds-control.c ipso-objects.% ipso-temperature.% ipso-light-control.% ipso-button.c,${notdir ${wildcard $(CONTIKI)/apps/ipso-objects/ipso-*}}}}
 TARGET_FILES += ${addprefix $(TARGETCDIR)/,$(CORE_FILES) $(CORE_FILES:.c=.h) \

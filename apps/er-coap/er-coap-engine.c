@@ -31,7 +31,7 @@
 
 /**
  * \file
- *      CoAP implementation for the REST Engine.
+ *      CoAP implementation Engine.
  * \author
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
@@ -56,11 +56,23 @@
 #define PRINTS(l,s,f)
 #endif
 
+static void process_callback(coap_timer_t *t);
+
+/*
+ * To be called by HTTP/COAP server as a callback function when a new service request appears.
+ * This function dispatches the corresponding RESTful service.
+ */
+static int invoke_restful_service(void *request, void *response,
+                                  uint8_t *buffer, uint16_t buffer_size,
+                                  int32_t *offset);
+
 /*---------------------------------------------------------------------------*/
 /*- Variables ---------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 LIST(coap_handlers);
-static service_callback_t service_cbk = NULL;
+LIST(restful_services);
+LIST(restful_periodic_services);
+static uint8_t is_initialized = 0;
 
 /*---------------------------------------------------------------------------*/
 /*- CoAP service handlers---------------------------------------------------*/
@@ -110,14 +122,12 @@ call_service(coap_packet_t *request, coap_packet_t *response,
   if(status != COAP_HANDLER_STATUS_CONTINUE) {
     return status;
   }
-  if(service_cbk != NULL) {
-    status = service_cbk(request, response, buffer, buffer_size, offset);
-    if(status != COAP_HANDLER_STATUS_CONTINUE) {
-      return status;
-    }
+  status = invoke_restful_service(request, response, buffer, buffer_size, offset);
+  if(status != COAP_HANDLER_STATUS_CONTINUE) {
+    return status;
   }
 
-  REST.set_response_status(response, REST.status.NOT_FOUND);
+  coap_set_status_code(response, NOT_FOUND_4_04);
 
   return COAP_HANDLER_STATUS_CONTINUE;
 }
@@ -128,9 +138,6 @@ call_service(coap_packet_t *request, coap_packet_t *response,
 
 /* the discover resource is automatically included for CoAP */
 extern resource_t res_well_known_core;
-#ifdef WITH_DTLS
-extern resource_t res_dtls;
-#endif
 
 /*---------------------------------------------------------------------------*/
 /*- Internal API ------------------------------------------------------------*/
@@ -358,9 +365,18 @@ coap_receive(const coap_endpoint_t *src,
 void
 coap_init_engine(void)
 {
-  PRINTF("Starting %s receiver...\n", coap_rest_implementation.name);
+  /* avoid initializing twice */
+  if(is_initialized) {
+    PRINTF("CoAP engine process already running - double initialization?\n");
+    return;
+  }
+  is_initialized = 1;
+
+  PRINTF("Starting CoAP engine...\n");
 
   list_init(coap_handlers);
+  list_init(restful_services);
+  list_init(restful_periodic_services);
 
   rest_activate_resource(&res_well_known_core, ".well-known/core");
 
@@ -368,100 +384,133 @@ coap_init_engine(void)
   coap_init_connection();
 }
 /*---------------------------------------------------------------------------*/
+coap_resource_flags_t
+coap_get_rest_method(coap_packet_t *packet)
+{
+  return (coap_resource_flags_t)
+    (1 << (((coap_packet_t *)packet)->code - 1));
+}
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Makes a resource available under the given URI path
+ * \param resource A pointer to a resource implementation
+ * \param path The URI path string for this resource
+ *
+ * The resource implementation must be imported first using the
+ * extern keyword. The build system takes care of compiling every
+ * *.c file in the ./resources/ sub-directory (see example Makefile).
+ */
 void
-coap_set_service_callback(service_callback_t callback)
+rest_activate_resource(resource_t *resource, const char *path)
 {
-  service_cbk = callback;
-}
-/*---------------------------------------------------------------------------*/
-rest_resource_flags_t
-coap_get_rest_method(void *packet)
-{
-  return (rest_resource_flags_t)(1 <<
-                                 (((coap_packet_t *)packet)->code - 1));
-}
-/*---------------------------------------------------------------------------*/
-/*- REST Engine Interface ---------------------------------------------------*/
-/*---------------------------------------------------------------------------*/
-const struct rest_implementation coap_rest_implementation = {
-  "CoAP-18",
+  periodic_resource_t *periodic;
+  resource->url = path;
+  list_add(restful_services, resource);
 
-  coap_init_engine,
-  coap_set_service_callback,
+  PRINTF("Activating: %s\n", resource->url);
 
-  coap_get_header_uri_path,
-  coap_get_rest_method,
-  coap_set_status_code,
-
-  coap_get_header_content_format,
-  coap_set_header_content_format,
-  coap_get_header_accept,
-  coap_get_header_size2,
-  coap_set_header_size2,
-  coap_get_header_max_age,
-  coap_set_header_max_age,
-  coap_set_header_etag,
-  coap_get_header_if_match,
-  coap_get_header_if_none_match,
-  coap_get_header_uri_host,
-  coap_set_header_location_path,
-
-  coap_get_payload,
-  coap_set_payload,
-
-  coap_get_header_uri_query,
-  coap_get_query_variable,
-  coap_get_post_variable,
-
-  coap_notify_observers,
-  coap_observe_handler,
-
-  {
-    CONTENT_2_05,
-    CREATED_2_01,
-    CHANGED_2_04,
-    DELETED_2_02,
-    VALID_2_03,
-    BAD_REQUEST_4_00,
-    UNAUTHORIZED_4_01,
-    BAD_OPTION_4_02,
-    FORBIDDEN_4_03,
-    NOT_FOUND_4_04,
-    METHOD_NOT_ALLOWED_4_05,
-    NOT_ACCEPTABLE_4_06,
-    REQUEST_ENTITY_TOO_LARGE_4_13,
-    UNSUPPORTED_MEDIA_TYPE_4_15,
-    INTERNAL_SERVER_ERROR_5_00,
-    NOT_IMPLEMENTED_5_01,
-    BAD_GATEWAY_5_02,
-    SERVICE_UNAVAILABLE_5_03,
-    GATEWAY_TIMEOUT_5_04,
-    PROXYING_NOT_SUPPORTED_5_05
-  },
-
-  {
-    TEXT_PLAIN,
-    TEXT_XML,
-    TEXT_CSV,
-    TEXT_HTML,
-    IMAGE_GIF,
-    IMAGE_JPEG,
-    IMAGE_PNG,
-    IMAGE_TIFF,
-    AUDIO_RAW,
-    VIDEO_RAW,
-    APPLICATION_LINK_FORMAT,
-    APPLICATION_XML,
-    APPLICATION_OCTET_STREAM,
-    APPLICATION_RDF_XML,
-    APPLICATION_SOAP_XML,
-    APPLICATION_ATOM_XML,
-    APPLICATION_XMPP_XML,
-    APPLICATION_EXI,
-    APPLICATION_FASTINFOSET,
-    APPLICATION_SOAP_FASTINFOSET,
-    APPLICATION_JSON,
-    APPLICATION_X_OBIX_BINARY
+  /* Only add periodic resources with a periodic_handler and a period > 0. */
+  if(resource->flags & IS_PERIODIC && resource->periodic
+     && resource->periodic->periodic_handler
+     && resource->periodic->period) {
+    PRINTF("Periodic resource: %p (%s)\n", resource->periodic,
+           resource->periodic->resource->url);
+    list_add(restful_periodic_services, resource->periodic);
+    periodic = resource->periodic;
+    coap_timer_set_callback(&periodic->periodic_timer, process_callback);
+    coap_timer_set_user_data(&periodic->periodic_timer, resource);
+    coap_timer_set(&periodic->periodic_timer, periodic->period);
   }
-};
+}
+/*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+/*- Internal API ------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+list_t
+rest_get_resources(void)
+{
+  return restful_services;
+}
+/*---------------------------------------------------------------------------*/
+static int
+invoke_restful_service(void *request, void *response, uint8_t *buffer,
+                       uint16_t buffer_size, int32_t *offset)
+{
+  uint8_t found = 0;
+  uint8_t allowed = 1;
+
+  resource_t *resource = NULL;
+  const char *url = NULL;
+  int url_len, res_url_len;
+
+  url_len = coap_get_header_uri_path(request, &url);
+  for(resource = (resource_t *)list_head(restful_services);
+      resource; resource = resource->next) {
+
+    /* if the web service handles that kind of requests and urls matches */
+    res_url_len = strlen(resource->url);
+    if((url_len == res_url_len
+        || (url_len > res_url_len
+            && (resource->flags & HAS_SUB_RESOURCES)
+            && url[res_url_len] == '/'))
+       && strncmp(resource->url, url, res_url_len) == 0) {
+      found = 1;
+      coap_resource_flags_t method = coap_get_rest_method(request);
+
+      PRINTF("/%s, method %u, resource->flags %u\n", resource->url,
+             (uint16_t)method, resource->flags);
+
+      if((method & METHOD_GET) && resource->get_handler != NULL) {
+        /* call handler function */
+        resource->get_handler(request, response, buffer, buffer_size, offset);
+      } else if((method & METHOD_POST) && resource->post_handler != NULL) {
+        /* call handler function */
+        resource->post_handler(request, response, buffer, buffer_size,
+                               offset);
+      } else if((method & METHOD_PUT) && resource->put_handler != NULL) {
+        /* call handler function */
+        resource->put_handler(request, response, buffer, buffer_size, offset);
+      } else if((method & METHOD_DELETE) && resource->delete_handler != NULL) {
+        /* call handler function */
+        resource->delete_handler(request, response, buffer, buffer_size,
+                                 offset);
+      } else {
+        allowed = 0;
+        coap_set_status_code(response, METHOD_NOT_ALLOWED_4_05);
+      }
+      break;
+    }
+  }
+  if(!found) {
+    coap_set_status_code(response, NOT_FOUND_4_04);
+  } else if(allowed) {
+    /* final handler for special flags */
+    if(resource->flags & IS_OBSERVABLE) {
+      coap_observe_handler(resource, request, response);
+    }
+  }
+  return found & allowed;
+}
+/*---------------------------------------------------------------------------*/
+/* This callback occurs when t is expired */
+static void
+process_callback(coap_timer_t *t)
+{
+  resource_t *resource;
+  resource = coap_timer_get_user_data(t);
+  if(resource != NULL && (resource->flags & IS_PERIODIC)
+     && resource->periodic != NULL && resource->periodic->period) {
+    PRINTF("Periodic: timer expired for /%s (period: %lu)\n",
+           resource->url, resource->periodic->period);
+
+    if(!is_initialized) {
+      /* REST has not yet been initialized. */
+    } else if(resource->periodic->periodic_handler) {
+      /* Call the periodic_handler function. */
+      resource->periodic->periodic_handler();
+    }
+
+    coap_timer_set(t, resource->periodic->period);
+  }
+}
 /*---------------------------------------------------------------------------*/

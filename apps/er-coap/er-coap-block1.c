@@ -76,10 +76,10 @@ int
 coap_block1_handler(void *request, void *response, uint8_t *target, size_t *len, size_t max_len)
 {
   const uint8_t *payload = 0;
-  int pay_len = REST.get_request_payload(request, &payload);
+  int pay_len = coap_get_payload(request, &payload);
 
   if(!pay_len || !payload) {
-    erbium_status_code = REST.status.BAD_REQUEST;
+    erbium_status_code = BAD_REQUEST_4_00;
     coap_error_message = "NoPayload";
     return -1;
   }
@@ -87,7 +87,7 @@ coap_block1_handler(void *request, void *response, uint8_t *target, size_t *len,
   coap_packet_t *packet = (coap_packet_t *)request;
 
   if(packet->block1_offset + pay_len > max_len) {
-    erbium_status_code = REST.status.REQUEST_ENTITY_TOO_LARGE;
+    erbium_status_code = REQUEST_ENTITY_TOO_LARGE_4_13;
     coap_error_message = "Message to big";
     return -1;
   }

@@ -47,6 +47,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define WITH_TEST_NOTIFICATION 1
 

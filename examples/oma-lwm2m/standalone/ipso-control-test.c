@@ -47,6 +47,7 @@
 #include "er-coap-engine.h"
 #include "ipso-sensor-template.h"
 #include "ipso-control-template.h"
+#include <stdio.h>
 #include <string.h>
 
 static lwm2m_status_t set_value(uint8_t value);

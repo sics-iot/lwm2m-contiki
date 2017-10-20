@@ -40,6 +40,7 @@
 #define COAP_SEPARATE_H_
 
 #include "er-coap.h"
+#include "er-coap-engine.h"
 
 typedef struct coap_separate {
 

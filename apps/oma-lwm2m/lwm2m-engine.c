@@ -254,7 +254,7 @@ double_buffer_flush(lwm2m_buffer_t *ctxbuf, lwm2m_buffer_t *outbuf, int size)
 /*---------------------------------------------------------------------------*/
 #if DEBUG
 static inline const char *
-get_method_as_string(rest_resource_flags_t method)
+get_method_as_string(coap_resource_flags_t method)
 {
   if(method == METHOD_GET) {
     return "GET";
@@ -538,7 +538,7 @@ lwm2m_engine_init(void)
 
 #endif /* LWM2M_ENGINE_CLIENT_ENDPOINT_NAME */
 
-  rest_init_engine();
+  coap_init_engine();
 
   /* Register the CoAP handler for lightweight object handling */
   coap_add_handler(&lwm2m_handler);
@@ -906,7 +906,7 @@ create_instance(lwm2m_context_t *context, lwm2m_object_t *object)
   instance = object->impl->create_instance(context->object_instance_id, NULL);
   if(instance != NULL) {
     PRINTF("Created instance: %u/%u\n", context->object_id, context->object_instance_id);
-    REST.set_response_status(context->response, CREATED_2_01);
+    coap_set_status_code(context->response, CREATED_2_01);
 #if USE_RD_CLIENT
     lwm2m_rd_client_set_update_rd();
 #endif
@@ -1124,7 +1124,7 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
         if(status != LWM2M_STATUS_OK) {
           return status;
         }
-        REST.set_response_status(ctx->response, CHANGED_2_04);
+        coap_set_status_code(ctx->response, CHANGED_2_04);
       }
       tlvpos += len;
     }
@@ -1342,7 +1342,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     PRINTF("Block1 size:%d\n", bsize);
     if(bsize > COAP_MAX_BLOCK_SIZE) {
       PRINTF("Entity too large...\n");
-      REST.set_response_status(response, REQUEST_ENTITY_TOO_LARGE_4_13);
+      coap_set_status_code(response, REQUEST_ENTITY_TOO_LARGE_4_13);
       coap_set_header_size1(response, COAP_MAX_BLOCK_SIZE);
       return COAP_HANDLER_STATUS_PROCESSED;
     }
@@ -1354,11 +1354,11 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   context.writer = &oma_tlv_writer;
 
 
-  url_len = REST.get_url(request, &url);
+  url_len = coap_get_header_uri_path(request, &url);
 
   if(url_len == 2 && strncmp("bs", url, 2) == 0) {
     PRINTF("BOOTSTRAPPED!!!\n");
-    REST.set_response_status(response, CHANGED_2_04);
+    coap_set_status_code(response, CHANGED_2_04);
     return COAP_HANDLER_STATUS_PROCESSED;
   }
 
@@ -1369,19 +1369,19 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return COAP_HANDLER_STATUS_CONTINUE;
   }
 
-  PRINTF("%s URL:'", get_method_as_string(REST.get_method_type(request)));
+  PRINTF("%s URL:'", get_method_as_string(coap_get_rest_method(request)));
   PRINTS(url_len, url, "%c");
   PRINTF("' CTX:%u/%u/%u dp:%u bs:%d\n", context.object_id, context.object_instance_id,
 	 context.resource_id, depth, buffer_size);
   /* Get format and accept */
-  if(!REST.get_header_content_type(request, &format)) {
+  if(!coap_get_header_content_format(request, &format)) {
     PRINTF("lwm2m: No format given. Assume text plain...\n");
     format = TEXT_PLAIN;
   } else if(format == LWM2M_TEXT_PLAIN) {
     /* CoAP content format text plain - assume LWM2M text plain */
     format = TEXT_PLAIN;
   }
-  if(!REST.get_header_accept(request, &accept)) {
+  if(!coap_get_header_accept(request, &accept)) {
     if(format == TEXT_PLAIN && depth < 3) {
       PRINTF("lwm2m: No Accept header, assume JSON\n");
       accept = LWM2M_JSON;
@@ -1399,10 +1399,10 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
    */
   if(depth < 1) {
     /* No possible object id found in URL - ignore request unless delete all */
-    if(REST.get_method_type(request) == METHOD_DELETE) {
+    if(coap_get_rest_method(request) == METHOD_DELETE) {
       PRINTF("This is a delete all - for bootstrap...\n");
       context.operation = LWM2M_OP_DELETE;
-      REST.set_response_status(response, DELETED_2_02);
+      coap_set_status_code(response, DELETED_2_02);
 
       /* Delete all dynamic objects that can be deleted */
       for(object = list_head(generic_object_list);
@@ -1423,7 +1423,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   instance = get_instance_by_context(&context, &object);
   if(instance == NULL
      && object != NULL
-     && REST.get_method_type(request) == METHOD_PUT
+     && coap_get_rest_method(request) == METHOD_PUT
      && context.level == 2) {
     /* ALLOW generic instance if CREATE / WRITE*/
     instance = create_instance(&context, object);
@@ -1453,20 +1453,20 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   lwm2m_engine_select_reader(&context, format);
   lwm2m_engine_select_writer(&context, accept);
 
-  switch(REST.get_method_type(request)) {
+  switch(coap_get_rest_method(request)) {
   case METHOD_PUT:
     /* can also be write atts */
     context.operation = LWM2M_OP_WRITE;
-    REST.set_response_status(response, CHANGED_2_04);
+    coap_set_status_code(response, CHANGED_2_04);
     break;
   case METHOD_POST:
     if(context.level < 2) {
       /* write to a instance */
       context.operation = LWM2M_OP_WRITE;
-      REST.set_response_status(response, CHANGED_2_04);
+      coap_set_status_code(response, CHANGED_2_04);
     } else if(context.level == 3) {
       context.operation = LWM2M_OP_EXECUTE;
-      REST.set_response_status(response, CHANGED_2_04);
+      coap_set_status_code(response, CHANGED_2_04);
     }
     break;
   case METHOD_GET:
@@ -1475,11 +1475,11 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     } else {
       context.operation = LWM2M_OP_READ;
     }
-    REST.set_response_status(response, CONTENT_2_05);
+    coap_set_status_code(response, CONTENT_2_05);
     break;
   case METHOD_DELETE:
     context.operation = LWM2M_OP_DELETE;
-    REST.set_response_status(response, DELETED_2_02);
+    coap_set_status_code(response, DELETED_2_02);
     break;
   default:
     break;
@@ -1489,13 +1489,13 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   /* for debugging */
   PRINTPRE("lwm2m: [", url_len, url);
   PRINTF("] %s Format:%d ID:%d bsize:%u offset:%d\n",
-         get_method_as_string(REST.get_method_type(request)),
+         get_method_as_string(coap_get_rest_method(request)),
          format, context.object_id, buffer_size,
          offset != NULL ? ((int)*offset) : 0);
   if(format == TEXT_PLAIN) {
     /* a string */
     const uint8_t *data;
-    int plen = REST.get_request_payload(request, &data);
+    int plen = coap_get_payload(request, &data);
     if(plen > 0) {
       PRINTF("Data: '");
       PRINTS(plen, data, "%c");

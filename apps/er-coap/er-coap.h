@@ -44,8 +44,6 @@
 #include "er-coap-conf.h"
 #include "er-coap-transport.h"
 
-#include "rest-engine.h"
-
 #define COAP_MAX_PACKET_SIZE  (COAP_MAX_HEADER_SIZE + REST_MAX_CHUNK_SIZE)
 
 /* REST_MAX_CHUNK_SIZE can be different from 2^x so we need to get next lower 2^x for COAP_MAX_BLOCK_SIZE */
@@ -174,6 +172,7 @@ size_t coap_serialize_message(coap_packet_t *packet, uint8_t *buffer);
 coap_status_t coap_parse_message(coap_packet_t *request, uint8_t *data,
                                  uint16_t data_len);
 
+coap_resource_flags_t coap_get_rest_method(coap_packet_t *packet);
 int coap_get_query_variable(void *packet, const char *name,
                             const char **output);
 int coap_get_post_variable(void *packet, const char *name,

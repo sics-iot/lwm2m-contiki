@@ -41,6 +41,7 @@
 
 #include "er-coap.h"
 #include "er-coap-transactions.h"
+#include "er-coap-engine.h"
 
 #define COAP_OBSERVER_URL_LEN 20
 

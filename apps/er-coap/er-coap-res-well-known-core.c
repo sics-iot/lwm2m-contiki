@@ -36,8 +36,9 @@
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#include <string.h>
 #include "er-coap-engine.h"
+#include <string.h>
+#include <stdio.h>
 
 #define DEBUG 0
 #if DEBUG

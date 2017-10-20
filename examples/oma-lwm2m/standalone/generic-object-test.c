@@ -46,6 +46,7 @@
 #include "lwm2m-engine.h"
 #include "er-coap-engine.h"
 #include <string.h>
+#include <stdio.h>
 
 static lwm2m_object_t generic_object;
 
