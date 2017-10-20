@@ -37,18 +37,12 @@
  */
 
 #include "dtls-support.h"
-#include "dtls_debug.h"
 #include "lib/random.h"
 #include <stdio.h>
 #include <stdarg.h>
 
-#define DEBUG 1
-
-#if DEBUG
-#define PRINTF(X) printf(X)
-#else
-#define PRINTF(X)
-#endif
+#define DEBUG DEBUG_FULLY
+#include "dtls_debug.h"
 
 static dtls_context_t the_dtls_context;
 static dtls_cipher_context_t cipher_context;
