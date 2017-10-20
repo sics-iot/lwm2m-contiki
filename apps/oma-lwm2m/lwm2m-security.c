@@ -48,6 +48,7 @@
 #include "lwm2m-engine.h"
 #include "lwm2m-server.h"
 #include "lwm2m-security.h"
+#include "coap-keystore.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -57,10 +58,12 @@
     for(i = 0; i < l; i++) printf(f, s[i]); \
     } while(0)
 #define PRINTPRE(p,l,s) do { PRINTF(p);PRINTS(l,s,"%c"); } while(0);
+#define PRINTEP(ep) coap_endpoint_print(ep)
 #else
 #define PRINTF(...)
 #define PRINTS(l,s,f)
 #define PRINTPRE(p,l,s);
+#define PRINTEP(ep)
 #endif
 
 #define MAX_COUNT LWM2M_SERVER_MAX_COUNT
@@ -262,6 +265,88 @@ static lwm2m_object_t reg_object = {
   .impl = &impl,
 };
 /*---------------------------------------------------------------------------*/
+#if WITH_DTLS
+static int
+get_psk_info(const coap_endpoint_t *address_info,
+             coap_keystore_psk_entry_t *info)
+{
+  /* Find matching security object based on address */
+  lwm2m_security_value_t *e;
+  coap_endpoint_t ep;
+
+  if(info == NULL || address_info == NULL) {
+    return 0;
+  }
+
+  for(e = lwm2m_security_get_first();
+      e != NULL;
+      e = lwm2m_security_get_next(e)) {
+    if(e->server_uri_len == 0) {
+      continue;
+    }
+    if(e->security_mode != LWM2M_SECURITY_MODE_PSK) {
+      /* Only PSK supported for now */
+      continue;
+    }
+    if(!coap_endpoint_parse((char *)e->server_uri, e->server_uri_len, &ep)) {
+      /* Failed to parse URI to endpoint */
+      PRINTF("lwm2m-sec: failed to parse server URI ");
+      PRINTS(e->server_uri_len, e->server_uri, "%c");
+      PRINTF("\n");
+      continue;
+    }
+    if(!coap_endpoint_cmp(address_info, &ep)) {
+      /* Wrong server */
+      PRINTF("lwm2m-sec: wrong server ");
+      PRINTEP(address_info);
+      PRINTF(" != ");
+      PRINTEP(&ep);
+      PRINTF("\n");
+      continue;
+    }
+    if(info->identity_len > 0 && info->identity != NULL) {
+      /* Searching for a specific identity */
+      if(info->identity_len != e->public_key_len ||
+         memcmp(info->identity, e->public_key, info->identity_len)) {
+        /* Identity not matching */
+        PRINTF("lwm2m-sec: identity not matching\n");
+        continue;
+      }
+    }
+    /* Found security information for this server */
+    PRINTF("lwm2m-sec: found security match!\n");
+    break;
+  }
+
+  if(e == NULL) {
+    /* No matching security object found */
+    return 0;
+  }
+
+  if(info->identity == NULL || info->identity_len == 0) {
+    /* Identity requested */
+    info->identity = e->public_key;
+    info->identity_len = e->public_key_len;
+    return 1;
+  }
+
+  if(e->secret_key_len == 0) {
+    /* No secret key / password */
+    return 0;
+  }
+
+  info->key = e->secret_key;
+  info->key_len = e->secret_key_len;
+  return 1;
+}
+#endif /* WITH_DTLS */
+/*---------------------------------------------------------------------------*/
+#if WITH_DTLS
+static const coap_keystore_t key_store = {
+  .coap_get_psk_info = get_psk_info
+};
+#endif /* WITH_DTLS */
+/*---------------------------------------------------------------------------*/
 void
 lwm2m_security_init(void)
 {
@@ -274,7 +359,12 @@ lwm2m_security_init(void)
   for(i = 0; i < MAX_COUNT; i++) {
     instances[i].instance.instance_id = LWM2M_OBJECT_INSTANCE_NONE;
   }
-  lwm2m_engine_add_generic_object(&reg_object);
+  if(lwm2m_engine_add_generic_object(&reg_object)) {
+#if WITH_DTLS
+    /* Security object handler added - register keystore */
+    coap_set_keystore(&key_store);
+#endif /* WITH_DTLS */
+  }
 }
 /*---------------------------------------------------------------------------*/
 /** @} */
