@@ -45,6 +45,8 @@
 #include "er-coap-transport.h"
 #include "er-coap-transactions.h"
 #include "er-coap-constants.h"
+#include "coap-keystore.h"
+
 
 #if UIP_CONF_IPV6_RPL
 #include "net/rpl/rpl.h"
@@ -88,6 +90,8 @@
 
 static dtls_handler_t cb;
 static dtls_context_t *dtls_context = NULL;
+
+static struct coap_keystore *dtls_keystore = NULL;
 
 /* The PSK information for DTLS */
 #define PSK_ID_MAXLEN 256
@@ -422,7 +426,12 @@ output_to_peer(struct dtls_context_t *ctx,
   return len;
 }
 
-
+/* This defines the key-store set API since we hookup DTLS here */
+void
+coap_set_keystore(struct coap_keystore *keystore)
+{
+  dtls_keystore = keystore;
+}
 /* This function is the "key store" for tinyDTLS. It is called to
  * retrieve a key for the given identity within this particular
  * session. */
@@ -433,20 +442,37 @@ get_psk_info(struct dtls_context_t *ctx,
              const unsigned char *id, size_t id_len,
              unsigned char *result, size_t result_length)
 {
+  
   PRINTF("---===>>> Getting the Key or ID <<<===---\n");
   switch (type) {
   case DTLS_PSK_IDENTITY:
-    if (id_len) {
-      PRINTF("got psk_identity_hint: '%.*s'\n", id_len, id);
-    }
+    if(dtls_keystore != NULL) {
+      struct coap_psk_entry ks;
+      memset(&ks, 0, sizeof(ks));
+      /* we know that session is a coap endpoint */
+      dtls_keystore->coap_get_psk_info((coap_endpoint_t *) session,
+                                  &ks);
+      if(ks.identity == NULL) return 0;
 
-    if (result_length < psk_id_length) {
-      PRINTF("cannot set psk_identity -- buffer too small\n");
-      return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
-    }
+      if(result_length < ks.identity_len) {
+        PRINTF("cannot set psk_identity -- buffer too small\n");
+        return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+      }
+      memcpy(result, ks.identity, ks.identity_len);
+      return ks.identity_len;
+    } else {
 
-    memcpy(result, psk_id, psk_id_length);
-    return psk_id_length;
+      if (id_len) {
+        PRINTF("got psk_identity_hint: '%.*s'\n", id_len, id);
+      }
+
+      if (result_length < psk_id_length) {
+        PRINTF("cannot set psk_identity -- buffer too small\n");
+        return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+      }
+      memcpy(result, psk_id, psk_id_length);
+      return psk_id_length;
+    }
   case DTLS_PSK_KEY:
     if (id_len != psk_id_length || memcmp(psk_id, id, id_len) != 0) {
       PRINTF("PSK for unknown id requested, exiting\n");
