@@ -39,9 +39,11 @@
 #ifndef COAP_BLOCK1_H_
 #define COAP_BLOCK1_H_
 
+#include "er-coap.h"
 #include <stddef.h>
 #include <stdint.h>
 
-int coap_block1_handler(void *request, void *response, uint8_t *target, size_t *len, size_t max_len);
+int coap_block1_handler(coap_packet_t *request, coap_packet_t *response,
+                        uint8_t *target, size_t *len, size_t max_len);
 
 #endif /* COAP_BLOCK1_H_ */

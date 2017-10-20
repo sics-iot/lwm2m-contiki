@@ -62,20 +62,16 @@ LIST(obs_subjects_list);
 
 /*----------------------------------------------------------------------------*/
 static size_t
-get_token(void *packet, const uint8_t **token)
+get_token(coap_packet_t *coap_pkt, const uint8_t **token)
 {
-  coap_packet_t *const coap_pkt = (coap_packet_t *)packet;
-
   *token = coap_pkt->token;
 
   return coap_pkt->token_len;
 }
 /*----------------------------------------------------------------------------*/
 static int
-set_token(void *packet, const uint8_t *token, size_t token_len)
+set_token(coap_packet_t *coap_pkt, const uint8_t *token, size_t token_len)
 {
-  coap_packet_t *const coap_pkt = (coap_packet_t *)packet;
-
   coap_pkt->token_len = MIN(COAP_TOKEN_LEN, token_len);
   memcpy(coap_pkt->token, token, coap_pkt->token_len);
 
@@ -187,21 +183,18 @@ simple_reply(coap_message_type_t type, const coap_endpoint_t *endpoint,
 }
 /*----------------------------------------------------------------------------*/
 static coap_notification_flag_t
-classify_notification(void *response, int first)
+classify_notification(coap_packet_t *response, int first)
 {
-  coap_packet_t *pkt;
-
-  pkt = (coap_packet_t *)response;
-  if(!pkt) {
+  if(!response) {
     PRINTF("no response\n");
     return NO_REPLY_FROM_SERVER;
   }
   PRINTF("server replied\n");
-  if(!IS_RESPONSE_CODE_2_XX(pkt)) {
+  if(!IS_RESPONSE_CODE_2_XX(response)) {
     PRINTF("error response code\n");
     return ERROR_RESPONSE_CODE;
   }
-  if(!IS_OPTION(pkt, COAP_OPTION_OBSERVE)) {
+  if(!IS_OPTION(response, COAP_OPTION_OBSERVE)) {
     PRINTF("server does not support observe\n");
     return OBSERVE_NOT_SUPPORTED;
   }
@@ -215,7 +208,6 @@ void
 coap_handle_notification(const coap_endpoint_t *endpoint,
                          coap_packet_t *notification)
 {
-  coap_packet_t *pkt;
   const uint8_t *token;
   int token_len;
   coap_observee_t *obs;
@@ -223,8 +215,7 @@ coap_handle_notification(const coap_endpoint_t *endpoint,
   uint32_t observe;
 
   PRINTF("coap_handle_notification()\n");
-  pkt = (coap_packet_t *)notification;
-  token_len = get_token(pkt, &token);
+  token_len = get_token(notification, &token);
   PRINTF("Getting token\n");
   if(0 == token_len) {
     PRINTF("Error while handling coap observe notification: "
@@ -259,7 +250,7 @@ coap_handle_notification(const coap_endpoint_t *endpoint,
 }
 /*----------------------------------------------------------------------------*/
 static void
-handle_obs_registration_response(void *data, void *response)
+handle_obs_registration_response(void *data, coap_packet_t *response)
 {
   coap_observee_t *obs;
   notification_callback_t notification_callback;

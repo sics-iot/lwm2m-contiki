@@ -1369,7 +1369,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
     return COAP_HANDLER_STATUS_CONTINUE;
   }
 
-  PRINTF("%s URL:'", get_method_as_string(coap_get_rest_method(request)));
+  PRINTF("%s URL:'", get_method_as_string(coap_get_method_type(request)));
   PRINTS(url_len, url, "%c");
   PRINTF("' CTX:%u/%u/%u dp:%u bs:%d\n", context.object_id, context.object_instance_id,
 	 context.resource_id, depth, buffer_size);
@@ -1399,7 +1399,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
    */
   if(depth < 1) {
     /* No possible object id found in URL - ignore request unless delete all */
-    if(coap_get_rest_method(request) == METHOD_DELETE) {
+    if(coap_get_method_type(request) == METHOD_DELETE) {
       PRINTF("This is a delete all - for bootstrap...\n");
       context.operation = LWM2M_OP_DELETE;
       coap_set_status_code(response, DELETED_2_02);
@@ -1423,7 +1423,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   instance = get_instance_by_context(&context, &object);
   if(instance == NULL
      && object != NULL
-     && coap_get_rest_method(request) == METHOD_PUT
+     && coap_get_method_type(request) == METHOD_PUT
      && context.level == 2) {
     /* ALLOW generic instance if CREATE / WRITE*/
     instance = create_instance(&context, object);
@@ -1453,7 +1453,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   lwm2m_engine_select_reader(&context, format);
   lwm2m_engine_select_writer(&context, accept);
 
-  switch(coap_get_rest_method(request)) {
+  switch(coap_get_method_type(request)) {
   case METHOD_PUT:
     /* can also be write atts */
     context.operation = LWM2M_OP_WRITE;
@@ -1489,7 +1489,7 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   /* for debugging */
   PRINTPRE("lwm2m: [", url_len, url);
   PRINTF("] %s Format:%d ID:%d bsize:%u offset:%d\n",
-         get_method_as_string(coap_get_rest_method(request)),
+         get_method_as_string(coap_get_method_type(request)),
          format, context.object_id, buffer_size,
          offset != NULL ? ((int)*offset) : 0);
   if(format == TEXT_PLAIN) {

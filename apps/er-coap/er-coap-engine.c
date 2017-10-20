@@ -62,7 +62,8 @@ static void process_callback(coap_timer_t *t);
  * To be called by HTTP/COAP server as a callback function when a new service request appears.
  * This function dispatches the corresponding RESTful service.
  */
-static int invoke_restful_service(void *request, void *response,
+static int invoke_restful_service(coap_packet_t *request,
+                                  coap_packet_t *response,
                                   uint8_t *buffer, uint16_t buffer_size,
                                   int32_t *offset);
 
@@ -305,7 +306,7 @@ coap_receive(const coap_endpoint_t *src,
 
       if((transaction = coap_get_transaction_by_mid(message->mid))) {
         /* free transaction memory before callback, as it may create a new transaction */
-        restful_response_handler callback = transaction->callback;
+        restful_response_handler_t callback = transaction->callback;
         void *callback_data = transaction->callback_data;
 
         coap_clear_transaction(transaction);
@@ -384,13 +385,6 @@ coap_init_engine(void)
   coap_init_connection();
 }
 /*---------------------------------------------------------------------------*/
-coap_resource_flags_t
-coap_get_rest_method(coap_packet_t *packet)
-{
-  return (coap_resource_flags_t)
-    (1 << (((coap_packet_t *)packet)->code - 1));
-}
-/*---------------------------------------------------------------------------*/
 /**
  * \brief Makes a resource available under the given URI path
  * \param resource A pointer to a resource implementation
@@ -433,8 +427,8 @@ rest_get_resources(void)
 }
 /*---------------------------------------------------------------------------*/
 static int
-invoke_restful_service(void *request, void *response, uint8_t *buffer,
-                       uint16_t buffer_size, int32_t *offset)
+invoke_restful_service(coap_packet_t *request, coap_packet_t *response,
+                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
   uint8_t found = 0;
   uint8_t allowed = 1;
@@ -454,8 +448,8 @@ invoke_restful_service(void *request, void *response, uint8_t *buffer,
             && (resource->flags & HAS_SUB_RESOURCES)
             && url[res_url_len] == '/'))
        && strncmp(resource->url, url, res_url_len) == 0) {
+      coap_resource_flags_t method = coap_get_method_type(request);
       found = 1;
-      coap_resource_flags_t method = coap_get_rest_method(request);
 
       PRINTF("/%s, method %u, resource->flags %u\n", resource->url,
              (uint16_t)method, resource->flags);

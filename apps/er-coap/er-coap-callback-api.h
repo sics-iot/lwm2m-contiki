@@ -60,6 +60,8 @@ struct request_state {
   void (*callback)(struct request_state *state);
 };
 
-void coap_send_request(struct request_state *state, coap_endpoint_t *endpoint,  coap_packet_t *request, void (*callback)(struct request_state *state));
+void coap_send_request(struct request_state *state, coap_endpoint_t *endpoint,
+                       coap_packet_t *request,
+                       void (*callback)(struct request_state *state));
 
 #endif /* COAP_CALLBACK_API_H_ */

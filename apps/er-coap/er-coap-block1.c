@@ -73,7 +73,8 @@
  *         -1 if initialisation failed
  */
 int
-coap_block1_handler(void *request, void *response, uint8_t *target, size_t *len, size_t max_len)
+coap_block1_handler(coap_packet_t *request, coap_packet_t *response,
+                    uint8_t *target, size_t *len, size_t max_len)
 {
   const uint8_t *payload = 0;
   int pay_len = coap_get_payload(request, &payload);
@@ -84,28 +85,26 @@ coap_block1_handler(void *request, void *response, uint8_t *target, size_t *len,
     return -1;
   }
 
-  coap_packet_t *packet = (coap_packet_t *)request;
-
-  if(packet->block1_offset + pay_len > max_len) {
+  if(request->block1_offset + pay_len > max_len) {
     erbium_status_code = REQUEST_ENTITY_TOO_LARGE_4_13;
     coap_error_message = "Message to big";
     return -1;
   }
 
   if(target && len) {
-    memcpy(target + packet->block1_offset, payload, pay_len);
-    *len = packet->block1_offset + pay_len;
+    memcpy(target + request->block1_offset, payload, pay_len);
+    *len = request->block1_offset + pay_len;
   }
 
-  if(IS_OPTION(packet, COAP_OPTION_BLOCK1)) {
+  if(IS_OPTION(request, COAP_OPTION_BLOCK1)) {
     PRINTF("Blockwise: block 1 request: Num: %u, More: %u, Size: %u, Offset: %u\n",
-           packet->block1_num,
-           packet->block1_more,
-           packet->block1_size,
-           packet->block1_offset);
+           request->block1_num,
+           request->block1_more,
+           request->block1_size,
+           request->block1_offset);
 
-    coap_set_header_block1(response, packet->block1_num, packet->block1_more, packet->block1_size);
-    if(packet->block1_more) {
+    coap_set_header_block1(response, request->block1_num, request->block1_more, request->block1_size);
+    if(request->block1_more) {
       coap_set_status_code(response, CONTINUE_2_31);
       return 1;
     }

@@ -81,7 +81,7 @@ int coap_remove_observer_by_mid(const coap_endpoint_t *ep,
 void coap_notify_observers(resource_t *resource);
 void coap_notify_observers_sub(resource_t *resource, const char *subpath);
 
-void coap_observe_handler(resource_t *resource, void *request,
-                          void *response);
+void coap_observe_handler(resource_t *resource, coap_packet_t *request,
+                          coap_packet_t *response);
 
 #endif /* COAP_OBSERVE_H_ */

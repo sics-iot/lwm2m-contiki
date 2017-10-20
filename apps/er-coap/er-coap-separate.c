@@ -81,9 +81,8 @@ coap_separate_reject()
  * then retry later.
  */
 void
-coap_separate_accept(void *request, coap_separate_t *separate_store)
+coap_separate_accept(coap_packet_t *coap_req, coap_separate_t *separate_store)
 {
-  coap_packet_t *const coap_req = (coap_packet_t *)request;
   coap_transaction_t *const t = coap_get_transaction_by_mid(coap_req->mid);
 
   PRINTF("Separate ACCEPT: /%.*s MID %u\n", (int)coap_req->uri_path_len,
@@ -132,7 +131,7 @@ coap_separate_accept(void *request, coap_separate_t *separate_store)
 }
 /*----------------------------------------------------------------------------*/
 void
-coap_separate_resume(void *response, coap_separate_t *separate_store,
+coap_separate_resume(coap_packet_t *response, coap_separate_t *separate_store,
                      uint8_t code)
 {
   coap_init_message(response, separate_store->type, code,

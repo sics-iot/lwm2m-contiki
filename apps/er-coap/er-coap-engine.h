@@ -89,39 +89,41 @@ coap_handler_status_t er_coap_call_handlers(coap_packet_t *request,
                                             uint8_t *buffer,
                                             uint16_t buffer_size,
                                             int32_t *offset);
-
 /*---------------------------------------------------------------------------*/
 /* signatures of handler functions */
-typedef void (*restful_handler)(void *request, void *response,
-                                uint8_t *buffer, uint16_t preferred_size,
-                                int32_t *offset);
-typedef void (*restful_final_handler)(resource_t *resource,
-                                      void *request, void *response);
-typedef void (*restful_periodic_handler)(void);
-typedef void (*restful_response_handler)(void *data, void *response);
-typedef void (*restful_trigger_handler)(void);
+typedef void (* restful_handler_t)(coap_packet_t *request,
+                                   coap_packet_t *response,
+                                   uint8_t *buffer, uint16_t preferred_size,
+                                   int32_t *offset);
+typedef void (* restful_final_handler_t)(resource_t *resource,
+                                        coap_packet_t *request,
+                                        coap_packet_t *response);
+typedef void (* restful_periodic_handler_t)(void);
+typedef void (* restful_response_handler_t)(void *data,
+                                            coap_packet_t *response);
+typedef void (* restful_trigger_handler_t)(void);
 
 /* data structure representing a resource in REST */
 struct resource_s {
-  resource_t *next;               /* for LIST, points to next resource defined */
-  const char *url;                /*handled URL */
-  coap_resource_flags_t flags;    /* handled RESTful methods */
-  const char *attributes;         /* link-format attributes */
-  restful_handler get_handler;    /* handler function */
-  restful_handler post_handler;   /* handler function */
-  restful_handler put_handler;    /* handler function */
-  restful_handler delete_handler; /* handler function */
+  resource_t *next;                 /* for LIST, points to next resource defined */
+  const char *url;                  /*handled URL */
+  coap_resource_flags_t flags;      /* handled RESTful methods */
+  const char *attributes;           /* link-format attributes */
+  restful_handler_t get_handler;    /* handler function */
+  restful_handler_t post_handler;   /* handler function */
+  restful_handler_t put_handler;    /* handler function */
+  restful_handler_t delete_handler; /* handler function */
   union {
-    periodic_resource_t *periodic; /* special data depending on flags */
-    restful_trigger_handler trigger;
-    restful_trigger_handler resume;
+    periodic_resource_t *periodic;  /* special data depending on flags */
+    restful_trigger_handler_t trigger;
+    restful_trigger_handler_t resume;
   };
 };
 
 struct periodic_resource_s {
   uint32_t period;
   coap_timer_t periodic_timer;
-  const restful_periodic_handler periodic_handler;
+  const restful_periodic_handler_t periodic_handler;
 };
 
 /*

@@ -59,19 +59,19 @@
 /*- Client Part -------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 void
-coap_blocking_request_callback(void *callback_data, void *response)
+coap_blocking_request_callback(void *callback_data, coap_packet_t *response)
 {
   struct request_state_t *state = (struct request_state_t *)callback_data;
 
-  state->response = (coap_packet_t *)response;
+  state->response = response;
   process_poll(state->process);
 }
 /*---------------------------------------------------------------------------*/
 PT_THREAD(coap_blocking_request
-            (struct request_state_t *state, process_event_t ev,
-            coap_endpoint_t *remote_ep,
-            coap_packet_t *request,
-            blocking_response_handler request_callback))
+          (struct request_state_t *state, process_event_t ev,
+           coap_endpoint_t *remote_ep,
+           coap_packet_t *request,
+           blocking_response_handler_t request_callback))
 {
   PT_BEGIN(&state->pt);
 

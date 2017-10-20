@@ -66,7 +66,7 @@ static uint32_t res_block;
 static uint8_t block_error;
 
 
-static void coap_request_callback(void *callback_data, void *response);
+static void coap_request_callback(void *callback_data, coap_packet_t *response);
 
 /*---------------------------------------------------------------------------*/
 
@@ -95,12 +95,12 @@ progress_request(struct request_state *state) {
 /*---------------------------------------------------------------------------*/
 
 static void
-coap_request_callback(void *callback_data, void *response)
+coap_request_callback(void *callback_data, coap_packet_t *response)
 {
   struct request_state *state = (struct request_state *)callback_data;
-
-  state->response = (coap_packet_t *)response;
   uint32_t res_block1;
+
+  state->response = response;
 
   PRINTF("COAP: request callback\n");
 
