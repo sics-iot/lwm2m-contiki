@@ -74,11 +74,13 @@
     } while(0)
 #define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
 #define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
+#define PRINTEP(ep) coap_endpoint_print(ep)
 #else
 #define PRINTF(...)
 #define PRINTS(l,s,f)
 #define PRINT6ADDR(addr)
 #define PRINTLLADDR(addr)
+#define PRINTEP(ep)
 #endif
 
 #ifndef LWM2M_DEFAULT_CLIENT_LIFETIME
@@ -559,7 +561,7 @@ periodic_process(coap_timer_t *timer)
         snprintf(query_data, sizeof(query_data) - 1, "?ep=%s", session_info.ep);
         coap_set_header_uri_query(request, query_data);
         PRINTF("Registering ID with bootstrap server [");
-        coap_endpoint_print(&session_info.bs_server_ep);
+        PRINTEP(&session_info.bs_server_ep);
         PRINTF("] as '%s'\n", query_data);
 
         coap_send_request(&rd_request_state, &session_info.bs_server_ep,
@@ -605,7 +607,7 @@ periodic_process(coap_timer_t *timer)
             PRINTF("Failed to parse server URI!\n");
           } else {
             PRINTF("Server address:");
-            coap_endpoint_print(&session_info.server_ep);
+            PRINTEP(&session_info.server_ep);
             PRINTF("\n");
             if(secure) {
               PRINTF("Secure CoAP requested but not supported - can not bootstrap\n");
@@ -652,7 +654,7 @@ periodic_process(coap_timer_t *timer)
       rd_callback = registration_callback;
 
       PRINTF("Registering with [");
-      coap_endpoint_print(&session_info.server_ep);
+      PRINTEP(&session_info.server_ep);
       PRINTF("] lwm2m endpoint '%s': '", query_data);
       if(len) {
         PRINTS(len, rd_data, "%c");
