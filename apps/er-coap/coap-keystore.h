@@ -29,22 +29,25 @@
  *
  */
 
-#include "contiki.h"
+#ifndef COAP_KEYSTORE_H_
+#define COAP_KEYSTORE_H_
+
 #include "er-coap-endpoint.h"
 
 /* Pre-shared key info */
-struct coap_psk_entry {
-  uint8_t *identity;
+typedef struct {
+  const uint8_t *identity;
   uint16_t identity_len;
-  uint8_t *key;
+  const uint8_t *key;
   uint16_t key_len;
-};
+} coap_keystore_psk_entry_t;
 
 /* the function for getting the data from a keystore */
-struct coap_keystore {
+typedef struct coap_keystore {
   int (* coap_get_psk_info)(const coap_endpoint_t *address_info,
-                            struct coap_psk_entry *info);
-};
+                            coap_keystore_psk_entry_t *info);
+} coap_keystore_t;
 
-void coap_set_keystore(struct coap_keystore *keystore);
+void coap_set_keystore(const coap_keystore_t *keystore);
 
+#endif /* COAP_KEYSTORE_H_ */
