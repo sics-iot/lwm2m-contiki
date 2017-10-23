@@ -261,14 +261,14 @@ coap_notify_observers_sub(coap_resource_t *resource, const char *subpath)
 
         /* Either old style get_handler or the full handler */
         if(coap_call_handlers(request, notification, transaction->packet +
-                              COAP_MAX_HEADER_SIZE, REST_MAX_CHUNK_SIZE,
+                              COAP_MAX_HEADER_SIZE, COAP_MAX_CHUNK_SIZE,
                               NULL) > 0) {
           PRINTF("Notification on new handlers\n");
         } else {
           if(resource != NULL) {
             resource->get_handler(request, notification,
                                   transaction->packet + COAP_MAX_HEADER_SIZE,
-                                  REST_MAX_CHUNK_SIZE, NULL);
+                                  COAP_MAX_CHUNK_SIZE, NULL);
           } else {
             /* What to do here? */
             notification->code = BAD_REQUEST_4_00;

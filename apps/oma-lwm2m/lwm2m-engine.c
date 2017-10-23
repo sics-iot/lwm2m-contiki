@@ -538,7 +538,7 @@ lwm2m_engine_init(void)
 
 #endif /* LWM2M_ENGINE_CLIENT_ENDPOINT_NAME */
 
-  coap_init_engine();
+  coap_engine_init();
 
   /* Register the CoAP handler for lightweight object handling */
   coap_add_handler(&lwm2m_handler);

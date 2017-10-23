@@ -44,17 +44,17 @@
 #include "er-coap-conf.h"
 #include "er-coap-transport.h"
 
-#define COAP_MAX_PACKET_SIZE  (COAP_MAX_HEADER_SIZE + REST_MAX_CHUNK_SIZE)
+#define COAP_MAX_PACKET_SIZE  (COAP_MAX_HEADER_SIZE + COAP_MAX_CHUNK_SIZE)
 
-/* REST_MAX_CHUNK_SIZE can be different from 2^x so we need to get next lower 2^x for COAP_MAX_BLOCK_SIZE */
+/* COAP_MAX_CHUNK_SIZE can be different from 2^x so we need to get next lower 2^x for COAP_MAX_BLOCK_SIZE */
 #ifndef COAP_MAX_BLOCK_SIZE
-#define COAP_MAX_BLOCK_SIZE           (REST_MAX_CHUNK_SIZE < 32 ? 16 : \
-                                       (REST_MAX_CHUNK_SIZE < 64 ? 32 : \
-                                        (REST_MAX_CHUNK_SIZE < 128 ? 64 : \
-                                         (REST_MAX_CHUNK_SIZE < 256 ? 128 : \
-                                          (REST_MAX_CHUNK_SIZE < 512 ? 256 : \
-                                          (REST_MAX_CHUNK_SIZE < 1024 ? 512 : \
-                                          (REST_MAX_CHUNK_SIZE < 2048 ? 1024 : 2048)))))))
+#define COAP_MAX_BLOCK_SIZE           (COAP_MAX_CHUNK_SIZE < 32 ? 16 : \
+                                       (COAP_MAX_CHUNK_SIZE < 64 ? 32 : \
+                                        (COAP_MAX_CHUNK_SIZE < 128 ? 64 : \
+                                         (COAP_MAX_CHUNK_SIZE < 256 ? 128 : \
+                                          (COAP_MAX_CHUNK_SIZE < 512 ? 256 : \
+                                          (COAP_MAX_CHUNK_SIZE < 1024 ? 512 : \
+                                          (COAP_MAX_CHUNK_SIZE < 2048 ? 1024 : 2048)))))))
 #endif /* COAP_MAX_BLOCK_SIZE */
 
 /* bitmap for set options */

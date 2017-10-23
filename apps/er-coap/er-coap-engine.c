@@ -364,7 +364,7 @@ coap_receive(const coap_endpoint_t *src,
 }
 /*---------------------------------------------------------------------------*/
 void
-coap_init_engine(void)
+coap_engine_init(void)
 {
   /* avoid initializing twice */
   if(is_initialized) {

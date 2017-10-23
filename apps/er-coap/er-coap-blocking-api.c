@@ -95,7 +95,7 @@ PT_THREAD(coap_blocking_request
 
       if(state->block_num > 0) {
         coap_set_header_block2(request, state->block_num, 0,
-                               REST_MAX_CHUNK_SIZE);
+                               COAP_MAX_CHUNK_SIZE);
       }
       state->transaction->packet_len = coap_serialize_message(request,
                                                               state->

@@ -70,7 +70,7 @@
 
 /* sanity check for configured values */
 #if COAP_MAX_PACKET_SIZE > (UIP_BUFSIZE - UIP_IPH_LEN - UIP_UDPH_LEN)
-#error "UIP_CONF_BUFFER_SIZE too small for REST_MAX_CHUNK_SIZE"
+#error "UIP_CONF_BUFFER_SIZE too small for COAP_MAX_CHUNK_SIZE"
 #endif
 
 #define SERVER_LISTEN_PORT        UIP_HTONS(COAP_DEFAULT_PORT)

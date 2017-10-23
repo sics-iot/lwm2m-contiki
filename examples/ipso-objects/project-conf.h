@@ -63,8 +63,8 @@
 #define UIP_CONF_TCP                   0
 
 /* Increase rpl-border-router IP-buffer when using more than 64. */
-#undef REST_MAX_CHUNK_SIZE
-#define REST_MAX_CHUNK_SIZE            64
+#undef COAP_MAX_CHUNK_SIZE
+#define COAP_MAX_CHUNK_SIZE            64
 
 /* Multiplies with chunk size, be aware of memory constraints. */
 #undef COAP_MAX_OPEN_TRANSACTIONS

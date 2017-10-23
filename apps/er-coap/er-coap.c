@@ -467,9 +467,9 @@ coap_parse_message(coap_packet_t *coap_pkt, uint8_t *data, uint16_t data_len)
       coap_pkt->payload = ++current_option;
       coap_pkt->payload_len = data_len - (coap_pkt->payload - data);
 
-      /* also for receiving, the Erbium upper bound is REST_MAX_CHUNK_SIZE */
-      if(coap_pkt->payload_len > REST_MAX_CHUNK_SIZE) {
-        coap_pkt->payload_len = REST_MAX_CHUNK_SIZE;
+      /* also for receiving, the Erbium upper bound is COAP_MAX_CHUNK_SIZE */
+      if(coap_pkt->payload_len > COAP_MAX_CHUNK_SIZE) {
+        coap_pkt->payload_len = COAP_MAX_CHUNK_SIZE;
         /* null-terminate payload */
       }
       coap_pkt->payload[coap_pkt->payload_len] = '\0';
@@ -690,7 +690,7 @@ coap_parse_message(coap_packet_t *coap_pkt, uint8_t *data, uint16_t data_len)
   return NO_ERROR;
 }
 /*---------------------------------------------------------------------------*/
-/*- REST Engine API ---------------------------------------------------------*/
+/*- CoAP Engine API ---------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 int
 coap_get_query_variable(coap_packet_t *coap_pkt,
@@ -733,7 +733,7 @@ coap_set_token(coap_packet_t *coap_pkt, const uint8_t *token, size_t token_len)
   return coap_pkt->token_len;
 }
 /*---------------------------------------------------------------------------*/
-/*- CoAP REST Implementation API --------------------------------------------*/
+/*- CoAP Implementation API -------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 int
 coap_get_header_content_format(coap_packet_t *coap_pkt, unsigned int *format)
@@ -1130,7 +1130,7 @@ int
 coap_set_payload(coap_packet_t *coap_pkt, const void *payload, size_t length)
 {
   coap_pkt->payload = (uint8_t *)payload;
-  coap_pkt->payload_len = MIN(REST_MAX_CHUNK_SIZE, length);
+  coap_pkt->payload_len = MIN(COAP_MAX_CHUNK_SIZE, length);
 
   return coap_pkt->payload_len;
 }
