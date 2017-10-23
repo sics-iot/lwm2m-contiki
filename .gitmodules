@@ -20,4 +20,4 @@
 [submodule "lib/tinydtls"]
 	path = lib/tinydtls
 	url = https://github.com/sics-iot/tinydtls-standalone.git
-	branch = dtls-standalone
+	branch = dtls-contiki
