@@ -509,13 +509,15 @@ get_psk_info(struct dtls_context_t *ctx,
   PRINTF("---===>>> Getting the Key or ID <<<===---\n");
   switch(type) {
   case DTLS_PSK_IDENTITY:
-    if(id_len) {
+    if(id && id_len) {
+      ks.identity_hint = id;
+      ks.identity_hint_len = id_len;
       PRINTF("got psk_identity_hint: '%.*s'\n", id_len, id);
     }
 
-    if(dtls_keystore->coap_get_psk_info) {
+    if(keystore->coap_get_psk_info) {
       /* we know that session is a coap endpoint */
-      dtls_keystore->coap_get_psk_info((coap_endpoint_t *)session, &ks);
+      keystore->coap_get_psk_info((coap_endpoint_t *)session, &ks);
     }
     if(ks.identity == NULL || ks.identity_len == 0) {
       return 0;
@@ -529,11 +531,11 @@ get_psk_info(struct dtls_context_t *ctx,
     return ks.identity_len;
 
   case DTLS_PSK_KEY:
-    if(dtls_keystore->coap_get_psk_info) {
+    if(keystore->coap_get_psk_info) {
       ks.identity = id;
       ks.identity_len = id_len;
       /* we know that session is a coap endpoint */
-      dtls_keystore->coap_get_psk_info((coap_endpoint_t *)session, &ks);
+      keystore->coap_get_psk_info((coap_endpoint_t *)session, &ks);
     }
     if(ks.key == NULL || ks.key_len == 0) {
       PRINTF("PSK for unknown id requested, exiting\n");

@@ -36,6 +36,8 @@
 
 /* Pre-shared key info */
 typedef struct {
+  const uint8_t *identity_hint;
+  uint16_t identity_hint_len;
   const uint8_t *identity;
   uint16_t identity_len;
   const uint8_t *key;
