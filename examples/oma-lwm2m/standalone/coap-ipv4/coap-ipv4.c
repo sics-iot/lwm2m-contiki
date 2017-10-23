@@ -79,9 +79,6 @@ static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
 
 #if WITH_DTLS
-#define PSK_DEFAULT_IDENTITY "Client_identity"
-#define PSK_DEFAULT_KEY      "secretPSK"
-
 static int dtls_ipv4_fd = -1;
 static dtls_handler_t cb;
 static dtls_context_t *dtls_context = NULL;
@@ -512,34 +509,6 @@ coap_set_keystore(const coap_keystore_t *keystore)
   dtls_keystore = keystore;
 }
 
-#if defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY)
-static int
-get_default_psk_info(const coap_endpoint_t *address_info,
-                     coap_keystore_psk_entry_t *info)
-{
-  if(info != NULL) {
-    if(info->identity == NULL || info->identity_len == 0) {
-      /* Identity requested */
-      info->identity = (uint8_t *)PSK_DEFAULT_IDENTITY;
-      info->identity_len = strlen(PSK_DEFAULT_IDENTITY);
-      return 1;
-    }
-    if(info->identity_len != strlen(PSK_DEFAULT_IDENTITY) ||
-       memcmp(info->identity, PSK_DEFAULT_IDENTITY, info->identity_len) != 0) {
-      /* Identity not matching */
-      return 0;
-    }
-    info->key = (uint8_t *)PSK_DEFAULT_KEY;
-    info->key_len = strlen(PSK_DEFAULT_KEY);
-    return 1;
-  }
-  return 0;
-}
-static const coap_keystore_t default_key_store = {
-  .coap_get_psk_info = get_default_psk_info
-};
-#endif /* defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY) */
-
 /* This function is the "key store" for tinyDTLS. It is called to
  * retrieve a key for the given identity within this particular
  * session. */
@@ -554,13 +523,6 @@ get_psk_info(struct dtls_context_t *ctx,
   coap_keystore_psk_entry_t ks;
 
   keystore = dtls_keystore;
-
-#if defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY)
-  if(keystore == NULL) {
-    keystore = &default_key_store;
-  }
-#endif /* defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY) */
-
   if(keystore == NULL) {
     PRINTF("--- No key store available ---\n");
     return 0;

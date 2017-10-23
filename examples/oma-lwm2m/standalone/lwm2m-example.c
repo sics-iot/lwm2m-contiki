@@ -49,6 +49,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define PSK_DEFAULT_IDENTITY "Client_identity"
+#define PSK_DEFAULT_KEY      "secretPSK"
+
 #define WITH_TEST_NOTIFICATION 1
 
 void ipso_sensor_temp_init(void);
@@ -57,7 +60,7 @@ void ipso_blockwise_test_init(void);
 void lwm2m_generic_object_test_init(void);
 
 /* set this above zero to get auto deregister */
-int deregister = -1;
+static int deregister = -1;
 
 /*---------------------------------------------------------------------------*/
 #if WITH_TEST_NOTIFICATION
@@ -85,7 +88,7 @@ session_callback(struct lwm2m_session_info *si, int state)
 /*---------------------------------------------------------------------------*/
 #ifndef LWM2M_DEFAULT_RD_SERVER
 /* Default to leshan.eclipse.org */
-#if WITH_DTLS
+#ifdef WITH_DTLS
 #define LWM2M_DEFAULT_RD_SERVER "coaps://5.39.83.206"
 #else
 #define LWM2M_DEFAULT_RD_SERVER "coap://5.39.83.206"
@@ -144,6 +147,36 @@ start_application(int argc, char *argv[])
     printf("Starting RD client to register at ");
     coap_endpoint_print(&server_ep);
     printf("\n");
+
+#ifdef WITH_DTLS
+#if defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY)
+    {
+      lwm2m_security_server_t *server;
+      /* Register new server with instance id, server id, lifetime in seconds */
+      if(!lwm2m_server_add(0, 1, 600)) {
+        printf("failed to add server object\n");
+      }
+
+      server = lwm2m_security_add_server(0, 1,
+                                         (uint8_t *)default_server,
+                                         strlen(default_server));
+      if(server == NULL) {
+        printf("failed to add security object\n");
+      } else {
+        if(lwm2m_security_set_server_psk(server,
+                                         (uint8_t *)PSK_DEFAULT_IDENTITY,
+                                         strlen(PSK_DEFAULT_IDENTITY),
+                                         (uint8_t *)PSK_DEFAULT_KEY,
+                                         strlen(PSK_DEFAULT_KEY))) {
+          printf("registered security object for endpoint %s\n",
+                 default_server);
+        } else {
+          printf("failed to register security object\n");
+        }
+      }
+    }
+#endif /* defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY) */
+#endif /* WITH_DTLS */
 
 #define BOOTSTRAP 0
 #if BOOTSTRAP
