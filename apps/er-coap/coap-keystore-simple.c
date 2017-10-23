@@ -40,15 +40,16 @@
 #include "coap-keystore.h"
 #include <string.h>
 
-#ifndef PSK_DEFAULT_IDENTITY
-#define PSK_DEFAULT_IDENTITY "Client_identity"
-#endif /* PSK_DEFAULT_IDENTITY */
+/* #ifndef PSK_DEFAULT_IDENTITY */
+/* #define PSK_DEFAULT_IDENTITY "Client_identity" */
+/* #endif /\* PSK_DEFAULT_IDENTITY *\/ */
 
-#ifndef PSK_DEFAULT_KEY
-#define PSK_DEFAULT_KEY      "secretPSK"
-#endif /* PSK_DEFAULT_KEY */
+/* #ifndef PSK_DEFAULT_KEY */
+/* #define PSK_DEFAULT_KEY      "secretPSK" */
+/* #endif /\* PSK_DEFAULT_KEY *\/ */
 /*---------------------------------------------------------------------------*/
 #ifdef WITH_DTLS
+#if defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY)
 static int
 get_default_psk_info(const coap_endpoint_t *address_info,
                      coap_keystore_psk_entry_t *info)
@@ -74,13 +75,16 @@ get_default_psk_info(const coap_endpoint_t *address_info,
 static const coap_keystore_t simple_key_store = {
   .coap_get_psk_info = get_default_psk_info
 };
+#endif /* defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY) */
 #endif /* WITH_DTLS */
 /*---------------------------------------------------------------------------*/
 void
 coap_store_simple_init(void)
 {
 #ifdef WITH_DTLS
+#if defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY)
   coap_set_keystore(&simple_key_store);
+#endif /* defined(PSK_DEFAULT_IDENTITY) && defined(PSK_DEFAULT_KEY) */
 #endif /* WITH_DTLS */
 }
 /*---------------------------------------------------------------------------*/
