@@ -44,12 +44,15 @@
 #define LWM2M_SERVER_MAX_COUNT 2
 #endif
 
-typedef struct server_value {
+typedef struct {
   lwm2m_object_instance_t instance;
   uint16_t server_id;
   uint32_t lifetime;
-} server_value_t;
+} lwm2m_server_t;
 
+lwm2m_server_t *lwm2m_server_add(uint16_t instance_id,
+                                 uint16_t server_id,
+                                 uint32_t lifetime);
 
 void lwm2m_server_init(void);
 

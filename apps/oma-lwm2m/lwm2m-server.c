@@ -90,7 +90,7 @@ static lwm2m_object_t server_object = {
 };
 
 LIST(server_list);
-static server_value_t server_instances[MAX_COUNT];
+static lwm2m_server_t server_instances[MAX_COUNT];
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
 create_instance(uint16_t instance_id, lwm2m_status_t *status)
@@ -201,8 +201,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
                lwm2m_context_t *ctx)
 {
   int32_t value;
-  server_value_t *server;
-  server = (server_value_t *) object;
+  lwm2m_server_t *server;
+  server = (lwm2m_server_t *) object;
 
   if(ctx->operation == LWM2M_OP_WRITE) {
     PRINTF("Write to: %d\n", ctx->resource_id);
@@ -215,7 +215,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
   } else if(ctx->operation == LWM2M_OP_READ) {
     switch(ctx->resource_id) {
     case LWM2M_SERVER_SHORT_SERVER_ID:
-      lwm2m_object_write_int(ctx, object->instance_id);
+      lwm2m_object_write_int(ctx, server->server_id);
       break;
     case LWM2M_SERVER_LIFETIME_ID:
       lwm2m_object_write_int(ctx, server->lifetime);
@@ -233,7 +233,54 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 
   return LWM2M_STATUS_OK;
 }
+/*---------------------------------------------------------------------------*/
+lwm2m_server_t *
+lwm2m_server_add(uint16_t instance_id, uint16_t server_id, uint32_t lifetime)
+{
+  lwm2m_server_t *server;
+  int i;
 
+  for(server = list_head(server_list);
+      server;
+      server = (lwm2m_server_t *)server->instance.next) {
+    if(server->server_id == server_id) {
+      /* Found a matching server */
+      if(server->instance.instance_id != instance_id) {
+        /* Non-matching instance id */
+        PRINTF("lwm2m-server: non-matching instance id for server %u\n",
+               server_id);
+        return NULL;
+      }
+      server->lifetime = lifetime;
+      return server;
+    } else if(server->instance.instance_id == instance_id) {
+      /* Right instance but wrong server id */
+      PRINTF("lwm2m-server: non-matching server id for instance %u\n",
+             instance_id);
+      return NULL;
+    }
+  }
+
+  for(i = 0; i < MAX_COUNT; i++) {
+    if(server_instances[i].instance.instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+      server_instances[i].instance.callback = lwm2m_callback;
+      server_instances[i].instance.object_id = LWM2M_OBJECT_SERVER_ID;
+      server_instances[i].instance.instance_id = instance_id;
+      server_instances[i].instance.resource_ids = resources;
+      server_instances[i].instance.resource_count =
+        sizeof(resources) / sizeof(lwm2m_resource_id_t);
+      server_instances[i].server_id = server_id;
+      server_instances[i].lifetime = lifetime;
+      list_add(server_list, &server_instances[i].instance);
+
+      return &server_instances[i];
+    }
+  }
+
+  PRINTF("lwm2m-server: no space for more servers\n");
+
+  return NULL;
+}
 /*---------------------------------------------------------------------------*/
 void
 lwm2m_server_init(void)
