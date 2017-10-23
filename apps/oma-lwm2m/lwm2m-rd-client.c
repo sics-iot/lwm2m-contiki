@@ -577,7 +577,7 @@ periodic_process(coap_timer_t *timer)
   case BOOTSTRAP_DONE:
     /* check that we should still use bootstrap */
     if(session_info.use_bootstrap) {
-      lwm2m_security_value_t *security;
+      lwm2m_security_server_t *security;
       PRINTF("*** Bootstrap - checking for server info...\n");
       /* get the security object - ignore bootstrap servers */
       for(security = lwm2m_security_get_first();

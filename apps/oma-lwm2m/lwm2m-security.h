@@ -39,7 +39,7 @@
 #define URI_SIZE 64
 #define KEY_SIZE 32
 
-typedef struct security_value {
+typedef struct {
   lwm2m_object_instance_t instance;
   uint16_t server_id;
   uint8_t bootstrap;
@@ -52,10 +52,21 @@ typedef struct security_value {
   uint8_t secret_key_len;
   uint8_t server_public_key[KEY_SIZE];
   uint8_t server_public_key_len;
-} lwm2m_security_value_t;
+} lwm2m_security_server_t;
 
-lwm2m_security_value_t *lwm2m_security_get_first(void);
-lwm2m_security_value_t *lwm2m_security_get_next(lwm2m_security_value_t *last);
+lwm2m_security_server_t *lwm2m_security_get_first(void);
+lwm2m_security_server_t *lwm2m_security_get_next(lwm2m_security_server_t *last);
+
+lwm2m_security_server_t *lwm2m_security_add_server(uint16_t instance_id,
+                                                  uint16_t server_id,
+                                                  const uint8_t *server_uri,
+                                                  uint8_t server_uri_len);
+
+int lwm2m_security_set_server_psk(lwm2m_security_server_t *server,
+                                  const uint8_t *identity,
+                                  uint8_t identity_len,
+                                  const uint8_t *key,
+                                  uint8_t key_len);
 
 void lwm2m_security_init(void);
 

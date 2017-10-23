@@ -67,6 +67,12 @@
 #define PRINTEP(ep)
 #endif
 
+#ifdef LWM2M_SECURITY_CONF_REGISTER_KEY_STORE
+#define LWM2M_SECURITY_REGISTER_KEY_STORE LWM2M_SECURITY_CONF_REGISTER_KEY_STORE
+#else /* LWM2M_SECURITY_CONF_REGISTER_KEY_STORE */
+#define LWM2M_SECURITY_REGISTER_KEY_STORE 1
+#endif /* LWM2M_SECURITY_CONF_REGISTER_KEY_STORE */
+
 #define MAX_COUNT LWM2M_SERVER_MAX_COUNT
 
 static lwm2m_status_t lwm2m_callback(lwm2m_object_instance_t *object,
@@ -83,7 +89,7 @@ static const lwm2m_resource_id_t resources[] = {
 };
 
 LIST(instances_list);
-static lwm2m_security_value_t instances[MAX_COUNT];
+static lwm2m_security_server_t instances[MAX_COUNT];
 /*---------------------------------------------------------------------------*/
 static lwm2m_object_instance_t *
 create_instance(uint16_t instance_id, lwm2m_status_t *status)
@@ -180,8 +186,8 @@ lwm2m_callback(lwm2m_object_instance_t *object,
      avoid reading out data */
   int32_t value;
   int iv;
-  lwm2m_security_value_t *security;
-  security = (lwm2m_security_value_t *) object;
+  lwm2m_security_server_t *security;
+  security = (lwm2m_security_server_t *) object;
 
   if(ctx->operation == LWM2M_OP_WRITE) {
     /* Handle the writes */
@@ -242,16 +248,100 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 }
 
 /*---------------------------------------------------------------------------*/
-lwm2m_security_value_t *
+lwm2m_security_server_t *
 lwm2m_security_get_first(void)
 {
   return list_head(instances_list);
 }
 /*---------------------------------------------------------------------------*/
-lwm2m_security_value_t *
-lwm2m_security_get_next(lwm2m_security_value_t *last)
+lwm2m_security_server_t *
+lwm2m_security_get_next(lwm2m_security_server_t *last)
 {
-  return last == NULL ? NULL : (lwm2m_security_value_t *)last->instance.next;
+  return last == NULL ? NULL : (lwm2m_security_server_t *)last->instance.next;
+}
+/*---------------------------------------------------------------------------*/
+lwm2m_security_server_t *
+lwm2m_security_add_server(uint16_t instance_id,
+                          uint16_t server_id,
+                          const uint8_t *server_uri,
+                          uint8_t server_uri_len)
+{
+  lwm2m_security_server_t *server;
+  int i;
+
+  if(server_uri_len > URI_SIZE) {
+    PRINTF("lwm2m-sec: too long server URI\n");
+    return NULL;
+  }
+
+  for(server = lwm2m_security_get_first();
+      server != NULL;
+      server = lwm2m_security_get_next(server)) {
+    if(server->server_id == server_id) {
+      if(server->instance.instance_id != instance_id) {
+        PRINTF("lwm2m-sec: wrong instance id\n");
+        return NULL;
+      }
+      /* Correct server id and instance id */
+      break;
+    } else if(server->instance.instance_id == instance_id) {
+      PRINTF("lwm2m-sec: wrong server id\n");
+      return NULL;
+    }
+  }
+
+  if(server == NULL) {
+    for(i = 0; i < MAX_COUNT; i++) {
+      if(instances[i].instance.instance_id == LWM2M_OBJECT_INSTANCE_NONE) {
+        memset(&instances[i], 0, sizeof(instances[i]));
+        instances[i].instance.callback = lwm2m_callback;
+        instances[i].instance.object_id = LWM2M_OBJECT_SECURITY_ID;
+        instances[i].instance.instance_id = instance_id;
+        instances[i].instance.resource_ids = resources;
+        instances[i].instance.resource_count =
+          sizeof(resources) / sizeof(lwm2m_resource_id_t);
+        list_add(instances_list, &instances[i].instance);
+        server = &instances[i];
+      }
+    }
+    if(server == NULL) {
+      PRINTF("lwm2m-sec: no space for more servers\n");
+      return NULL;
+    }
+  }
+
+  memcpy(server->server_uri, server_uri, server_uri_len);
+  server->server_uri_len = server_uri_len;
+
+  return server;
+}
+/*---------------------------------------------------------------------------*/
+int
+lwm2m_security_set_server_psk(lwm2m_security_server_t *server,
+                              const uint8_t *identity,
+                              uint8_t identity_len,
+                              const uint8_t *key,
+                              uint8_t key_len)
+{
+  if(server == NULL || identity == NULL || key == NULL) {
+    return 0;
+  }
+  if(identity_len > KEY_SIZE) {
+    PRINTF("lwm2m-sec: too large identity\n");
+    return 0;
+  }
+  if(key_len > KEY_SIZE) {
+    PRINTF("lwm2m-sec: too large identity\n");
+    return 0;
+  }
+  memcpy(server->public_key, identity, identity_len);
+  server->public_key_len = identity_len;
+  memcpy(server->secret_key, key, key_len);
+  server->secret_key_len = key_len;
+
+  server->security_mode = LWM2M_SECURITY_MODE_PSK;
+
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 static const lwm2m_object_impl_t impl = {
@@ -266,13 +356,14 @@ static lwm2m_object_t reg_object = {
   .impl = &impl,
 };
 /*---------------------------------------------------------------------------*/
-#if WITH_DTLS
+#ifdef WITH_DTLS
+#if LWM2M_SECURITY_REGISTER_KEY_STORE
 static int
 get_psk_info(const coap_endpoint_t *address_info,
              coap_keystore_psk_entry_t *info)
 {
   /* Find matching security object based on address */
-  lwm2m_security_value_t *e;
+  lwm2m_security_server_t *e;
   coap_endpoint_t ep;
 
   if(info == NULL || address_info == NULL) {
@@ -340,12 +431,15 @@ get_psk_info(const coap_endpoint_t *address_info,
   info->key_len = e->secret_key_len;
   return 1;
 }
+#endif /* LWM2M_SECURITY_REGISTER_KEY_STORE */
 #endif /* WITH_DTLS */
 /*---------------------------------------------------------------------------*/
-#if WITH_DTLS
+#ifdef WITH_DTLS
+#if LWM2M_SECURITY_REGISTER_KEY_STORE
 static const coap_keystore_t key_store = {
   .coap_get_psk_info = get_psk_info
 };
+#endif /* LWM2M_SECURITY_REGISTER_KEY_STORE */
 #endif /* WITH_DTLS */
 /*---------------------------------------------------------------------------*/
 void
@@ -361,9 +455,12 @@ lwm2m_security_init(void)
     instances[i].instance.instance_id = LWM2M_OBJECT_INSTANCE_NONE;
   }
   if(lwm2m_engine_add_generic_object(&reg_object)) {
-#if WITH_DTLS
+
+#ifdef WITH_DTLS
+#if LWM2M_SECURITY_REGISTER_KEY_STORE
     /* Security object handler added - register keystore */
     coap_set_keystore(&key_store);
+#endif /* LWM2M_SECURITY_REGISTER_KEY_STORE */
 #endif /* WITH_DTLS */
   }
 }
