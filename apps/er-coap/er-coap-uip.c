@@ -61,7 +61,7 @@
 #define PRINTEP(X)
 #endif
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
 #include "tinydtls.h"
 #include "dtls.h"
 #include "dtls_debug.h"
@@ -84,7 +84,7 @@
 #define UIP_UDP_BUF  ((struct uip_udp_hdr *)&uip_buf[UIP_LLH_LEN + UIP_IPH_LEN])
 #endif
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
 static dtls_handler_t cb;
 static dtls_context_t *dtls_context = NULL;
 
@@ -221,7 +221,7 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
   }
 #endif /* UIP_CONF_IPV6_RPL */
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   if(ep != NULL && ep->secure != 0 && dtls_context != NULL) {
     dtls_peer_t *peer;
     peer = dtls_get_peer(dtls_context, ep);
@@ -253,7 +253,7 @@ coap_endpoint_connect(coap_endpoint_t *ep)
     return 1;
   }
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   PRINTF("Connect - DTLS EP:");
   PRINTEP(ep);
   PRINTF(" len:%d\n", sizeof(ep));
@@ -270,7 +270,7 @@ coap_endpoint_connect(coap_endpoint_t *ep)
 void
 coap_endpoint_disconnect(coap_endpoint_t *ep)
 {
-#if WITH_DTLS
+#ifdef WITH_DTLS
   if(ep && ep->secure && dtls_context) {
     dtls_close(dtls_context, ep);
   }
@@ -293,14 +293,14 @@ void
 coap_transport_init(void)
 {
   process_start(&coap_engine, NULL);
-#if WITH_DTLS
+#ifdef WITH_DTLS
   dtls_init();
   dtls_set_log_level(8);
-#endif
+#endif /* WITH_DTLS */
 
 }
 /*---------------------------------------------------------------------------*/
-#if WITH_DTLS
+#ifdef WITH_DTLS
 static void
 process_secure_data(void)
 {
@@ -336,7 +336,7 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data,
     return;
   }
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   if(coap_endpoint_is_secure(ep)) {
     if(dtls_context) {
       dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, length);
@@ -359,7 +359,7 @@ PROCESS_THREAD(coap_engine, ev, data)
   udp_bind(udp_conn, SERVER_LISTEN_PORT);
   PRINTF("Listening on port %u\n", uip_ntohs(udp_conn->lport));
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   /* create new context with app-data */
   dtls_conn = udp_new(NULL, 0, NULL);
   if(dtls_conn != NULL) {
@@ -379,7 +379,7 @@ PROCESS_THREAD(coap_engine, ev, data)
 
     if(ev == tcpip_event) {
       if(uip_newdata()) {
-#if WITH_DTLS
+#ifdef WITH_DTLS
         if(uip_udp_conn == dtls_conn) {
           process_secure_data();
           continue;
@@ -395,7 +395,7 @@ PROCESS_THREAD(coap_engine, ev, data)
 /*---------------------------------------------------------------------------*/
 
 /* DTLS */
-#if WITH_DTLS
+#ifdef WITH_DTLS
 
 /* This is input coming from the DTLS code - e.g. de-crypted input from
    the other side - peer */

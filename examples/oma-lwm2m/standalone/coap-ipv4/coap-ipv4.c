@@ -54,12 +54,12 @@
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTEP(ep) coap_endpoint_print(ep)
-#else
+#else /* DEBUG */
 #define PRINTF(...)
 #define PRINTEP(ep)
-#endif
+#endif /* DEBUG */
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
 #include "tinydtls.h"
 #include "dtls.h"
 #include "dtls_debug.h"
@@ -78,7 +78,7 @@ static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
 static int dtls_ipv4_fd = -1;
 static dtls_handler_t cb;
 static dtls_context_t *dtls_context = NULL;
@@ -103,7 +103,7 @@ int
 coap_endpoint_is_connected(const coap_endpoint_t *ep)
 {
   if(ep->secure) {
-#if WITH_DTLS
+#ifdef WITH_DTLS
     dtls_peer_t *peer;
     peer = dtls_get_peer(dtls_context, ep);
     if(peer != NULL) {
@@ -130,7 +130,7 @@ coap_endpoint_connect(coap_endpoint_t *ep)
   if(ep->secure == 0) {
     return 1;
   }
-#if WITH_DTLS
+#ifdef WITH_DTLS
   PRINTF("DTLS EP:");
   PRINTEP(ep);
   PRINTF(" len:%d\n", ep->size);
@@ -147,7 +147,7 @@ coap_endpoint_connect(coap_endpoint_t *ep)
 void
 coap_endpoint_disconnect(coap_endpoint_t *ep)
 {
-#if WITH_DTLS
+#ifdef WITH_DTLS
   if(ep && ep->secure && dtls_context) {
     dtls_close(dtls_context, ep);
   }
@@ -330,7 +330,7 @@ dtls_ipv4_set_fd(fd_set *rset, fd_set *wset)
 }
 #endif /* WITH_DTLS */
 /*---------------------------------------------------------------------------*/
-#if WITH_DTLS
+#ifdef WITH_DTLS
 static void
 dtls_ipv4_handle_fd(fd_set *rset, fd_set *wset)
 {
@@ -377,7 +377,7 @@ coap_transport_init(void)
   printf("CoAP server listening on port %u\n", COAP_SERVER_PORT);
   select_set_callback(coap_ipv4_fd, &udp_callback);
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   dtls_init();
   dtls_set_log_level(8);
 
@@ -421,7 +421,7 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     return;
   }
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   if(coap_endpoint_is_secure(ep)) {
     if(dtls_context) {
       dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, len);
@@ -454,7 +454,7 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
 }
 /*---------------------------------------------------------------------------*/
 /* DTLS */
-#if WITH_DTLS
+#ifdef WITH_DTLS
 
 /* This is input coming from the DTLS code - e.g. de-crypted input from
    the other side - peer */

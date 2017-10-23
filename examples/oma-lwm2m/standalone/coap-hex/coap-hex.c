@@ -51,7 +51,7 @@
 #define PRINTEP(ep)
 #endif
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
 #include "tinydtls.h"
 #include "dtls.h"
 #include "dtls_debug.h"
@@ -68,7 +68,7 @@ static coap_endpoint_t last_source;
 static coap_buf_t coap_aligned_buf;
 static uint16_t coap_buf_len;
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
 #define PSK_DEFAULT_IDENTITY "Client_identity"
 #define PSK_DEFAULT_KEY      "secretPSK"
 
@@ -82,7 +82,7 @@ static unsigned char psk_id[PSK_ID_MAXLEN];
 static size_t psk_id_length = 0;
 static unsigned char psk_key[PSK_MAXLEN];
 static size_t psk_key_length = 0;
-#endif
+#endif /* WITH_DTLS */
 
 /*---------------------------------------------------------------------------*/
 static const coap_endpoint_t *
@@ -114,9 +114,9 @@ coap_endpoint_parse(const char *text, size_t size, coap_endpoint_t *ep)
 {
   /* Hex based CoAP has no addresses, just writes data to standard out */
   ep->addr = last_source.addr;
-#if WITH_DTLS
+#ifdef WITH_DTLS
   ep->secure = 1;
-#endif
+#endif /* WITH_DTLS */
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -194,13 +194,13 @@ stdin_callback(const char *line)
     printf("\n");
   }
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   /* DTLS receive??? */
   last_source.secure = 1;
   dtls_handle_message(dtls_context, (coap_endpoint_t *) coap_src_endpoint(), coap_databuf(), coap_datalen());
 #else
   coap_receive(coap_src_endpoint(), coap_databuf(), coap_datalen());
-#endif
+#endif /* WITH_DTLS */
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -210,7 +210,7 @@ coap_transport_init(void)
 
   printf("CoAP listening on standard in\n");
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   /* create new contet with app-data - no real app-data... */
   dtls_context = dtls_new_context(&last_source);
   if (!dtls_context) {
@@ -226,7 +226,7 @@ coap_transport_init(void)
 #endif /* DTLS_PSK */
   PRINTF("Setting DTLS handler\n");
   dtls_set_handler(dtls_context, &cb);
-#endif
+#endif /* WITH_DTLS */
 
 }
 /*---------------------------------------------------------------------------*/
@@ -238,12 +238,12 @@ coap_send_message(const coap_endpoint_t *ep, const uint8_t *data, uint16_t len)
     return;
   }
 
-#if WITH_DTLS
+#ifdef WITH_DTLS
   if(coap_endpoint_is_secure(ep)) {
     dtls_write(dtls_context, (session_t *)ep, (uint8_t *)data, len);
     return;
   }
-#endif
+#endif /* WITH_DTLS */
 
   int i;
   printf("COAPHEX:");
@@ -259,7 +259,7 @@ coap_endpoint_connect(coap_endpoint_t *ep)
   if(ep->secure == 0) {
     return 1;
   }
-#if WITH_DTLS
+#ifdef WITH_DTLS
   PRINTF("DTLS EP:");
   PRINTEP(ep);
   PRINTF(" len:%d\n", ep->size);
@@ -267,14 +267,14 @@ coap_endpoint_connect(coap_endpoint_t *ep)
   /* setup all address info here... should be done to connect */
 
   dtls_connect(dtls_context, ep);
-#endif
+#endif /* WITH_DTLS */
   return 1;
 }
 /*---------------------------------------------------------------------------*/
 void
 coap_endpoint_disconnect(coap_endpoint_t *ep)
 {
-#if WITH_DTLS
+#ifdef WITH_DTLS
   dtls_close(dtls_context, ep);
 #endif /* WITH_DTLS */
 }
@@ -289,7 +289,7 @@ int
 coap_endpoint_is_connected(const coap_endpoint_t *ep)
 {
   if(ep->secure) {
-#if WITH_DTLS
+#ifdef WITH_DTLS
     dtls_peer_t *peer;
     peer = dtls_get_peer(dtls_context, ep);
     if(peer != NULL) {
@@ -311,7 +311,7 @@ coap_endpoint_is_connected(const coap_endpoint_t *ep)
 }
 
 /* DTLS */
-#if WITH_DTLS
+#ifdef WITH_DTLS
 
 /* This is input coming from the DTLS code - e.g. de-crypted input from
    the other side - peer */
