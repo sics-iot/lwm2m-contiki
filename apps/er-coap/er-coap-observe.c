@@ -41,6 +41,7 @@
 #include "er-coap-observe.h"
 #include "er-coap-engine.h"
 #include "lib/memb.h"
+#include "lib/list.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -180,14 +181,14 @@ coap_remove_observer_by_mid(const coap_endpoint_t *endpoint, uint16_t mid)
 /*- Notification ------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 void
-coap_notify_observers(resource_t *resource)
+coap_notify_observers(coap_resource_t *resource)
 {
   coap_notify_observers_sub(resource, NULL);
 }
 /* Can be used either for sub - or when there is not resource - just
    a handler */
 void
-coap_notify_observers_sub(resource_t *resource, const char *subpath)
+coap_notify_observers_sub(coap_resource_t *resource, const char *subpath)
 {
   /* build notification */
   coap_packet_t notification[1]; /* this way the packet can be treated as pointer as usual */
@@ -259,9 +260,9 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
         notification->mid = transaction->mid;
 
         /* Either old style get_handler or the full handler */
-        if(er_coap_call_handlers(request, notification, transaction->packet +
-                                 COAP_MAX_HEADER_SIZE, REST_MAX_CHUNK_SIZE,
-                                 NULL) > 0) {
+        if(coap_call_handlers(request, notification, transaction->packet +
+                              COAP_MAX_HEADER_SIZE, REST_MAX_CHUNK_SIZE,
+                              NULL) > 0) {
           PRINTF("Notification on new handlers\n");
         } else {
           if(resource != NULL) {
@@ -289,7 +290,7 @@ coap_notify_observers_sub(resource_t *resource, const char *subpath)
 }
 /*---------------------------------------------------------------------------*/
 void
-coap_observe_handler(resource_t *resource, coap_packet_t *coap_req,
+coap_observe_handler(coap_resource_t *resource, coap_packet_t *coap_req,
                      coap_packet_t *coap_res)
 {
   const coap_endpoint_t *src_ep;

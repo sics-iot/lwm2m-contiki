@@ -49,6 +49,7 @@
 #include "lwm2m-server.h"
 #include "lwm2m-security.h"
 #include "coap-keystore.h"
+#include "lib/list.h"
 
 #define DEBUG 0
 #if DEBUG

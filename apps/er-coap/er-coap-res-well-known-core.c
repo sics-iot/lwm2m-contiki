@@ -81,7 +81,7 @@ well_known_core_get_handler(coap_packet_t *request, coap_packet_t *response,
   size_t strpos = 0;            /* position in overall string (which is larger than the buffer) */
   size_t bufpos = 0;            /* position within buffer (bytes written) */
   size_t tmplen = 0;
-  resource_t *resource = NULL;
+  coap_resource_t *resource = NULL;
 
 #if COAP_LINK_FORMAT_FILTERING
   /* For filtering. */
@@ -111,8 +111,8 @@ well_known_core_get_handler(coap_packet_t *request, coap_packet_t *response,
   }
 #endif
 
-  for(resource = (resource_t *)list_head(rest_get_resources()); resource;
-      resource = resource->next) {
+  for(resource = coap_get_first_resource(); resource;
+      resource = coap_get_next_resource(resource)) {
 #if COAP_LINK_FORMAT_FILTERING
     /* Filtering */
     if(len) {

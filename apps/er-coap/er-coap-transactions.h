@@ -61,7 +61,7 @@ typedef struct coap_transaction {
 
   coap_endpoint_t endpoint;
 
-  restful_response_handler_t callback;
+  coap_resource_response_handler_t callback;
   void *callback_data;
 
   uint16_t packet_len;

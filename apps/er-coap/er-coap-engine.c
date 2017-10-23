@@ -59,20 +59,20 @@
 static void process_callback(coap_timer_t *t);
 
 /*
- * To be called by HTTP/COAP server as a callback function when a new service request appears.
- * This function dispatches the corresponding RESTful service.
+ * To be called by HTTP/COAP server as a callback function when a new service
+ * request appears.  This function dispatches the corresponding CoAP service.
  */
-static int invoke_restful_service(coap_packet_t *request,
-                                  coap_packet_t *response,
-                                  uint8_t *buffer, uint16_t buffer_size,
-                                  int32_t *offset);
+static int invoke_coap_resource_service(coap_packet_t *request,
+                                        coap_packet_t *response,
+                                        uint8_t *buffer, uint16_t buffer_size,
+                                        int32_t *offset);
 
 /*---------------------------------------------------------------------------*/
 /*- Variables ---------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 LIST(coap_handlers);
-LIST(restful_services);
-LIST(restful_periodic_services);
+LIST(coap_resource_services);
+LIST(coap_resource_periodic_services);
 static uint8_t is_initialized = 0;
 
 /*---------------------------------------------------------------------------*/
@@ -91,7 +91,7 @@ coap_remove_handler(coap_handler_t *handler)
 }
 /*---------------------------------------------------------------------------*/
 coap_handler_status_t
-er_coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
+coap_call_handlers(coap_packet_t *request, coap_packet_t *response,
                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
   coap_handler_status_t status;
@@ -119,11 +119,11 @@ call_service(coap_packet_t *request, coap_packet_t *response,
              uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
 {
   coap_handler_status_t status;
-  status = er_coap_call_handlers(request, response, buffer, buffer_size, offset);
+  status = coap_call_handlers(request, response, buffer, buffer_size, offset);
   if(status != COAP_HANDLER_STATUS_CONTINUE) {
     return status;
   }
-  status = invoke_restful_service(request, response, buffer, buffer_size, offset);
+  status = invoke_coap_resource_service(request, response, buffer, buffer_size, offset);
   if(status != COAP_HANDLER_STATUS_CONTINUE) {
     return status;
   }
@@ -138,7 +138,7 @@ call_service(coap_packet_t *request, coap_packet_t *response,
 /*---------------------------------------------------------------------------*/
 
 /* the discover resource is automatically included for CoAP */
-extern resource_t res_well_known_core;
+extern coap_resource_t res_well_known_core;
 
 /*---------------------------------------------------------------------------*/
 /*- Internal API ------------------------------------------------------------*/
@@ -201,7 +201,7 @@ coap_receive(const coap_endpoint_t *src,
           new_offset = block_offset;
         }
 
-        /* call REST framework and check if found and allowed */
+        /* call CoAP framework and check if found and allowed */
         status = call_service(message, response,
                               transaction->packet + COAP_MAX_HEADER_SIZE,
                               block_size, &new_offset);
@@ -306,7 +306,7 @@ coap_receive(const coap_endpoint_t *src,
 
       if((transaction = coap_get_transaction_by_mid(message->mid))) {
         /* free transaction memory before callback, as it may create a new transaction */
-        restful_response_handler_t callback = transaction->callback;
+        coap_resource_response_handler_t callback = transaction->callback;
         void *callback_data = transaction->callback_data;
 
         coap_clear_transaction(transaction);
@@ -376,10 +376,10 @@ coap_init_engine(void)
   PRINTF("Starting CoAP engine...\n");
 
   list_init(coap_handlers);
-  list_init(restful_services);
-  list_init(restful_periodic_services);
+  list_init(coap_resource_services);
+  list_init(coap_resource_periodic_services);
 
-  rest_activate_resource(&res_well_known_core, ".well-known/core");
+  coap_activate_resource(&res_well_known_core, ".well-known/core");
 
   coap_transport_init();
   coap_init_connection();
@@ -395,11 +395,11 @@ coap_init_engine(void)
  * *.c file in the ./resources/ sub-directory (see example Makefile).
  */
 void
-rest_activate_resource(resource_t *resource, const char *path)
+coap_activate_resource(coap_resource_t *resource, const char *path)
 {
-  periodic_resource_t *periodic;
+  coap_periodic_resource_t *periodic;
   resource->url = path;
-  list_add(restful_services, resource);
+  list_add(coap_resource_services, resource);
 
   PRINTF("Activating: %s\n", resource->url);
 
@@ -409,7 +409,7 @@ rest_activate_resource(resource_t *resource, const char *path)
      && resource->periodic->period) {
     PRINTF("Periodic resource: %p (%s)\n", resource->periodic,
            resource->periodic->resource->url);
-    list_add(restful_periodic_services, resource->periodic);
+    list_add(coap_resource_periodic_services, resource->periodic);
     periodic = resource->periodic;
     coap_timer_set_callback(&periodic->periodic_timer, process_callback);
     coap_timer_set_user_data(&periodic->periodic_timer, resource);
@@ -420,25 +420,32 @@ rest_activate_resource(resource_t *resource, const char *path)
 /*---------------------------------------------------------------------------*/
 /*- Internal API ------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
-list_t
-rest_get_resources(void)
+coap_resource_t *
+coap_get_first_resource(void)
 {
-  return restful_services;
+  return list_head(coap_resource_services);
+}
+/*---------------------------------------------------------------------------*/
+coap_resource_t *
+coap_get_next_resource(coap_resource_t *resource)
+{
+  return list_item_next(resource);
 }
 /*---------------------------------------------------------------------------*/
 static int
-invoke_restful_service(coap_packet_t *request, coap_packet_t *response,
-                       uint8_t *buffer, uint16_t buffer_size, int32_t *offset)
+invoke_coap_resource_service(coap_packet_t *request, coap_packet_t *response,
+                             uint8_t *buffer, uint16_t buffer_size,
+                             int32_t *offset)
 {
   uint8_t found = 0;
   uint8_t allowed = 1;
 
-  resource_t *resource = NULL;
+  coap_resource_t *resource = NULL;
   const char *url = NULL;
   int url_len, res_url_len;
 
   url_len = coap_get_header_uri_path(request, &url);
-  for(resource = (resource_t *)list_head(restful_services);
+  for(resource = list_head(coap_resource_services);
       resource; resource = resource->next) {
 
     /* if the web service handles that kind of requests and urls matches */
@@ -490,7 +497,7 @@ invoke_restful_service(coap_packet_t *request, coap_packet_t *response,
 static void
 process_callback(coap_timer_t *t)
 {
-  resource_t *resource;
+  coap_resource_t *resource;
   resource = coap_timer_get_user_data(t);
   if(resource != NULL && (resource->flags & IS_PERIODIC)
      && resource->periodic != NULL && resource->periodic->period) {
@@ -498,7 +505,7 @@ process_callback(coap_timer_t *t)
            resource->url, resource->periodic->period);
 
     if(!is_initialized) {
-      /* REST has not yet been initialized. */
+      /* CoAP has not yet been initialized. */
     } else if(resource->periodic->periodic_handler) {
       /* Call the periodic_handler function. */
       resource->periodic->periodic_handler();

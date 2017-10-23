@@ -45,14 +45,6 @@
 
 #define COAP_OBSERVER_URL_LEN 20
 
-typedef struct coap_observable {
-  uint32_t observe_clock;
-  coap_timer_t orphan_timer;
-  list_t observers;
-  coap_packet_t notification;
-  uint8_t buffer[COAP_MAX_PACKET_SIZE + 1];
-} coap_observable_t;
-
 typedef struct coap_observer {
   struct coap_observer *next;   /* for LIST */
 
@@ -68,7 +60,6 @@ typedef struct coap_observer {
   uint8_t retrans_counter;
 } coap_observer_t;
 
-list_t coap_get_observers(void);
 void coap_remove_observer(coap_observer_t *o);
 int coap_remove_observer_by_client(const coap_endpoint_t *ep);
 int coap_remove_observer_by_token(const coap_endpoint_t *ep,
@@ -78,10 +69,10 @@ int coap_remove_observer_by_uri(const coap_endpoint_t *ep,
 int coap_remove_observer_by_mid(const coap_endpoint_t *ep,
                                 uint16_t mid);
 
-void coap_notify_observers(resource_t *resource);
-void coap_notify_observers_sub(resource_t *resource, const char *subpath);
+void coap_notify_observers(coap_resource_t *resource);
+void coap_notify_observers_sub(coap_resource_t *resource, const char *subpath);
 
-void coap_observe_handler(resource_t *resource, coap_packet_t *request,
+void coap_observe_handler(coap_resource_t *resource, coap_packet_t *request,
                           coap_packet_t *response);
 
 #endif /* COAP_OBSERVE_H_ */

@@ -59,7 +59,7 @@ typedef struct coap_separate {
   uint16_t block2_size;
 } coap_separate_t;
 
-int coap_separate_handler(resource_t *resource, coap_packet_t *request,
+int coap_separate_handler(coap_resource_t *resource, coap_packet_t *request,
                           coap_packet_t *response);
 void coap_separate_reject(void);
 void coap_separate_accept(coap_packet_t *request,
