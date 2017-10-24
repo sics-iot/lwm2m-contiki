@@ -39,7 +39,15 @@
 #define DTLS_SUPPORT_CONF_H_
 #include "er-coap-endpoint.h"
 
+#include "coap-timer.h"
+
 typedef coap_endpoint_t session_t;
+
+typedef struct {
+  coap_timer_t retransmit_timer;
+} dtls_support_context_state_t;
+
+#define DTLS_SUPPORT_CONF_CONTEXT_STATE dtls_support_context_state_t
 
 #define DTLS_TICKS_PER_SECOND 1000
 
