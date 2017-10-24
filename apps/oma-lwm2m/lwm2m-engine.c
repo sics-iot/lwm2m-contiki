@@ -667,7 +667,8 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
 
   if(ctx->offset == 0) {
     /* First GET request - need to setup all buffers and reset things here */
-    last_instance_id = (instance->object_id << 16) | instance->instance_id;
+    last_instance_id =
+      ((uint32_t)instance->object_id << 16) | instance->instance_id;
     last_rsc_pos = 0;
     /* reset any callback */
     current_opaque_callback = NULL;
@@ -853,7 +854,8 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
     }
     instance = next_object_instance(ctx, object, instance);
     if(instance != NULL) {
-      last_instance_id = (instance->object_id << 16) | instance->instance_id;
+      last_instance_id =
+        ((uint32_t)instance->object_id << 16) | instance->instance_id;
     } else {
       last_instance_id = NO_INSTANCE;
     }
