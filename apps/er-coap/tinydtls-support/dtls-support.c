@@ -49,7 +49,7 @@ static dtls_cipher_context_t cipher_context;
 static uint8_t lock_context = 0;
 /*---------------------------------------------------------------------------*/
 dtls_context_t *
-malloc_context(void)
+dtls_context_acquire(void)
 {
   if(lock_context) {
     return NULL;
@@ -60,7 +60,7 @@ malloc_context(void)
 }
 /*---------------------------------------------------------------------------*/
 void
-free_context(dtls_context_t *context)
+dtls_context_release(dtls_context_t *context)
 {
   if(context == &the_dtls_context) {
     lock_context = 0;
