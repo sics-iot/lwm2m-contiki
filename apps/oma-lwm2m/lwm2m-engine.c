@@ -741,7 +741,7 @@ perform_multi_resource_read_op(lwm2m_object_t *object,
             }
             /* ---------- Read operation ------------- */
           } else if(ctx->operation == LWM2M_OP_READ) {
-            lwm2m_status_t success;
+            lwm2m_status_t success = LWM2M_STATUS_OK;
             uint8_t lv;
 
             lv = ctx->level;
@@ -1628,12 +1628,35 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   return COAP_HANDLER_STATUS_PROCESSED;
 }
 /*---------------------------------------------------------------------------*/
-void lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
-                                   uint16_t resource)
+void
+lwm2m_notify_instance_observers(uint16_t object_id, uint16_t instance_id)
+{
+  char path[20]; /* 60000/60000 */
+  snprintf(path, sizeof(path) - 1, "%u/%u", object_id, instance_id);
+  path[sizeof(path) - 1] = '\0';
+  coap_notify_observers_sub(NULL, path);
+}
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_notify_resource_observers(uint16_t object_id, uint16_t instance_id,
+                                uint16_t resource_id)
+{
+  char path[20]; /* 60000/60000/60000 */
+  snprintf(path, sizeof(path) - 1, "%u/%u/%u",
+           object_id, instance_id, resource_id);
+  path[sizeof(path) - 1] = '\0';
+  coap_notify_observers_sub(NULL, path);
+}
+/*---------------------------------------------------------------------------*/
+void
+lwm2m_notify_object_observers(lwm2m_object_instance_t *obj,
+                              uint16_t resource)
 {
   char path[20]; /* 60000/60000/60000 */
   if(obj != NULL) {
-    snprintf(path, 20, "%d/%d/%d", obj->object_id, obj->instance_id, resource);
+    snprintf(path, sizeof(path) - 1, "%d/%d/%d",
+             obj->object_id, obj->instance_id, resource);
+    path[sizeof(path) - 1] = '\0';
     coap_notify_observers_sub(NULL, path);
   }
 }

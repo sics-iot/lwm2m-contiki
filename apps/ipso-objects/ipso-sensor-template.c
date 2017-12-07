@@ -44,7 +44,6 @@
 #include "ipso-sensor-template.h"
 #include "lwm2m-engine.h"
 #include <string.h>
-#include <stdio.h>
 
 #define IPSO_SENSOR_VALUE     5700
 #define IPSO_SENSOR_UNIT      5701
@@ -76,7 +75,7 @@ struct periodic_sensor {
   ipso_sensor_value_t *value;
   uint16_t ticks_left;
 } periodics[MAX_PERIODIC];
-
+/*---------------------------------------------------------------------------*/
 static void
 timer_callback(ntimer_t *timer)
 {
@@ -97,8 +96,8 @@ timer_callback(ntimer_t *timer)
     }
   }
 }
-
-static void
+/*---------------------------------------------------------------------------*/
+static int
 add_periodic(const ipso_sensor_t *sensor)
 {
   int i;
@@ -106,7 +105,20 @@ add_periodic(const ipso_sensor_t *sensor)
     if(periodics[i].value == NULL) {
       periodics[i].value = sensor->sensor_value;
       periodics[i].ticks_left = sensor->update_interval;
-      return;
+      return 1;
+    }
+  }
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static void
+remove_periodic(const ipso_sensor_t *sensor)
+{
+  int i;
+  for(i = 0; i < MAX_PERIODIC; i++) {
+    if(periodics[i].value == sensor->sensor_value) {
+      periodics[i].value = NULL;
+      break;
     }
   }
 }
@@ -203,16 +215,7 @@ lwm2m_callback(lwm2m_object_instance_t *object,
 int
 ipso_sensor_add(const ipso_sensor_t *sensor)
 {
-  if(sensor->update_interval > 0) {
-    if(init == 0) {
-      ntimer_set_callback(&nt, timer_callback);
-      ntimer_set(&nt, 1000);
-      init = 1;
-    }
-    add_periodic(sensor);
-  }
-
-  if(sensor->sensor_value == NULL) {
+  if(sensor == NULL || sensor->sensor_value == NULL) {
     return 0;
   }
   sensor->sensor_value->reg_object.object_id = sensor->object_id;
@@ -226,13 +229,30 @@ ipso_sensor_add(const ipso_sensor_t *sensor)
   sensor->sensor_value->reg_object.resource_ids = resources;
   sensor->sensor_value->reg_object.resource_count =
     sizeof(resources) / sizeof(lwm2m_resource_id_t);
-  return lwm2m_engine_add_object(&sensor->sensor_value->reg_object);
+
+  if(lwm2m_engine_add_object(&sensor->sensor_value->reg_object)) {
+    if(sensor->update_interval > 0) {
+      if(init == 0) {
+        ntimer_set_callback(&nt, timer_callback);
+        ntimer_set(&nt, 1000);
+        init = 1;
+      }
+      add_periodic(sensor);
+    }
+    return 1;
+  }
+
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 int
 ipso_sensor_remove(const ipso_sensor_t *sensor)
 {
+  if(sensor == NULL || sensor->sensor_value == NULL) {
+    return 0;
+  }
   lwm2m_engine_remove_object(&sensor->sensor_value->reg_object);
+  remove_periodic(sensor);
   return 1;
 }
 /*---------------------------------------------------------------------------*/
