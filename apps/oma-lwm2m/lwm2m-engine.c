@@ -96,6 +96,7 @@
 #define RSC_ID(x)       ((uint16_t)(x & 0xffff))
 #define RSC_READABLE(x) ((x & LWM2M_RESOURCE_READ) > 0)
 #define RSC_WRITABLE(x) ((x & LWM2M_RESOURCE_WRITE) > 0)
+#define RSC_UNSPECIFIED(x) ((x & LWM2M_RESOURCE_OP_MASK) == 0)
 
 /* invalid instance ID - ffff object ID */
 #define NO_INSTANCE 0xffffffff
@@ -128,6 +129,13 @@ static coap_handler_status_t lwm2m_handler_callback(coap_packet_t *request,
 static lwm2m_object_instance_t *
 next_object_instance(const lwm2m_context_t *context, lwm2m_object_t *object, lwm2m_object_instance_t *last);
 
+struct {
+  uint16_t object_id;
+  uint16_t instance_id;
+  uint16_t token_len;
+  uint8_t token[8]; /* max 8 bytes in COAP? */
+  /* in the future also a timeout */
+} created;
 
 COAP_HANDLER(lwm2m_handler, lwm2m_handler_callback);
 LIST(object_list);
@@ -905,7 +913,7 @@ create_instance(lwm2m_context_t *context, lwm2m_object_t *object)
   /* NOTE: context->object_instance_id needs to be set before calling */
   instance = object->impl->create_instance(context->object_instance_id, NULL);
   if(instance != NULL) {
-    PRINTF("Created instance: %u/%u\n", context->object_id, context->object_instance_id);
+    PRINTF("Created instance: %u/%u t_len:%u t1:%u\n", context->object_id, context->object_instance_id, context->request->token_len, context->request->token[0]);
     REST.set_response_status(context->response, CREATED_2_01);
 #if USE_RD_CLIENT
     lwm2m_rd_client_set_update_rd();
@@ -921,7 +929,7 @@ create_instance(lwm2m_context_t *context, lwm2m_object_t *object)
 
 static lwm2m_object_instance_t *
 get_or_create_instance(lwm2m_context_t *ctx, lwm2m_object_t *object,
-                       uint8_t *created)
+                       uint16_t *c)
 {
   lwm2m_object_instance_t *instance;
 
@@ -929,34 +937,57 @@ get_or_create_instance(lwm2m_context_t *ctx, lwm2m_object_t *object,
   PRINTF("Instance: %u/%u/%u = %p\n", ctx->object_id,
          ctx->object_instance_id, ctx->resource_id, instance);
   /* by default we assume that the instance is not created... so we set flag to zero */
-  if(created != NULL) {
-    *created = 0;
+  if(c != NULL) {
+    *c = LWM2M_OBJECT_INSTANCE_NONE; /* NO instance created yet */
   }
   if(instance == NULL) {
     instance = create_instance(ctx, object);
     if(instance != NULL) {
       /* set created flag to one */
-      if(created != NULL) {
-        *created = 1;
+      if(c != NULL) {
+        *c = instance->instance_id;
+        created.instance_id = instance->instance_id;
+        created.object_id = instance->object_id;
+        created.token_len = created.token_len;
+        memcpy(&created.token, ctx->request->token, created.token_len);
       }
     }
   }
   return instance;
 }
+
 /*---------------------------------------------------------------------------*/
 static int
-check_write(lwm2m_object_instance_t *instance, int rid)
+check_write(lwm2m_context_t *ctx, lwm2m_object_instance_t *instance, int rid)
 {
   int i;
   if(instance->resource_ids != NULL && instance->resource_count > 0) {
     int count = instance->resource_count;
     for(i = 0; i < count; i++) {
-      if(RSC_ID(instance->resource_ids[i]) == rid &&
-         RSC_WRITABLE(instance->resource_ids[i])) {
-        /* yes - writable */
-        return 1;
+      if(RSC_ID(instance->resource_ids[i]) == rid) {
+        if(RSC_WRITABLE(instance->resource_ids[i])) {
+          /* yes - writable */
+          return 1;
+        }
+        if(RSC_UNSPECIFIED(instance->resource_ids[i]) &&
+           created.instance_id == instance->instance_id &&
+           created.object_id == instance->object_id &&
+           memcmp(&created.token, ctx->request->token,
+                  created.token_len) == 0) {
+          /* yes - writeable at create - never otherwise - sec / srv */
+          return 1;
+        }
+        break;
       }
     }
+  }
+  /* Resource did not exist... - Ignore to avoid problems. */
+  if(created.instance_id == instance->instance_id &&
+     created.object_id == instance->object_id &&
+     memcmp(&created.token, ctx->request->token,
+            created.token_len) == 0) {
+    PRINTF("Ignoring resource: %d\n", rid);
+    return 1;
   }
   return 0;
 }
@@ -966,7 +997,7 @@ process_tlv_write(lwm2m_context_t *ctx, lwm2m_object_t *object,
                   int rid, uint8_t *data, int len)
 {
   lwm2m_object_instance_t *instance;
-  uint8_t created = 0;
+  uint16_t created = LWM2M_OBJECT_INSTANCE_NONE;
   ctx->inbuf->buffer = data;
   ctx->inbuf->pos = 0;
   ctx->inbuf->size = len;
@@ -976,7 +1007,7 @@ process_tlv_write(lwm2m_context_t *ctx, lwm2m_object_t *object,
          ctx->object_instance_id, ctx->resource_id);
   instance = get_or_create_instance(ctx, object, &created);
   if(instance != NULL && instance->callback != NULL) {
-    if(created || check_write(instance, rid)) {
+    if(check_write(ctx, instance, rid)) {
       return instance->callback(instance, ctx);
     } else {
       return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
@@ -1010,7 +1041,7 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
 
     while(lwm2m_json_next_token(ctx, &json)) {
       int i;
-      uint8_t created = 0;
+      uint16_t created = LWM2M_OBJECT_INSTANCE_NONE;
       PRINTF("JSON: '");
       for(i = 0; i < json.name_len; i++) PRINTF("%c", json.name[i]);
       PRINTF("':'");
@@ -1047,7 +1078,7 @@ perform_multi_resource_write_op(lwm2m_object_t *object,
 
       if(mode == MODE_READY) {
         /* allow write if just created - otherwise not */
-        if(!created && !check_write(instance, ctx->resource_id)) {
+        if(!check_write(ctx, instance, ctx->resource_id)) {
           return LWM2M_STATUS_OPERATION_NOT_ALLOWED;
         }
         if(instance->callback(instance, ctx) != LWM2M_STATUS_OK) {
@@ -1421,17 +1452,17 @@ lwm2m_handler_callback(coap_packet_t *request, coap_packet_t *response,
   }
 
   instance = get_instance_by_context(&context, &object);
-  if(instance == NULL
-     && object != NULL
-     && REST.get_method_type(request) == METHOD_PUT
-     && context.level == 2) {
-    /* ALLOW generic instance if CREATE / WRITE*/
-    instance = create_instance(&context, object);
-    if(instance == NULL) {
-      PRINTF("lwm2m-engine: failed to create instance %u/%u\n",
-             context.object_id, context.object_instance_id);
-    }
-  }
+  /* if(instance == NULL */
+  /*    && object != NULL */
+  /*    && REST.get_method_type(request) == METHOD_PUT */
+  /*    && context.level == 2) { */
+  /*   /\* ALLOW generic instance if CREATE / WRITE*\/ */
+  /*   instance = create_instance(&context, object); */
+  /*   if(instance == NULL) { */
+  /*     PRINTF("lwm2m-engine: failed to create instance %u/%u\n", */
+  /*            context.object_id, context.object_instance_id); */
+  /*   } */
+  /* } */
 
   /*
    * Check if we found either instance or object. Instance means we found an
